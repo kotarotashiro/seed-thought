@@ -1,0 +1,132 @@
+// SeedThought - Prisma Schema
+// DB: PostgreSQL for production and ongoing development
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Post {
+  id              String   @id @default(cuid())
+  source          String   // "x" | "manual"
+  sourcePostId    String?
+  sourceUrl       String?
+  savedType       String   // "like" | "bookmark" | "manual"
+  authorName      String?
+  authorUsername   String?
+  authorAvatarUrl String?
+  text            String
+  postedAt        DateTime?
+  savedAt         DateTime @default(now())
+  rawJson         String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  classification  PostClassification?
+  deepDiveSessions DeepDiveSession[]
+
+  @@unique([sourcePostId, savedType])
+}
+
+model PostClassification {
+  id                    String   @id @default(cuid())
+  postId                String   @unique
+  postType              String   // "thought" | "learning" | "output_material" | "unknown"
+  primaryCategory       String
+  tagsJson              String   // JSON array of strings
+  summary               String
+  recommendReason       String
+  difficultyLevel       String   // "beginner" | "intermediate" | "advanced" | "unknown"
+  outputPotentialScore  Int      @default(0)
+  learningPotentialScore Int     @default(0)
+  thinkingPotentialScore Int     @default(0)
+  recommendedMode       String   // "thought_lens" | "learning_lesson" | "unknown"
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+}
+
+model DeepDiveSession {
+  id            String    @id @default(cuid())
+  postId        String
+  mode          String    // "thought_lens" | "learning_lesson"
+  status        String    @default("in_progress") // "in_progress" | "completed" | "archived"
+  currentStep   Int       @default(0)
+  finalSummary  String?
+  userFinalNote String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  completedAt   DateTime?
+
+  post  Post             @relation(fields: [postId], references: [id], onDelete: Cascade)
+  steps DeepDiveStep[]
+  outputs GeneratedOutput[]
+}
+
+model DeepDiveStep {
+  id            String   @id @default(cuid())
+  sessionId     String
+  stepIndex     Int
+  stepKey       String
+  title         String
+  question      String
+  aiContentJson String   // JSON object
+  userNote      String?
+  completed     Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  session DeepDiveSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, stepIndex])
+}
+
+model GeneratedOutput {
+  id          String   @id @default(cuid())
+  sessionId   String
+  outputType  String   // "x" | "instagram" | "note" | "markdown_log"
+  title       String
+  content     String
+  contentJson String?  // JSON object
+  status      String   @default("draft") // "draft" | "copied" | "exported"
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  session DeepDiveSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+}
+
+model XAccount {
+  id                    String    @id @default(cuid())
+  xUserId               String    @unique
+  username              String
+  displayName           String?
+  accessTokenEncrypted  String
+  refreshTokenEncrypted String?
+  tokenExpiresAt        DateTime?
+  scopesJson            String    // JSON array
+  connectedAt           DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  syncRuns XSyncRun[]
+}
+
+model XSyncRun {
+  id                   String    @id @default(cuid())
+  xAccountId           String
+  syncType             String    // "likes" | "bookmarks" | "both"
+  status               String    @default("running") // "running" | "success" | "failed"
+  requestedLimit       Int
+  fetchedCount         Int       @default(0)
+  insertedCount        Int       @default(0)
+  skippedDuplicateCount Int      @default(0)
+  errorMessage         String?
+  startedAt            DateTime  @default(now())
+  finishedAt           DateTime?
+
+  xAccount XAccount @relation(fields: [xAccountId], references: [id], onDelete: Cascade)
+}

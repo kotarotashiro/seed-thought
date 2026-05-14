@@ -1,65 +1,135 @@
-import Image from "next/image";
+"use client";
 
-export default function Home() {
+import { useEffect, useState } from "react";
+import { PostCard } from "@/components/posts/PostCard";
+import { RecommendationModeSelect } from "@/components/posts/RecommendationModeSelect";
+import { Sprout } from "lucide-react";
+
+export default function HomePage() {
+  const [mode, setMode] = useState("latest");
+  const [genre, setGenre] = useState("");
+  const [genres, setGenres] = useState<string[]>([]);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [posts, setPosts] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const loadRecommendations = async (showLoading = true) => {
+    if (showLoading) setLoading(true);
+    try {
+      const params = new URLSearchParams({ mode });
+      if (mode === "genre" && genre) params.set("genre", genre);
+
+      const res = await fetch(`/api/recommendations?${params}`);
+      const data = await res.json();
+      setPosts(data.posts || []);
+      setGenres(data.genres || []);
+    } catch (error) {
+      console.error("Failed to fetch recommendations:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function fetchInitialRecommendations() {
+      try {
+        const params = new URLSearchParams({ mode });
+        if (mode === "genre" && genre) params.set("genre", genre);
+
+        const res = await fetch(`/api/recommendations?${params}`);
+        const data = await res.json();
+        if (cancelled) return;
+        setPosts(data.posts || []);
+        setGenres(data.genres || []);
+      } catch (error) {
+        console.error("Failed to fetch recommendations:", error);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+
+    fetchInitialRecommendations();
+    return () => {
+      cancelled = true;
+    };
+  }, [mode, genre]);
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
+    <div className="space-y-8">
+      {/* Header */}
+      <div>
+        <div className="flex items-center gap-3 mb-2">
+          <div className="w-10 h-10 rounded-xl bg-accent-light flex items-center justify-center">
+            <Sprout className="w-5 h-5 text-accent" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold text-text">今日の深掘り候補</h1>
+          </div>
+        </div>
+        <p className="text-sm text-text-secondary mt-2 ml-[52px]">
+          保存した投稿の中から、今日深掘りするのにおすすめの3件を選びました。
+        </p>
+      </div>
+
+      {/* Mode Select */}
+      <RecommendationModeSelect
+        mode={mode}
+        genres={genres}
+        selectedGenre={genre}
+        onModeChange={setMode}
+        onGenreChange={setGenre}
+        onRefresh={() => loadRecommendations()}
+        loading={loading}
+      />
+
+      {/* Cards */}
+      {loading ? (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {[1, 2, 3].map((i) => (
+            <div
+              key={i}
+              className="bg-white rounded-2xl border border-border p-6 animate-pulse"
             >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-full bg-border-light" />
+                <div className="space-y-2 flex-1">
+                  <div className="h-3 bg-border-light rounded w-24" />
+                  <div className="h-2 bg-border-light rounded w-32" />
+                </div>
+              </div>
+              <div className="space-y-2 mb-4">
+                <div className="h-3 bg-border-light rounded" />
+                <div className="h-3 bg-border-light rounded w-3/4" />
+              </div>
+              <div className="h-9 bg-border-light rounded-xl" />
+            </div>
+          ))}
+        </div>
+      ) : posts.length === 0 ? (
+        <div className="text-center py-16">
+          <div className="w-16 h-16 rounded-2xl bg-accent-light flex items-center justify-center mx-auto mb-4">
+            <Sprout className="w-8 h-8 text-accent" />
+          </div>
+          <h3 className="text-lg font-semibold text-text mb-2">
+            まだ投稿がありません
+          </h3>
+          <p className="text-sm text-text-secondary">
+            「投稿を追加」から手動で追加するか、X連携で投稿を取り込みましょう。
           </p>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {posts.map((post) => (
+            <PostCard
+              key={post.id}
+              post={post}
+              showRecommendReason
             />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+          ))}
         </div>
-      </main>
+      )}
     </div>
   );
 }

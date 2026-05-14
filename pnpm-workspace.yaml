@@ -1,3 +1,10 @@
 ignoredBuiltDependencies:
   - sharp
   - unrs-resolver
+onlyBuiltDependencies:
+  - '@google/genai'
+  - '@prisma/engines'
+  - better-sqlite3
+  - esbuild
+  - prisma
+  - protobufjs
