@@ -4,7 +4,7 @@ import { openaiProvider } from "./openaiProvider";
 import { geminiProvider } from "./geminiProvider";
 
 export function getAiProvider(): AiProvider {
-  const provider = process.env.AI_PROVIDER || "mock";
+  const provider = process.env.AI_PROVIDER || "gemini";
 
   switch (provider) {
     case "openai":

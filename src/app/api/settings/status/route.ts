@@ -2,6 +2,6 @@ import { NextResponse } from "next/server";
 
 export async function GET() {
   return NextResponse.json({
-    aiProvider: process.env.AI_PROVIDER || "mock",
+    aiProvider: process.env.AI_PROVIDER || "gemini",
   });
 }
