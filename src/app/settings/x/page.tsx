@@ -14,11 +14,38 @@ import {
   Unplug,
 } from "lucide-react";
 
+function parseAccountScopes(account: { scopesJson?: string | null } | null | undefined): string[] {
+  if (!account?.scopesJson) return [];
+  try {
+    const scopes = JSON.parse(account.scopesJson);
+    return Array.isArray(scopes) ? scopes.map(String) : [];
+  } catch {
+    return [];
+  }
+}
+
+function getMissingSyncScopes(syncType: string, scopes: string[]): string[] {
+  const required = new Set<string>();
+  if (syncType === "likes" || syncType === "both") required.add("like.read");
+  if (syncType === "bookmarks" || syncType === "both") required.add("bookmark.read");
+  return [...required].filter((scope) => !scopes.includes(scope));
+}
+
+function toSyncErrorMessage(message: string): string {
+  if (message.includes("403") || message.toLowerCase().includes("forbidden")) {
+    return "X API権限が不足しています。いいね同期には like.read、ブックマーク同期には bookmark.read が必要です。X Developer PortalとVercelの X_SCOPES を更新後、接続解除して再接続してください。";
+  }
+  return message;
+}
+
 export default function XSettingsPage() {
   const [xStatus, setXStatus] = useState<{
     connected: boolean;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    account: any;
+    account: {
+      username: string;
+      displayName?: string | null;
+      scopesJson?: string | null;
+    } | null;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     syncRuns: any[];
     config?: {
@@ -39,6 +66,8 @@ export default function XSettingsPage() {
     return new URLSearchParams(window.location.search).get("error");
   });
   const [loading, setLoading] = useState(true);
+  const accountScopes = parseAccountScopes(xStatus?.account);
+  const missingSyncScopes = getMissingSyncScopes(syncType, accountScopes);
 
   const loadStatus = async (showLoading = false) => {
     if (showLoading) setLoading(true);
@@ -120,7 +149,11 @@ export default function XSettingsPage() {
       const data = await res.json();
 
       if (data.error) {
-        setError(data.error);
+        setError(toSyncErrorMessage(data.error));
+      } else if (data.results?.errorMessage) {
+        setError(toSyncErrorMessage(data.results.errorMessage));
+        setSyncResult(null);
+        loadStatus();
       } else {
         setSyncResult(data.results);
         loadStatus(); // Refresh sync history
@@ -173,7 +206,7 @@ export default function XSettingsPage() {
       {/* Connection Status */}
       <Card>
         <h3 className="text-base font-bold text-text mb-4">接続状態</h3>
-        {xStatus?.connected ? (
+        {xStatus?.connected && xStatus.account ? (
           <div className="space-y-4">
             <div className="flex items-center gap-3">
               <CheckCircle className="w-5 h-5 text-success" />
@@ -234,6 +267,19 @@ export default function XSettingsPage() {
         <Card>
           <h3 className="text-base font-bold text-text mb-4">同期設定</h3>
           <div className="space-y-4">
+            {missingSyncScopes.length > 0 && (
+              <div className="rounded-xl border border-warning/20 bg-warning-light px-4 py-3">
+                <p className="text-sm font-medium text-warning">同期権限が不足しています</p>
+                <p className="mt-1 text-sm text-text-secondary">
+                  現在のX接続には {missingSyncScopes.join(" / ")} が含まれていません。
+                  X Developer PortalとVercelの X_SCOPES に必要な権限を追加し、
+                  接続解除後に再接続してください。
+                </p>
+                <p className="mt-2 text-xs text-text-muted break-all">
+                  現在の接続スコープ: {accountScopes.join(" ") || "取得できません"}
+                </p>
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-4">
               <Select
                 label="同期対象"
@@ -260,7 +306,7 @@ export default function XSettingsPage() {
 
             <Button
               onClick={handleSync}
-              disabled={syncing}
+              disabled={syncing || missingSyncScopes.length > 0}
               className="w-full"
             >
               <RefreshCw className={`w-4 h-4 mr-2 ${syncing ? "animate-spin" : ""}`} />
@@ -352,7 +398,7 @@ export default function XSettingsPage() {
                       : "実行中"}
                   </Badge>
                   {run.errorMessage && (
-                    <p className="text-xs text-danger mt-1">{run.errorMessage}</p>
+                    <p className="text-xs text-danger mt-1">{toSyncErrorMessage(run.errorMessage)}</p>
                   )}
                 </div>
               </div>

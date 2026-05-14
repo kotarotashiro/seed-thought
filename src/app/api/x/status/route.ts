@@ -12,6 +12,7 @@ export async function GET() {
         displayName: true,
         connectedAt: true,
         tokenExpiresAt: true,
+        scopesJson: true,
       },
     });
 

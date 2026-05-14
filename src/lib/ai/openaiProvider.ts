@@ -33,19 +33,19 @@ async function callOpenAI(prompt: string): Promise<string> {
 
 export const openaiProvider: AiProvider = {
   async classifyPost(input: ClassifyPostInput): Promise<PostClassificationResult> {
-    const prompt = buildClassifyPrompt(input);
+    const prompt = await buildClassifyPrompt(input);
     const result = await callOpenAI(prompt);
     return JSON.parse(result) as PostClassificationResult;
   },
 
   async generateDeepDiveSession(input: GenerateDeepDiveSessionInput): Promise<GeneratedDeepDiveSessionResult> {
-    const prompt = buildDeepDivePrompt(input);
+    const prompt = await buildDeepDivePrompt(input);
     const result = await callOpenAI(prompt);
     return JSON.parse(result) as GeneratedDeepDiveSessionResult;
   },
 
   async generateOutput(input: GenerateOutputInput): Promise<GeneratedOutputResult> {
-    const prompt = buildOutputPrompt(input);
+    const prompt = await buildOutputPrompt(input);
     const result = await callOpenAI(prompt);
     return JSON.parse(result) as GeneratedOutputResult;
   },

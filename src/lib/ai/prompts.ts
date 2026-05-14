@@ -1,17 +1,18 @@
-import { fixedProfile } from "@/lib/profile/fixedProfile";
+import { getProfile } from "@/lib/profile/fixedProfile";
 import type { ClassifyPostInput, GenerateDeepDiveSessionInput, GenerateOutputInput } from "./types";
 
-export function buildClassifyPrompt(input: ClassifyPostInput): string {
+export async function buildClassifyPrompt(input: ClassifyPostInput): Promise<string> {
+  const profile = await getProfile();
   return `あなたはSNS投稿の分類エキスパートです。
 
 以下の投稿を分析し、JSON形式で返してください。
 
 ## ユーザープロフィール
-名前: ${fixedProfile.name}
-役割: ${fixedProfile.role}
-テーマ: ${fixedProfile.themes.join("、")}
-出力チャンネル: ${fixedProfile.outputChannels.join("、")}
-トーン: ${fixedProfile.tone}
+名前: ${profile.name}
+役割: ${profile.role}
+テーマ: ${profile.themes.join("、")}
+出力チャンネル: ${profile.outputChannels.join("、")}
+トーン: ${profile.tone}
 
 ## 投稿本文
 ${input.text}
@@ -44,7 +45,8 @@ ${input.authorUsername ? `アカウント: @${input.authorUsername}` : ""}
 JSONのみ返してください。説明文は不要です。`;
 }
 
-export function buildDeepDivePrompt(input: GenerateDeepDiveSessionInput): string {
+export async function buildDeepDivePrompt(input: GenerateDeepDiveSessionInput): Promise<string> {
+  const profile = await getProfile();
   const modeSteps = input.mode === "thought_lens"
     ? [
         { key: "surface_claim", title: "表面的な主張" },
@@ -69,10 +71,10 @@ export function buildDeepDivePrompt(input: GenerateDeepDiveSessionInput): string
   return `あなたは深掘り学習のファシリテーターです。
 
 ## ユーザープロフィール
-名前: ${fixedProfile.name}
-役割: ${fixedProfile.role}
-テーマ: ${fixedProfile.themes.join("、")}
-トーン: ${fixedProfile.tone}
+名前: ${profile.name}
+役割: ${profile.role}
+テーマ: ${profile.themes.join("、")}
+トーン: ${profile.tone}
 
 ## 元投稿
 ${input.postText}
@@ -111,7 +113,8 @@ ${stepsDescription}
 JSONのみ返してください。`;
 }
 
-export function buildOutputPrompt(input: GenerateOutputInput): string {
+export async function buildOutputPrompt(input: GenerateOutputInput): Promise<string> {
+  const profile = await getProfile();
   const stepsContext = input.steps
     .map((s, i) => `### ステップ${i + 1}: ${s.title}\n問い: ${s.question}\nAI解説: ${s.aiContent}\nユーザーメモ: ${s.userNote || "なし"}`)
     .join("\n\n");
@@ -130,11 +133,11 @@ export function buildOutputPrompt(input: GenerateOutputInput): string {
 - ユーザーの理解メモと考えを中心に、自分の言葉として使えるアウトプットを生成してください
 
 ## ユーザープロフィール
-名前: ${fixedProfile.name}
-役割: ${fixedProfile.role}
-テーマ: ${fixedProfile.themes.join("、")}
-出力チャンネル: ${fixedProfile.outputChannels.join("、")}
-トーン: ${fixedProfile.tone}
+名前: ${profile.name}
+役割: ${profile.role}
+テーマ: ${profile.themes.join("、")}
+出力チャンネル: ${profile.outputChannels.join("、")}
+トーン: ${profile.tone}
 
 ## 元投稿（参考のみ、転載禁止）
 ${input.postText}

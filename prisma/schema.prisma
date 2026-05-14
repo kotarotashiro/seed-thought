@@ -130,3 +130,10 @@ model XSyncRun {
 
   xAccount XAccount @relation(fields: [xAccountId], references: [id], onDelete: Cascade)
 }
+
+model AppSetting {
+  key       String   @id
+  valueJson String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}

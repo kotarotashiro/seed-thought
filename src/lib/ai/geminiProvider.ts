@@ -40,19 +40,19 @@ async function callGemini(prompt: string): Promise<string> {
 
 export const geminiProvider: AiProvider = {
   async classifyPost(input: ClassifyPostInput): Promise<PostClassificationResult> {
-    const prompt = buildClassifyPrompt(input);
+    const prompt = await buildClassifyPrompt(input);
     const result = await callGemini(prompt);
     return parseAiJson(result, isPostClassificationResult, "投稿分類");
   },
 
   async generateDeepDiveSession(input: GenerateDeepDiveSessionInput): Promise<GeneratedDeepDiveSessionResult> {
-    const prompt = buildDeepDivePrompt(input);
+    const prompt = await buildDeepDivePrompt(input);
     const result = await callGemini(prompt);
     return parseAiJson(result, isGeneratedDeepDiveSessionResult, "深掘りセッション");
   },
 
   async generateOutput(input: GenerateOutputInput): Promise<GeneratedOutputResult> {
-    const prompt = buildOutputPrompt(input);
+    const prompt = await buildOutputPrompt(input);
     const result = await callGemini(prompt);
     return parseAiJson(result, isGeneratedOutputResult, "アウトプット生成");
   },
