@@ -22,6 +22,7 @@ interface PostListItem {
     postType: string;
     primaryCategory: string;
   } | null;
+  threadPosts?: { id: string }[];
   deepDiveSessions?: { id: string; status: string }[];
 }
 
@@ -253,6 +254,11 @@ export default function PostsPage() {
                           <Badge variant="success">深掘り済み</Badge>
                         ) : (
                           <Badge variant="warning">未消化</Badge>
+                        )}
+                        {(post.threadPosts?.length ?? 0) > 0 && (
+                          <Badge variant="success">
+                            ツリー {(post.threadPosts?.length ?? 0) + 1}投稿
+                          </Badge>
                         )}
                       </div>
 

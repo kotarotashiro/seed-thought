@@ -11,7 +11,7 @@ export async function GET(
     const session = await prisma.deepDiveSession.findUnique({
       where: { id: sessionId },
       include: {
-        post: { include: { classification: true } },
+        post: { include: { classification: true, threadPosts: { orderBy: { threadOrder: "asc" } } } },
         steps: { orderBy: { stepIndex: "asc" } },
         outputs: { orderBy: { createdAt: "desc" } },
       },
@@ -56,7 +56,7 @@ export async function PUT(
       where: { id: sessionId },
       data: updateData,
       include: {
-        post: { include: { classification: true } },
+        post: { include: { classification: true, threadPosts: { orderBy: { threadOrder: "asc" } } } },
         steps: { orderBy: { stepIndex: "asc" } },
       },
     });

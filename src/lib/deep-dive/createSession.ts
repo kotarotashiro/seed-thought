@@ -2,6 +2,7 @@ import { prisma } from "@/lib/db/prisma";
 import { getAiProvider } from "@/lib/ai/provider";
 import type { PostClassificationResult } from "@/lib/ai/types";
 import { createFallbackDeepDiveSession } from "@/lib/ai/fallback";
+import { buildPostTextWithThread } from "@/lib/posts/threadText";
 
 export async function createDeepDiveSession(
   postId: string,
@@ -10,7 +11,10 @@ export async function createDeepDiveSession(
   // Get the post and its classification
   const post = await prisma.post.findUnique({
     where: { id: postId },
-    include: { classification: true },
+    include: {
+      classification: true,
+      threadPosts: { orderBy: { threadOrder: "asc" } },
+    },
   });
 
   if (!post) throw new Error("投稿が見つかりません");
@@ -43,17 +47,18 @@ export async function createDeepDiveSession(
 
   // Generate all steps via AI at session creation (batch generation)
   const provider = getAiProvider();
+  const postText = buildPostTextWithThread(post);
   const result = await provider
     .generateDeepDiveSession({
       mode,
-      postText: post.text,
+      postText,
       classification,
     })
     .catch((error) => {
       console.error("Deep-dive generation failed, using fallback:", error);
       return createFallbackDeepDiveSession({
         mode,
-        postText: post.text,
+        postText,
         classification,
       });
     });
@@ -78,7 +83,7 @@ export async function createDeepDiveSession(
     },
     include: {
       steps: { orderBy: { stepIndex: "asc" } },
-      post: { include: { classification: true } },
+      post: { include: { classification: true, threadPosts: { orderBy: { threadOrder: "asc" } } } },
     },
   });
 

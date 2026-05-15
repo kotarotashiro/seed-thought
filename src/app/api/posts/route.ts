@@ -53,6 +53,7 @@ export async function GET(request: Request) {
       where,
       include: {
         classification: true,
+        threadPosts: { select: { id: true } },
         deepDiveSessions: { select: { id: true, status: true } },
       },
       orderBy: [

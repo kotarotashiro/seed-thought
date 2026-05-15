@@ -16,7 +16,7 @@ export async function selectRecommendations(
         where: savedTypeWhere,
         orderBy: { savedAt: "desc" },
         take: count,
-        include: { classification: true, deepDiveSessions: true },
+        include: { classification: true, deepDiveSessions: true, threadPosts: true },
       });
       return posts;
     }
@@ -25,7 +25,7 @@ export async function selectRecommendations(
       // SQLite doesn't have RANDOM() in Prisma, so fetch all and shuffle
       const allPosts = await prisma.post.findMany({
         where: savedTypeWhere,
-        include: { classification: true, deepDiveSessions: true },
+        include: { classification: true, deepDiveSessions: true, threadPosts: true },
       });
       return shuffleAndTake(allPosts, count);
     }
@@ -35,7 +35,7 @@ export async function selectRecommendations(
         // Fallback to random
         const allPosts = await prisma.post.findMany({
           where: savedTypeWhere,
-          include: { classification: true, deepDiveSessions: true },
+          include: { classification: true, deepDiveSessions: true, threadPosts: true },
         });
         return shuffleAndTake(allPosts, count);
       }
@@ -46,7 +46,7 @@ export async function selectRecommendations(
             primaryCategory: genre,
           },
         },
-        include: { classification: true, deepDiveSessions: true },
+        include: { classification: true, deepDiveSessions: true, threadPosts: true },
       });
       return shuffleAndTake(genrePosts, count);
     }
@@ -59,7 +59,7 @@ export async function selectRecommendations(
             none: {},
           },
         },
-        include: { classification: true, deepDiveSessions: true },
+        include: { classification: true, deepDiveSessions: true, threadPosts: true },
         take: count,
         orderBy: { savedAt: "desc" },
       });

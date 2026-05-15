@@ -28,6 +28,12 @@ export function getUserFacingError(error: unknown, fallback: string): string {
   if (error.message.includes("DATABASE_URL")) {
     return "DATABASE_URL が設定されていません。Postgres の接続文字列を .env またはVercel環境変数に設定してください。";
   }
+  if (error.message.includes("X API error: 403")) {
+    return "X APIの権限またはプラン制限により取得できませんでした。X Developer Portalの権限、X_SCOPES、APIプランを確認してから再接続してください。";
+  }
+  if (error.message.includes("X API error: 429")) {
+    return "X APIのレート制限に達しました。少し時間を置いてから再実行してください。";
+  }
   if (
     error.message.includes("RESOURCE_EXHAUSTED") ||
     error.message.includes("code\":429") ||

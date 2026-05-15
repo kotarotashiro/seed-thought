@@ -28,8 +28,30 @@ model Post {
 
   classification  PostClassification?
   deepDiveSessions DeepDiveSession[]
+  threadPosts      ThreadPost[]
 
   @@unique([sourcePostId, savedType])
+}
+
+model ThreadPost {
+  id              String    @id @default(cuid())
+  postId          String
+  sourcePostId    String
+  sourceUrl       String?
+  authorName      String?
+  authorUsername  String?
+  authorAvatarUrl String?
+  text            String
+  postedAt        DateTime?
+  threadOrder     Int
+  rawJson         String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, sourcePostId])
+  @@index([postId, threadOrder])
 }
 
 model PostClassification {

@@ -6,7 +6,18 @@ import Link from "next/link";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { PostTypeBadge, Badge } from "@/components/ui/Badge";
-import { ArrowLeft, ArrowRight, Lightbulb, BookOpen, Zap, Brain, User } from "lucide-react";
+import {
+  AlertCircle,
+  ArrowLeft,
+  ArrowRight,
+  Brain,
+  BookOpen,
+  GitBranch,
+  Lightbulb,
+  RefreshCw,
+  User,
+  Zap,
+} from "lucide-react";
 
 export default function ConfirmPage({ params }: { params: Promise<{ postId: string }> }) {
   const { postId } = use(params);
@@ -14,21 +25,67 @@ export default function ConfirmPage({ params }: { params: Promise<{ postId: stri
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [post, setPost] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [fetchingThread, setFetchingThread] = useState(false);
+  const [threadMessage, setThreadMessage] = useState<string | null>(null);
+  const [threadError, setThreadError] = useState<string | null>(null);
+
+  const loadPost = async () => {
+    try {
+      const res = await fetch(`/api/posts/${postId}`);
+      const data = await res.json();
+      setPost(data);
+    } catch (error) {
+      console.error("Failed to fetch post:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    async function fetchPost() {
+    let cancelled = false;
+
+    async function fetchInitialPost() {
       try {
         const res = await fetch(`/api/posts/${postId}`);
         const data = await res.json();
-        setPost(data);
+        if (!cancelled) setPost(data);
       } catch (error) {
         console.error("Failed to fetch post:", error);
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     }
-    fetchPost();
+
+    fetchInitialPost();
+    return () => {
+      cancelled = true;
+    };
   }, [postId]);
+
+  const handleFetchThread = async () => {
+    setFetchingThread(true);
+    setThreadMessage(null);
+    setThreadError(null);
+
+    try {
+      const res = await fetch(`/api/posts/${postId}/thread`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok || data.error) {
+        setThreadError(data.error || "ツリーの取得に失敗しました");
+        return;
+      }
+      setThreadMessage(
+        data.fetchedCount > 0
+          ? `ツリーを${data.fetchedCount}件取得しました。`
+          : "続きの投稿は見つかりませんでした。"
+      );
+      await loadPost();
+    } catch {
+      setThreadError("ツリーの取得に失敗しました");
+    } finally {
+      setFetchingThread(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -54,6 +111,8 @@ export default function ConfirmPage({ params }: { params: Promise<{ postId: stri
     { icon: ArrowRight, label: "発信への転用", description: "自分の発信ネタとして活用できます" },
     { icon: Brain, label: "自分の考えの整理", description: "自分の視点や意見を言語化できます" },
   ];
+  const threadPosts = post.threadPosts || [];
+  const canFetchThread = post.source === "x" && post.sourcePostId;
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
@@ -98,7 +157,59 @@ export default function ConfirmPage({ params }: { params: Promise<{ postId: stri
             <Badge>{post.classification.primaryCategory}</Badge>
           </div>
         )}
+        {canFetchThread && (
+          <div className="mt-4 border-t border-border-light pt-4">
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={handleFetchThread}
+                disabled={fetchingThread}
+              >
+                {fetchingThread ? (
+                  <RefreshCw className="w-4 h-4 mr-1 animate-spin" />
+                ) : (
+                  <GitBranch className="w-4 h-4 mr-1" />
+                )}
+                {threadPosts.length > 0 ? "ツリーを再取得" : "ツリーを追加"}
+              </Button>
+              {threadPosts.length > 0 && (
+                <Badge variant="success">ツリー {threadPosts.length + 1}投稿</Badge>
+              )}
+            </div>
+            {threadMessage && (
+              <p className="mt-2 text-xs text-success">{threadMessage}</p>
+            )}
+            {threadError && (
+              <div className="mt-3 flex items-start gap-2 rounded-xl border border-danger/20 bg-danger-light px-3 py-2">
+                <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0 text-danger" />
+                <p className="text-xs text-danger">{threadError}</p>
+              </div>
+            )}
+          </div>
+        )}
       </Card>
+
+      {threadPosts.length > 0 && (
+        <Card>
+          <div className="mb-4 flex items-center gap-2">
+            <GitBranch className="h-5 w-5 text-accent" />
+            <h3 className="text-base font-bold text-text">取得済みツリー</h3>
+          </div>
+          <div className="space-y-4">
+            {threadPosts.map((threadPost: { id: string; text: string; threadOrder: number }) => (
+              <div key={threadPost.id} className="rounded-xl bg-border-light px-4 py-3">
+                <p className="mb-1 text-xs font-medium text-text-muted">
+                  {threadPost.threadOrder + 1}投稿目
+                </p>
+                <p className="whitespace-pre-wrap text-sm leading-relaxed text-text">
+                  {threadPost.text}
+                </p>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
 
       {/* AI Summary */}
       {post.classification && (

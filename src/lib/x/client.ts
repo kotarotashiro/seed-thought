@@ -7,6 +7,7 @@ interface TweetData {
   text: string;
   created_at?: string;
   author_id?: string;
+  conversation_id?: string;
 }
 
 interface UserData {
@@ -31,13 +32,14 @@ export interface XTweetWithAuthor {
   id: string;
   text: string;
   createdAt: string | null;
+  conversationId?: string | null;
   authorName: string | null;
   authorUsername: string | null;
   authorAvatarUrl: string | null;
   sourceUrl: string;
 }
 
-const TWEET_FIELDS = "created_at,author_id,text";
+const TWEET_FIELDS = "created_at,author_id,text,conversation_id";
 const USER_FIELDS = "name,username,profile_image_url";
 const EXPANSIONS = "author_id";
 
@@ -79,11 +81,50 @@ function mapTweetsWithAuthors(response: XApiResponse): XTweetWithAuthor[] {
       id: tweet.id,
       text: tweet.text,
       createdAt: tweet.created_at || null,
+      conversationId: tweet.conversation_id || null,
       authorName: author?.name || null,
       authorUsername: author?.username || null,
       authorAvatarUrl: author?.profile_image_url || null,
       sourceUrl: `https://x.com/${author?.username || "i"}/status/${tweet.id}`,
     };
+  });
+}
+
+export async function fetchTweetById(
+  tweetId: string,
+  accessToken: string
+): Promise<XTweetWithAuthor | null> {
+  const response = await fetchFromX(`/tweets/${tweetId}`, accessToken, {
+    "tweet.fields": TWEET_FIELDS,
+    "user.fields": USER_FIELDS,
+    expansions: EXPANSIONS,
+  });
+
+  return mapTweetsWithAuthors({
+    data: response.data ? [response.data as unknown as TweetData] : [],
+    includes: response.includes,
+    meta: response.meta,
+  })[0] || null;
+}
+
+export async function fetchConversationTweets(
+  conversationId: string,
+  authorUsername: string,
+  accessToken: string,
+  maxResults: number = 50
+): Promise<XTweetWithAuthor[]> {
+  const response = await fetchFromX("/tweets/search/recent", accessToken, {
+    query: `conversation_id:${conversationId} from:${authorUsername} -is:retweet`,
+    max_results: String(Math.min(Math.max(maxResults, 10), 100)),
+    "tweet.fields": TWEET_FIELDS,
+    "user.fields": USER_FIELDS,
+    expansions: EXPANSIONS,
+  });
+
+  return mapTweetsWithAuthors(response).sort((a, b) => {
+    const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+    const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+    return aTime - bTime;
   });
 }
 

@@ -17,6 +17,7 @@ export async function GET(
       where: { id: postId },
       include: {
         classification: true,
+        threadPosts: { orderBy: { threadOrder: "asc" } },
         deepDiveSessions: {
           include: { steps: true },
           orderBy: { createdAt: "desc" },
@@ -75,6 +76,7 @@ export async function GET(
         where: { id: postId },
         include: {
           classification: true,
+          threadPosts: { orderBy: { threadOrder: "asc" } },
           deepDiveSessions: {
             include: { steps: true },
             orderBy: { createdAt: "desc" },

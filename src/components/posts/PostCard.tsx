@@ -13,6 +13,7 @@ interface PostCardProps {
     authorAvatarUrl?: string | null;
     savedAt: Date | string;
     savedType?: string;
+    threadPosts?: { id: string }[];
     classification?: {
       postType: string;
       primaryCategory: string;
@@ -66,6 +67,9 @@ export function PostCard({ post, showRecommendReason = false }: PostCardProps) {
           <PostTypeBadge type={post.classification.postType} />
           <Badge>{post.classification.primaryCategory}</Badge>
           {post.savedType && <SavedTypeBadge type={post.savedType} />}
+          {(post.threadPosts?.length ?? 0) > 0 && (
+            <Badge variant="success">ツリー {(post.threadPosts?.length ?? 0) + 1}投稿</Badge>
+          )}
         </div>
       )}
 

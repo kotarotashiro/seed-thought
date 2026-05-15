@@ -4,6 +4,7 @@ import { getAiProvider } from "@/lib/ai/provider";
 import { getUserFacingError } from "@/lib/api/errors";
 import type { PostClassificationResult } from "@/lib/ai/types";
 import { createFallbackOutput } from "@/lib/ai/fallback";
+import { buildPostTextWithThread } from "@/lib/posts/threadText";
 
 // POST /api/deep-dive/sessions/[sessionId]/outputs - Generate output
 export async function POST(
@@ -26,7 +27,7 @@ export async function POST(
     const session = await prisma.deepDiveSession.findUnique({
       where: { id: sessionId },
       include: {
-        post: { include: { classification: true } },
+        post: { include: { classification: true, threadPosts: { orderBy: { threadOrder: "asc" } } } },
         steps: { orderBy: { stepIndex: "asc" } },
       },
     });
@@ -66,10 +67,11 @@ export async function POST(
 
     const provider = getAiProvider();
     let warning: string | null = null;
+    const postText = buildPostTextWithThread(session.post);
     const result = await provider
       .generateOutput({
         outputType,
-        postText: session.post.text,
+        postText,
         classification,
         steps: session.steps.map((s) => ({
           title: s.title,
@@ -84,7 +86,7 @@ export async function POST(
         warning = getUserFacingError(error, "AI生成に失敗したため、下書きを作成しました");
         return createFallbackOutput({
           outputType,
-          postText: session.post.text,
+          postText,
           classification,
           userFinalNote: session.userFinalNote,
           finalSummary: session.finalSummary,
