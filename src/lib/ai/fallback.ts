@@ -56,6 +56,18 @@ function inferCategory(text: string): string {
 
 function buildSummary(text: string): string {
   const compact = compactText(text);
+  if (compact.includes("ツルハシ")) {
+    return "市場では、道具を売る側、使う側、その支援側の順に利益機会が生まれるという構造を説明している投稿です。";
+  }
+  if (/Codex|Claude Code|ChatGPT|Gemini|Cursor/i.test(compact)) {
+    return "AI開発ツールやエージェント活用の新機能・使い方を紹介し、実務でどう活かせるかのヒントを示している投稿です。";
+  }
+  if (/LINE|Instagram|SNS|X|note|投稿|発信/i.test(compact)) {
+    return "SNSや導線設計の成果につながる考え方や実践ポイントを、自分の発信に応用できる形で示している投稿です。";
+  }
+  if (/Canva|Photoshop|画像|動画|スライド|資料/i.test(compact)) {
+    return "制作物の見せ方や作業効率を高めるための具体的な工夫を、クリエイティブ実務向けに紹介している投稿です。";
+  }
   const firstSentence = compact.split(/[。！？!?]/)[0] || compact;
   if (firstSentence.length <= 70) {
     return `${firstSentence}、という視点を提示している投稿です。`;
