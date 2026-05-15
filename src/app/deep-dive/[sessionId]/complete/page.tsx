@@ -71,6 +71,9 @@ export default function CompletePage({ params }: { params: Promise<{ sessionId: 
 
       const output = await res.json();
       setGeneratedOutput(output);
+      if (output.warning) {
+        setError(`${output.warning} 代わりに下書きを表示しています。`);
+      }
       setSession((prev: { outputs?: GeneratedOutputView[] } | null) =>
         prev
           ? {

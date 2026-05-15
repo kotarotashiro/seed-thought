@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db/prisma";
 import { getAiProvider } from "@/lib/ai/provider";
 import { getUserFacingError } from "@/lib/api/errors";
 import type { PostClassificationResult } from "@/lib/ai/types";
+import { createFallbackOutput } from "@/lib/ai/fallback";
 
 // POST /api/deep-dive/sessions/[sessionId]/outputs - Generate output
 export async function POST(
@@ -64,19 +65,31 @@ export async function POST(
         };
 
     const provider = getAiProvider();
-    const result = await provider.generateOutput({
-      outputType,
-      postText: session.post.text,
-      classification,
-      steps: session.steps.map((s) => ({
-        title: s.title,
-        question: s.question,
-        aiContent: s.aiContentJson,
-        userNote: s.userNote,
-      })),
-      userFinalNote: session.userFinalNote,
-      finalSummary: session.finalSummary,
-    });
+    let warning: string | null = null;
+    const result = await provider
+      .generateOutput({
+        outputType,
+        postText: session.post.text,
+        classification,
+        steps: session.steps.map((s) => ({
+          title: s.title,
+          question: s.question,
+          aiContent: s.aiContentJson,
+          userNote: s.userNote,
+        })),
+        userFinalNote: session.userFinalNote,
+        finalSummary: session.finalSummary,
+      })
+      .catch((error) => {
+        warning = getUserFacingError(error, "AI生成に失敗したため、下書きを作成しました");
+        return createFallbackOutput({
+          outputType,
+          postText: session.post.text,
+          classification,
+          userFinalNote: session.userFinalNote,
+          finalSummary: session.finalSummary,
+        });
+      });
 
     // Save the output
     const output = await prisma.generatedOutput.create({
@@ -93,6 +106,7 @@ export async function POST(
     return NextResponse.json({
       ...output,
       contentJson: result.contentJson || null,
+      warning,
     }, { status: 201 });
   } catch (error) {
     console.error("Failed to generate output:", error);

@@ -19,6 +19,14 @@ export function getUserFacingError(error: unknown, fallback: string): string {
   if (error.message.includes("DATABASE_URL")) {
     return "DATABASE_URL が設定されていません。Postgres の接続文字列を .env またはVercel環境変数に設定してください。";
   }
+  if (
+    error.message.includes("RESOURCE_EXHAUSTED") ||
+    error.message.includes("code\":429") ||
+    error.message.includes("Quota exceeded") ||
+    error.message.includes("rate-limit")
+  ) {
+    return "Gemini APIの利用上限に達しました。少し時間を置いて再実行するか、Google AI Studio側で課金/上限設定を確認してください。";
+  }
 
   return error.message || fallback;
 }

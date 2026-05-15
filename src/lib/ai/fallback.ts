@@ -1,6 +1,7 @@
 import type {
   DeepDiveStepContent,
   GeneratedDeepDiveSessionResult,
+  GeneratedOutputResult,
   PostClassificationResult,
 } from "./types";
 
@@ -73,6 +74,90 @@ function buildSummary(text: string): string {
     return `${firstSentence}、という視点を提示している投稿です。`;
   }
   return `${trimJapanese(firstSentence, 72)}について、要点や考え方を共有している投稿です。`;
+}
+
+function inferLearningTopic(text: string): {
+  topic: string;
+  basics: string;
+  mechanism: string;
+  practicalSteps: string[];
+  examples: string[];
+} {
+  const compact = compactText(text);
+
+  if (/\/goal|goal|Claude Code/i.test(compact)) {
+    return {
+      topic: "Claude Codeの /goal によるゴール駆動の開発進行",
+      basics:
+        "/goal は、作業の完了条件を先に言語化して、AIに進捗判断をさせながら作業を進める考え方です。単に「続けて」と頼むのではなく、何が終わったら完了かを明確にすることで、AIの自走を安定させます。",
+      mechanism:
+        "AIは毎回、現在の作業がゴールに近づいているか、まだ足りない点は何かを判定します。これにより、実装、検証、修正のループが目的から外れにくくなります。",
+      practicalSteps: [
+        "最初に「完成条件」を1行で書く",
+        "作業途中でAIに達成状況を判定させる",
+        "未達の理由をもとに次のタスクへ進ませる",
+      ],
+      examples: [
+        "例: 「保存一覧で投稿日順ソートができ、ビルドが通る状態まで完了」",
+        "例: 「X同期でいいねのみを取得し、重複時はスキップ数が表示される状態まで完了」",
+      ],
+    };
+  }
+
+  if (/Codex|ChatGPT|Gemini|Cursor|v0/i.test(compact)) {
+    return {
+      topic: "AI開発ツールを実務に取り入れる方法",
+      basics:
+        "AI開発ツールは、コードを書く道具というより、設計、実装、検証、修正を一緒に進める作業パートナーです。重要なのは、依頼内容を小さく分け、完成条件を明確にすることです。",
+      mechanism:
+        "AIは文脈と指示から次の作業を推定します。完成条件、制約、確認方法が具体的なほど、出力のブレが減り、実務で使える成果物になりやすくなります。",
+      practicalSteps: [
+        "やりたいことを1つの画面・1つの機能に絞る",
+        "完成条件と確認方法を先に書く",
+        "生成後に必ず実画面とテストで確認する",
+      ],
+      examples: [
+        "保存一覧をカードUIにする場合、表示項目、ボタン、ソート条件を先に決める",
+        "AI要約を直す場合、良い要約と悪い要約の例を与える",
+      ],
+    };
+  }
+
+  if (/ツルハシ/.test(compact)) {
+    return {
+      topic: "市場で利益が生まれる順番を見る考え方",
+      basics:
+        "この投稿の中心は、流行そのものよりも、その流行を支える道具・支援・応用の市場を見るという視点です。誰が最初に利益を得るか、次に誰が成果を出すかを分けて考えます。",
+      mechanism:
+        "新しい市場では、まず道具を売る側が利益を得やすく、その後、道具を使って成果を出す側、さらにその人たちを支援する側へ機会が広がります。ただし、使う側が成果を出せない市場は長続きしません。",
+      practicalSteps: [
+        "市場の参加者を「売る側」「使う側」「支援する側」に分ける",
+        "自分がどの立場で価値を出せるか考える",
+        "読者にとって再現できる形に言い換える",
+      ],
+      examples: [
+        "AI市場なら、ツール提供者、AIを使う事業者、導入支援者に分けて見る",
+        "SNS運用なら、教材販売者、実践者、添削や運用支援者に分けて見る",
+      ],
+    };
+  }
+
+  return {
+    topic: buildSummary(text),
+    basics:
+      "この投稿を学習素材にするには、まず主張、背景、使える場面を分けて読むことが大切です。投稿文の表現ではなく、そこにある考え方を取り出します。",
+    mechanism:
+      "投稿の中には、原因、方法、結果の関係があります。その関係を見つけると、別のテーマや自分の仕事にも応用しやすくなります。",
+    practicalSteps: [
+      "投稿の結論を一文で抜き出す",
+      "なぜそう言えるのかを整理する",
+      "自分の発信や仕事に置き換える",
+    ],
+    examples: [
+      "投稿の考え方を、自分の読者が抱える悩みに変換する",
+      "具体的な行動手順やチェックリストに変える",
+    ],
+  };
 }
 
 function buildRecommendReason(type: PostClassificationResult["postType"], category: string): string {
@@ -183,6 +268,7 @@ export function createFallbackDeepDiveSession(input: {
 }): GeneratedDeepDiveSessionResult {
   const summary = input.classification.summary || buildSummary(input.postText);
   const category = input.classification.primaryCategory;
+  const lesson = inferLearningTopic(input.postText);
 
   const steps =
     input.mode === "thought_lens"
@@ -253,40 +339,40 @@ export function createFallbackDeepDiveSession(input: {
             0,
             "what_to_learn",
             "この投稿から学べること",
-            "この投稿から、何を学ぶと実務に使えそうですか？",
-            `この投稿は${category}の学習素材として使えます。まず、知識として覚える部分と、実際に試す部分を分けて整理します。`,
-            ["学ぶ対象を決める", "実務への使い道を見る", "後で試せる形にする"],
-            ["投稿の考え方を自分の発信テーマに置き換える", "手順や構造をチェックリスト化する"],
-            "学びたいことを一つ選んでください。"
+            `この投稿では「${lesson.topic}」を学べます。どこを理解したいですか？`,
+            `この投稿は、${lesson.topic}を学ぶ入口になります。単に投稿の感想を書くのではなく、何が新しいのか、どんな場面で使えるのか、どこに注意点があるのかを分けて理解していきます。`,
+            ["投稿の中心テーマをつかむ", "使える場面を考える", "注意点もセットで見る"],
+            lesson.examples,
+            "まず、この投稿から学びたいことを一つ選んでください。"
           ),
           step(
             1,
             "basics",
             "基礎知識",
             "理解するために必要な基礎知識は何ですか？",
-            "基礎を押さえると、投稿の表面的な情報だけでなく、なぜそれが有効なのかまで理解できます。",
-            ["用語を確認する", "背景を押さえる", "前提条件を見る"],
-            ["対象者、目的、成果指標を分ける", "ツール名と使い方を切り分ける"],
-            "知らない言葉や前提を書き出してください。"
+            lesson.basics,
+            ["用語を確認する", "投稿の背景を押さえる", "何が便利になるのかを見る"],
+            lesson.examples,
+            "まだ曖昧な言葉や前提を書き出してください。"
           ),
           step(
             2,
             "mechanism",
             "仕組み",
             "なぜこの方法や考え方が機能するのですか？",
-            "仕組みを理解すると、別のテーマにも応用できます。投稿の中の因果関係を、入力、処理、結果に分けて見ます。",
-            ["原因と結果を分ける", "再現条件を見る", "応用できる形にする"],
-            ["情報を整理することで判断が早くなる", "導線を減らすことで迷いが減る"],
-            "なぜうまくいくのかを一文で書いてください。"
+            lesson.mechanism,
+            ["入力と結果を分ける", "AIや仕組みが判断している部分を見る", "人間が決めるべき部分を残す"],
+            lesson.examples,
+            "なぜこの考え方が役に立つのかを一文で書いてください。"
           ),
           step(
             3,
             "practical_steps",
             "実践手順",
             "自分が試すなら、最初の3ステップは何ですか？",
-            "実践に移すには、小さく試せる手順へ落とします。完璧な計画より、今日できる一歩にするのが大事です。",
-            ["最小手順にする", "必要な材料を確認する", "完了条件を決める"],
-            ["投稿テーマを一つ選ぶ", "自分の読者向けに言い換える", "短い投稿案にする"],
+            "学んだ内容を使うには、最初から大きく変えず、小さく試せる手順にします。投稿内の考え方を、自分の作業や発信に当てはめます。",
+            lesson.practicalSteps,
+            lesson.examples,
             "今日試せる最初の一歩を書いてください。"
           ),
           step(
@@ -294,9 +380,9 @@ export function createFallbackDeepDiveSession(input: {
             "examples",
             "具体例",
             "自分のテーマなら、どんな具体例になりますか？",
-            "具体例にすると、自分の理解の穴が見えます。読者や顧客に説明するつもりで、身近な例に置き換えます。",
+            `具体例にすると理解が定着します。${lesson.topic}を、あなたのテーマや読者の悩みに置き換えて説明してみます。`,
             ["読者に近い例にする", "一つの場面に絞る", "成果が見える形にする"],
-            ["AI活用なら、作業時間が減る場面で説明する", "LINE導線なら、予約までの流れで説明する"],
+            lesson.examples,
             "自分の読者向けの例を書いてください。"
           ),
           step(
@@ -322,4 +408,48 @@ export function createFallbackDeepDiveSession(input: {
         ];
 
   return { steps };
+}
+
+export function createFallbackOutput(input: {
+  outputType: "x" | "instagram" | "note" | "markdown_log";
+  postText: string;
+  classification: PostClassificationResult;
+  finalSummary?: string | null;
+  userFinalNote?: string | null;
+}): GeneratedOutputResult {
+  const summary = input.finalSummary || input.classification.summary || buildSummary(input.postText);
+  const note = input.userFinalNote ? `\n\n自分のメモ: ${input.userFinalNote}` : "";
+
+  if (input.outputType === "x") {
+    return {
+      title: "X投稿下書き",
+      content: `${summary}\n\n保存した投稿から学べるのは、情報そのものより「どう自分の仕事に置き換えるか」。一度、自分のテーマで使える形に言い換えてみる。${note ? "\n\n#AI活用 #学び" : "\n\n#AI活用 #学び"}`,
+    };
+  }
+
+  if (input.outputType === "instagram") {
+    return {
+      title: "Instagramカルーセル下書き",
+      content: "カルーセル構成の下書きです。",
+      contentJson: {
+        slides: [
+          { slideNumber: 1, heading: "保存した投稿から学ぶ", body: summary, note: "導入" },
+          { slideNumber: 2, heading: "ポイント", body: input.classification.recommendReason, note: "学びの核" },
+          { slideNumber: 3, heading: "自分に置き換える", body: input.userFinalNote || "自分の仕事や発信テーマに当てはめる", note: "実践" },
+        ],
+      },
+    };
+  }
+
+  if (input.outputType === "note") {
+    return {
+      title: "保存した投稿からの学び",
+      content: `# 保存した投稿からの学び\n\n${summary}\n\n## なぜ気になったか\n${input.classification.recommendReason}\n\n## 自分の仕事に置き換えるなら\n${input.userFinalNote || "この視点を自分の発信テーマや導線設計に置き換えて考える。"}${note}`,
+    };
+  }
+
+  return {
+    title: "Markdown学習ログ",
+    content: `# 学習ログ\n\n## 投稿の要点\n${summary}\n\n## 学びのポイント\n- ${input.classification.recommendReason}\n- 自分のテーマに置き換える\n- 次の発信や実務に使える形にする\n\n## 自分のメモ\n${input.userFinalNote || "未記入"}`,
+  };
 }
