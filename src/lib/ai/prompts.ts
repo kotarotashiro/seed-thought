@@ -1,5 +1,5 @@
 import { getProfile } from "@/lib/profile/fixedProfile";
-import type { ClassifyPostInput, GenerateDeepDiveSessionInput, GenerateOutputInput } from "./types";
+import type { ClassifyPostInput, GenerateDeepDiveSessionInput, GenerateOutputInput, TranslateTextInput } from "./types";
 
 export async function buildClassifyPrompt(input: ClassifyPostInput): Promise<string> {
   const profile = await getProfile();
@@ -45,6 +45,24 @@ ${input.authorUsername ? `アカウント: @${input.authorUsername}` : ""}
 JSONのみ返してください。説明文は不要です。`;
 }
 
+export function buildTranslatePrompt(input: TranslateTextInput): string {
+  return `以下のSNS投稿を、日本語で自然に読める文章に翻訳してください。
+
+## ルール
+- 意味を補いすぎず、投稿者のニュアンスを保つ
+- URLやメンションは必要なら残す
+- 解説ではなく翻訳だけを書く
+- JSONのみ返す
+
+## 投稿
+${input.text}
+
+## 出力形式
+{
+  "translatedText": "日本語訳"
+}`;
+}
+
 export async function buildDeepDivePrompt(input: GenerateDeepDiveSessionInput): Promise<string> {
   const profile = await getProfile();
   const modeSteps = input.mode === "thought_lens"
@@ -68,7 +86,7 @@ export async function buildDeepDivePrompt(input: GenerateDeepDiveSessionInput): 
 
   const stepsDescription = modeSteps.map((s, i) => `${i + 1}. ${s.key}: ${s.title}`).join("\n");
 
-  return `あなたは深掘り学習のファシリテーターです。
+  return `あなたはSeedThoughtの専属学習コーチです。
 
 ## ユーザープロフィール
 名前: ${profile.name}
@@ -84,7 +102,15 @@ ${input.postText}
 カテゴリ: ${input.classification.primaryCategory}
 要約: ${input.classification.summary}
 
-## モード: ${input.mode === "thought_lens" ? "思考レンズ" : "学習レッスン"}
+## モード: ${input.mode === "thought_lens" ? "思考レンズ" : "厳密学習レッスン"}
+
+## 重要方針
+${input.mode === "learning_lesson" ? `- あなたは塾の先生、ユーザーは生徒です。
+- ユーザーに考えさせる前に、元投稿を教材として「何を学ぶべきか」「背景知識」「仕組み」「具体例」「実務での使い方」をあなたが具体的に教えてください。
+- 各ステップのexplanationは、投稿本文の内容に必ず触れ、抽象論だけで終わらせないでください。
+- questionは宿題ではなく、理解確認の短い問いにしてください。
+- keyPointsとexamplesは、投稿固有の内容に合わせてください。` : `- 投稿の主張、前提、本質、反論、自分への応用を順に分解してください。
+- 投稿固有の言葉や文脈を使い、汎用的な自己啓発文にしないでください。`}
 
 ## ステップ
 ${stepsDescription}
@@ -99,7 +125,7 @@ ${stepsDescription}
       "title": "ステップタイトル",
       "question": "ユーザーへの問いかけ（80文字程度）",
       "aiContent": {
-        "explanation": "AIの解説（200-400文字）",
+        "explanation": "${input.mode === "learning_lesson" ? "先生としての解説（500-900文字。投稿固有の内容、背景、具体例を含める）" : "AIの解説（250-500文字。投稿固有の内容に触れる）"}",
         "keyPoints": ["ポイント1", "ポイント2", "ポイント3"],
         "examples": ["具体例1", "具体例2"],
         "promptForUser": "ユーザーが考えるためのヒント（50文字程度）"

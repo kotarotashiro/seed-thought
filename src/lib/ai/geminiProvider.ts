@@ -7,13 +7,15 @@ import type {
   GeneratedDeepDiveSessionResult,
   GenerateOutputInput,
   GeneratedOutputResult,
+  TranslateTextInput,
 } from "./types";
-import { buildClassifyPrompt, buildDeepDivePrompt, buildOutputPrompt } from "./prompts";
+import { buildClassifyPrompt, buildDeepDivePrompt, buildOutputPrompt, buildTranslatePrompt } from "./prompts";
 import { parseAiJson } from "./json";
 import {
   isGeneratedDeepDiveSessionResult,
   isGeneratedOutputResult,
   isPostClassificationResult,
+  isTranslatedTextResult,
 } from "./validation";
 import { mergeClassificationFallback } from "./fallback";
 
@@ -45,6 +47,12 @@ export const geminiProvider: AiProvider = {
     const result = await callGemini(prompt);
     const classification = parseAiJson(result, isPostClassificationResult, "投稿分類");
     return mergeClassificationFallback(input.text, classification);
+  },
+
+  async translateText(input: TranslateTextInput): Promise<string> {
+    const prompt = buildTranslatePrompt(input);
+    const result = await callGemini(prompt);
+    return parseAiJson(result, isTranslatedTextResult, "日本語翻訳").translatedText;
   },
 
   async generateDeepDiveSession(input: GenerateDeepDiveSessionInput): Promise<GeneratedDeepDiveSessionResult> {

@@ -20,6 +20,8 @@ model Post {
   authorUsername   String?
   authorAvatarUrl String?
   text            String
+  translatedText  String?
+  mediaJson       String?
   postedAt        DateTime?
   savedAt         DateTime @default(now())
   rawJson         String?
@@ -42,6 +44,8 @@ model ThreadPost {
   authorUsername  String?
   authorAvatarUrl String?
   text            String
+  translatedText  String?
+  mediaJson       String?
   postedAt        DateTime?
   threadOrder     Int
   rawJson         String?

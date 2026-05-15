@@ -1,5 +1,5 @@
 import { Card } from "@/components/ui/Card";
-import { Lightbulb } from "lucide-react";
+import { GraduationCap } from "lucide-react";
 
 interface AiContentCardProps {
   content: {
@@ -15,16 +15,16 @@ export function AiContentCard({ content }: AiContentCardProps) {
     <Card className="bg-accent-subtle border-accent/10">
       <div className="flex items-start gap-3">
         <div className="w-8 h-8 rounded-lg bg-accent/10 flex items-center justify-center flex-shrink-0 mt-0.5">
-          <Lightbulb className="w-4 h-4 text-accent" />
+          <GraduationCap className="w-4 h-4 text-accent" />
         </div>
         <div className="flex-1 space-y-3">
-          <p className="text-sm text-text leading-relaxed">
+          <p className="text-sm text-text leading-relaxed whitespace-pre-wrap">
             {content.explanation}
           </p>
 
           {content.keyPoints && content.keyPoints.length > 0 && (
             <div>
-              <p className="text-xs font-medium text-accent mb-1.5">ポイント</p>
+              <p className="text-xs font-medium text-accent mb-1.5">先生の板書</p>
               <ul className="space-y-1">
                 {content.keyPoints.map((point, i) => (
                   <li key={i} className="text-sm text-text-secondary flex items-start gap-2">
@@ -38,7 +38,7 @@ export function AiContentCard({ content }: AiContentCardProps) {
 
           {content.examples && content.examples.length > 0 && (
             <div>
-              <p className="text-xs font-medium text-accent mb-1.5">具体例</p>
+              <p className="text-xs font-medium text-accent mb-1.5">たとえば</p>
               <div className="space-y-1">
                 {content.examples.map((example, i) => (
                   <p key={i} className="text-sm text-text-secondary bg-white/50 rounded-lg px-3 py-2">
@@ -51,7 +51,7 @@ export function AiContentCard({ content }: AiContentCardProps) {
 
           {content.promptForUser && (
             <div className="bg-white rounded-lg px-3 py-2 border border-accent/10">
-              <p className="text-xs text-accent font-medium">💭 考えてみましょう</p>
+              <p className="text-xs text-accent font-medium">理解チェック</p>
               <p className="text-sm text-text mt-1">{content.promptForUser}</p>
             </div>
           )}

@@ -4,6 +4,7 @@ import { refreshAccessToken } from "./oauth";
 import { decryptToken, encryptToken } from "./tokenStore";
 import { getAiProvider } from "@/lib/ai/provider";
 import { createFallbackClassification } from "@/lib/ai/fallback";
+import { needsJapaneseTranslation } from "@/lib/text/language";
 
 interface SyncResult {
   fetchedCount: number;
@@ -55,6 +56,15 @@ async function saveTweets(
       continue;
     }
 
+    let translatedText: string | null = null;
+    if (needsJapaneseTranslation(tweet.text)) {
+      try {
+        translatedText = await getAiProvider().translateText({ text: tweet.text });
+      } catch (error) {
+        console.error("X post translation failed:", error);
+      }
+    }
+
     const post = await prisma.post.create({
       data: {
         source: "x",
@@ -65,6 +75,8 @@ async function saveTweets(
         authorUsername: tweet.authorUsername,
         authorAvatarUrl: tweet.authorAvatarUrl,
         text: tweet.text,
+        translatedText,
+        mediaJson: tweet.media.length > 0 ? JSON.stringify(tweet.media) : null,
         postedAt: tweet.createdAt ? new Date(tweet.createdAt) : null,
         savedAt: new Date(),
         rawJson: JSON.stringify(tweet),

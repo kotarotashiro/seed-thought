@@ -5,6 +5,7 @@ import {
   createFallbackClassification,
   isWeakClassification,
 } from "@/lib/ai/fallback";
+import { needsJapaneseTranslation } from "@/lib/text/language";
 
 // GET /api/posts/[postId]
 export async function GET(
@@ -27,6 +28,26 @@ export async function GET(
 
     if (!post) {
       return NextResponse.json({ error: "投稿が見つかりません" }, { status: 404 });
+    }
+
+    if (!post.translatedText && needsJapaneseTranslation(post.text)) {
+      try {
+        const translatedText = await getAiProvider().translateText({ text: post.text });
+        post = await prisma.post.update({
+          where: { id: postId },
+          data: { translatedText },
+          include: {
+            classification: true,
+            threadPosts: { orderBy: { threadOrder: "asc" } },
+            deepDiveSessions: {
+              include: { steps: true },
+              orderBy: { createdAt: "desc" },
+            },
+          },
+        });
+      } catch (error) {
+        console.error("Post translation failed:", error);
+      }
     }
 
     if (!post.classification || isWeakClassification(post.classification)) {

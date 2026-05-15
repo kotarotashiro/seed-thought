@@ -6,6 +6,10 @@ export interface ClassifyPostInput {
   authorUsername?: string | null;
 }
 
+export interface TranslateTextInput {
+  text: string;
+}
+
 export interface PostClassificationResult {
   postType: "thought" | "learning" | "output_material" | "unknown";
   primaryCategory: string;
@@ -65,6 +69,7 @@ export interface GeneratedOutputResult {
 
 export interface AiProvider {
   classifyPost(input: ClassifyPostInput): Promise<PostClassificationResult>;
+  translateText(input: TranslateTextInput): Promise<string>;
   generateDeepDiveSession(input: GenerateDeepDiveSessionInput): Promise<GeneratedDeepDiveSessionResult>;
   generateOutput(input: GenerateOutputInput): Promise<GeneratedOutputResult>;
 }

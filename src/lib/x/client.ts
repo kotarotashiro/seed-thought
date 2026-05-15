@@ -8,6 +8,9 @@ interface TweetData {
   created_at?: string;
   author_id?: string;
   conversation_id?: string;
+  attachments?: {
+    media_keys?: string[];
+  };
 }
 
 interface UserData {
@@ -17,10 +20,19 @@ interface UserData {
   profile_image_url?: string;
 }
 
+interface MediaData {
+  media_key: string;
+  type: "photo" | "video" | "animated_gif";
+  url?: string;
+  preview_image_url?: string;
+  alt_text?: string;
+}
+
 interface XApiResponse {
   data?: TweetData[];
   includes?: {
     users?: UserData[];
+    media?: MediaData[];
   };
   meta?: {
     next_token?: string;
@@ -37,11 +49,20 @@ export interface XTweetWithAuthor {
   authorUsername: string | null;
   authorAvatarUrl: string | null;
   sourceUrl: string;
+  media: XTweetMedia[];
 }
 
-const TWEET_FIELDS = "created_at,author_id,text,conversation_id";
+export interface XTweetMedia {
+  type: "photo" | "video" | "animated_gif";
+  url: string | null;
+  previewUrl: string | null;
+  altText: string | null;
+}
+
+const TWEET_FIELDS = "created_at,author_id,text,conversation_id,attachments";
 const USER_FIELDS = "name,username,profile_image_url";
-const EXPANSIONS = "author_id";
+const MEDIA_FIELDS = "type,url,preview_image_url,alt_text";
+const EXPANSIONS = "author_id,attachments.media_keys";
 
 async function fetchFromX(
   endpoint: string,
@@ -71,12 +92,25 @@ function mapTweetsWithAuthors(response: XApiResponse): XTweetWithAuthor[] {
   if (!response.data) return [];
 
   const usersMap = new Map<string, UserData>();
+  const mediaMap = new Map<string, MediaData>();
   response.includes?.users?.forEach((user) => {
     usersMap.set(user.id, user);
+  });
+  response.includes?.media?.forEach((media) => {
+    mediaMap.set(media.media_key, media);
   });
 
   return response.data.map((tweet) => {
     const author = tweet.author_id ? usersMap.get(tweet.author_id) : undefined;
+    const media = (tweet.attachments?.media_keys || [])
+      .map((mediaKey) => mediaMap.get(mediaKey))
+      .filter((item): item is MediaData => Boolean(item))
+      .map((item) => ({
+        type: item.type,
+        url: item.url || item.preview_image_url || null,
+        previewUrl: item.preview_image_url || item.url || null,
+        altText: item.alt_text || null,
+      }));
     return {
       id: tweet.id,
       text: tweet.text,
@@ -86,6 +120,7 @@ function mapTweetsWithAuthors(response: XApiResponse): XTweetWithAuthor[] {
       authorUsername: author?.username || null,
       authorAvatarUrl: author?.profile_image_url || null,
       sourceUrl: `https://x.com/${author?.username || "i"}/status/${tweet.id}`,
+      media,
     };
   });
 }
@@ -97,6 +132,7 @@ export async function fetchTweetById(
   const response = await fetchFromX(`/tweets/${tweetId}`, accessToken, {
     "tweet.fields": TWEET_FIELDS,
     "user.fields": USER_FIELDS,
+    "media.fields": MEDIA_FIELDS,
     expansions: EXPANSIONS,
   });
 
@@ -118,6 +154,7 @@ export async function fetchConversationTweets(
     max_results: String(Math.min(Math.max(maxResults, 10), 100)),
     "tweet.fields": TWEET_FIELDS,
     "user.fields": USER_FIELDS,
+    "media.fields": MEDIA_FIELDS,
     expansions: EXPANSIONS,
   });
 
@@ -159,6 +196,7 @@ async function fetchTweetCollection(
       max_results: String(pageSize),
       "tweet.fields": TWEET_FIELDS,
       "user.fields": USER_FIELDS,
+      "media.fields": MEDIA_FIELDS,
       expansions: EXPANSIONS,
       ...(nextToken ? { pagination_token: nextToken } : {}),
     });

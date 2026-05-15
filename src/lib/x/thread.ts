@@ -2,6 +2,8 @@ import { prisma } from "@/lib/db/prisma";
 import { decryptToken, encryptToken } from "./tokenStore";
 import { refreshAccessToken } from "./oauth";
 import { fetchConversationTweets, fetchTweetById } from "./client";
+import { getAiProvider } from "@/lib/ai/provider";
+import { needsJapaneseTranslation } from "@/lib/text/language";
 
 interface ThreadFetchResult {
   fetchedCount: number;
@@ -48,6 +50,15 @@ export async function fetchAndSaveThread(postId: string): Promise<ThreadFetchRes
   let skippedCount = 0;
 
   for (const [index, tweet] of childTweets.entries()) {
+    let translatedText: string | null = null;
+    if (needsJapaneseTranslation(tweet.text)) {
+      try {
+        translatedText = await getAiProvider().translateText({ text: tweet.text });
+      } catch (error) {
+        console.error("Thread post translation failed:", error);
+      }
+    }
+
     const result = await prisma.threadPost.upsert({
       where: {
         postId_sourcePostId: {
@@ -63,6 +74,8 @@ export async function fetchAndSaveThread(postId: string): Promise<ThreadFetchRes
         authorUsername: tweet.authorUsername,
         authorAvatarUrl: tweet.authorAvatarUrl,
         text: tweet.text,
+        translatedText,
+        mediaJson: tweet.media.length > 0 ? JSON.stringify(tweet.media) : null,
         postedAt: tweet.createdAt ? new Date(tweet.createdAt) : null,
         threadOrder: index + 1,
         rawJson: JSON.stringify(tweet),
@@ -73,6 +86,8 @@ export async function fetchAndSaveThread(postId: string): Promise<ThreadFetchRes
         authorUsername: tweet.authorUsername,
         authorAvatarUrl: tweet.authorAvatarUrl,
         text: tweet.text,
+        translatedText,
+        mediaJson: tweet.media.length > 0 ? JSON.stringify(tweet.media) : null,
         postedAt: tweet.createdAt ? new Date(tweet.createdAt) : null,
         threadOrder: index + 1,
         rawJson: JSON.stringify(tweet),

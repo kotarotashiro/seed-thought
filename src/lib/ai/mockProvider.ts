@@ -6,6 +6,7 @@ import type {
   GeneratedDeepDiveSessionResult,
   GenerateOutputInput,
   GeneratedOutputResult,
+  TranslateTextInput,
 } from "./types";
 
 /**
@@ -40,6 +41,10 @@ export const mockProvider: AiProvider = {
       outputPotentialScore: isOutput ? 88 : 60,
       recommendedMode: isThought ? "thought_lens" : "learning_lesson",
     };
+  },
+
+  async translateText(input: TranslateTextInput): Promise<string> {
+    return input.text;
   },
 
   async generateDeepDiveSession(input: GenerateDeepDiveSessionInput): Promise<GeneratedDeepDiveSessionResult> {

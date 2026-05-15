@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { PostTypeBadge, Badge } from "@/components/ui/Badge";
+import { PostMediaGrid, parsePostMedia } from "@/components/posts/PostMediaGrid";
 import {
   AlertCircle,
   ArrowLeft,
@@ -18,6 +19,35 @@ import {
   User,
   Zap,
 } from "lucide-react";
+
+function buildGains(post: {
+  classification?: {
+    postType: string;
+    primaryCategory: string;
+    summary: string;
+    recommendReason: string;
+  } | null;
+}) {
+  const category = post.classification?.primaryCategory || "このテーマ";
+  const summary = post.classification?.summary || "投稿の中心テーマ";
+  const reason = post.classification?.recommendReason || "自分の仕事や発信に置き換える視点";
+
+  if (post.classification?.postType === "learning") {
+    return [
+      { icon: BookOpen, label: "学ぶテーマ", description: summary },
+      { icon: Lightbulb, label: "背景知識", description: `${category}の前提や用語を整理できます` },
+      { icon: Zap, label: "実務の型", description: reason },
+      { icon: ArrowRight, label: "次の一手", description: "自分の作業で試す手順に落とし込めます" },
+    ];
+  }
+
+  return [
+    { icon: Brain, label: "主張の核", description: summary },
+    { icon: Lightbulb, label: "前提の整理", description: `${category}で成り立つ条件を考えられます` },
+    { icon: Zap, label: "反論と条件", description: "どこまで使える考え方か見極められます" },
+    { icon: ArrowRight, label: "発信への転用", description: reason },
+  ];
+}
 
 export default function ConfirmPage({ params }: { params: Promise<{ postId: string }> }) {
   const { postId } = use(params);
@@ -105,14 +135,10 @@ export default function ConfirmPage({ params }: { params: Promise<{ postId: stri
     );
   }
 
-  const gains = [
-    { icon: BookOpen, label: "基礎理解", description: "この投稿のテーマの基本を理解できます" },
-    { icon: Zap, label: "実践の型", description: "具体的な実践方法が見えてきます" },
-    { icon: ArrowRight, label: "発信への転用", description: "自分の発信ネタとして活用できます" },
-    { icon: Brain, label: "自分の考えの整理", description: "自分の視点や意見を言語化できます" },
-  ];
+  const gains = buildGains(post);
   const threadPosts = post.threadPosts || [];
   const canFetchThread = post.source === "x" && post.sourcePostId;
+  const postMedia = parsePostMedia(post.mediaJson);
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
@@ -151,6 +177,15 @@ export default function ConfirmPage({ params }: { params: Promise<{ postId: stri
           </div>
         </div>
         <p className="text-sm text-text leading-relaxed">{post.text}</p>
+        {post.translatedText && (
+          <div className="mt-3 rounded-xl border border-accent/10 bg-accent-subtle px-4 py-3">
+            <p className="mb-1 text-xs font-medium text-accent">日本語訳</p>
+            <p className="whitespace-pre-wrap text-sm leading-relaxed text-text">
+              {post.translatedText}
+            </p>
+          </div>
+        )}
+        <PostMediaGrid media={postMedia} />
         {post.classification && (
           <div className="flex gap-2 mt-3">
             <PostTypeBadge type={post.classification.postType} />
@@ -197,7 +232,7 @@ export default function ConfirmPage({ params }: { params: Promise<{ postId: stri
             <h3 className="text-base font-bold text-text">取得済みツリー</h3>
           </div>
           <div className="space-y-4">
-            {threadPosts.map((threadPost: { id: string; text: string; threadOrder: number }) => (
+            {threadPosts.map((threadPost: { id: string; text: string; translatedText?: string | null; mediaJson?: string | null; threadOrder: number }) => (
               <div key={threadPost.id} className="rounded-xl bg-border-light px-4 py-3">
                 <p className="mb-1 text-xs font-medium text-text-muted">
                   {threadPost.threadOrder + 1}投稿目
@@ -205,6 +240,12 @@ export default function ConfirmPage({ params }: { params: Promise<{ postId: stri
                 <p className="whitespace-pre-wrap text-sm leading-relaxed text-text">
                   {threadPost.text}
                 </p>
+                {threadPost.translatedText && (
+                  <p className="mt-2 rounded-lg bg-white/70 px-3 py-2 text-sm leading-relaxed text-text-secondary">
+                    日本語訳: {threadPost.translatedText}
+                  </p>
+                )}
+                <PostMediaGrid media={parsePostMedia(threadPost.mediaJson)} />
               </div>
             ))}
           </div>

@@ -1,9 +1,12 @@
 import { PostTypeBadge, Badge } from "@/components/ui/Badge";
+import { PostMediaGrid, parsePostMedia } from "@/components/posts/PostMediaGrid";
 import { User } from "lucide-react";
 
 interface PostMiniCardProps {
   post: {
     text: string;
+    translatedText?: string | null;
+    mediaJson?: string | null;
     authorName?: string | null;
     authorUsername?: string | null;
     authorAvatarUrl?: string | null;
@@ -37,6 +40,12 @@ export function PostMiniCard({ post }: PostMiniCardProps) {
       <p className="text-sm text-text leading-relaxed line-clamp-2 mb-2">
         {post.text}
       </p>
+      {post.translatedText && (
+        <p className="mb-2 line-clamp-2 rounded-lg bg-white/70 px-2 py-1.5 text-xs leading-relaxed text-text-secondary">
+          日本語訳: {post.translatedText}
+        </p>
+      )}
+      <PostMediaGrid media={parsePostMedia(post.mediaJson)} />
       {post.classification && (
         <div className="flex gap-2">
           <PostTypeBadge type={post.classification.postType} />

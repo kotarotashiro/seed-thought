@@ -8,13 +8,15 @@ import type {
   GenerateOutputInput,
   GeneratedOutputResult,
   PostClassificationResult,
+  TranslateTextInput,
 } from "./types";
-import { buildClassifyPrompt, buildDeepDivePrompt, buildOutputPrompt } from "./prompts";
+import { buildClassifyPrompt, buildDeepDivePrompt, buildOutputPrompt, buildTranslatePrompt } from "./prompts";
 import { parseAiJson } from "./json";
 import {
   isGeneratedDeepDiveSessionResult,
   isGeneratedOutputResult,
   isPostClassificationResult,
+  isTranslatedTextResult,
 } from "./validation";
 import { mergeClassificationFallback } from "./fallback";
 import { getAiRuntimeSettings, type AiProviderName, type AiRuntimeSettings } from "./settings";
@@ -122,6 +124,15 @@ export function getAiProvider(): AiProvider {
       const result = await callConfiguredAi(prompt);
       const classification = parseAiJson(result, isPostClassificationResult, "投稿分類");
       return mergeClassificationFallback(input.text, classification);
+    },
+
+    async translateText(input: TranslateTextInput): Promise<string> {
+      const settings = await getAiRuntimeSettings();
+      if (settings.provider === "mock") return input.text;
+
+      const prompt = buildTranslatePrompt(input);
+      const result = await callConfiguredAi(prompt);
+      return parseAiJson(result, isTranslatedTextResult, "日本語翻訳").translatedText;
     },
 
     async generateDeepDiveSession(

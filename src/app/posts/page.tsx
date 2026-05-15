@@ -3,14 +3,17 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { PostFilters } from "@/components/posts/PostFilters";
+import { PostMediaGrid, parsePostMedia } from "@/components/posts/PostMediaGrid";
 import { PostTypeBadge, SavedTypeBadge, Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
-import { Archive, Trash2, Pencil, ArrowRight, Eye, ExternalLink, User } from "lucide-react";
+import { Archive, Trash2, Pencil, ArrowRight, Eye, ExternalLink, User, CheckCircle2 } from "lucide-react";
 
 interface PostListItem {
   id: string;
   text: string;
+  translatedText?: string | null;
+  mediaJson?: string | null;
   sourceUrl?: string | null;
   savedType: string;
   authorName?: string | null;
@@ -230,6 +233,12 @@ export default function PostsPage() {
                     <p className="text-sm text-text leading-relaxed line-clamp-4 mb-4">
                         {post.text}
                       </p>
+                    {post.translatedText && (
+                      <p className="mb-4 line-clamp-3 rounded-xl bg-accent-subtle px-3 py-2 text-xs leading-relaxed text-text-secondary">
+                        日本語訳: {post.translatedText}
+                      </p>
+                    )}
+                    <PostMediaGrid media={parsePostMedia(post.mediaJson)} />
 
                     <div className="mt-auto space-y-4">
                       <div className="flex flex-wrap items-center gap-2">
@@ -251,7 +260,10 @@ export default function PostsPage() {
                             : `保存日 ${formatDate(post.savedAt)}`}
                         </span>
                         {(post.deepDiveSessions?.length ?? 0) > 0 ? (
-                          <Badge variant="success">深掘り済み</Badge>
+                          <Badge variant="success" className="gap-1">
+                            <CheckCircle2 className="h-3 w-3" />
+                            深掘り済み
+                          </Badge>
                         ) : (
                           <Badge variant="warning">未消化</Badge>
                         )}

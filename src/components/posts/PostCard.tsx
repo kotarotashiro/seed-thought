@@ -2,18 +2,22 @@ import Link from "next/link";
 import { Card } from "@/components/ui/Card";
 import { PostTypeBadge, SavedTypeBadge, Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
-import { ArrowRight, User } from "lucide-react";
+import { PostMediaGrid, parsePostMedia } from "@/components/posts/PostMediaGrid";
+import { ArrowRight, CheckCircle2, User } from "lucide-react";
 
 interface PostCardProps {
   post: {
     id: string;
     text: string;
+    translatedText?: string | null;
+    mediaJson?: string | null;
     authorName?: string | null;
     authorUsername?: string | null;
     authorAvatarUrl?: string | null;
     savedAt: Date | string;
     savedType?: string;
     threadPosts?: { id: string }[];
+    deepDiveSessions?: { id: string; status: string }[];
     classification?: {
       postType: string;
       primaryCategory: string;
@@ -60,6 +64,12 @@ export function PostCard({ post, showRecommendReason = false }: PostCardProps) {
       <p className="text-sm text-text leading-relaxed mb-4 line-clamp-3">
         {post.text}
       </p>
+      {post.translatedText && (
+        <p className="mb-4 line-clamp-2 rounded-xl bg-accent-subtle px-3 py-2 text-xs leading-relaxed text-text-secondary">
+          日本語訳: {post.translatedText}
+        </p>
+      )}
+      <PostMediaGrid media={parsePostMedia(post.mediaJson)} />
 
       {/* Classification Badges */}
       {post.classification && (
@@ -69,6 +79,12 @@ export function PostCard({ post, showRecommendReason = false }: PostCardProps) {
           {post.savedType && <SavedTypeBadge type={post.savedType} />}
           {(post.threadPosts?.length ?? 0) > 0 && (
             <Badge variant="success">ツリー {(post.threadPosts?.length ?? 0) + 1}投稿</Badge>
+          )}
+          {(post.deepDiveSessions?.length ?? 0) > 0 && (
+            <Badge variant="success" className="gap-1">
+              <CheckCircle2 className="h-3 w-3" />
+              深掘り済み
+            </Badge>
           )}
         </div>
       )}

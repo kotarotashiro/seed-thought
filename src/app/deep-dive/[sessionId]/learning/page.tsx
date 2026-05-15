@@ -122,7 +122,7 @@ export default function LearningLessonPage({ params }: { params: Promise<{ sessi
         <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center">
           <BookOpen className="w-5 h-5 text-blue-600" />
         </div>
-        <h1 className="text-xl font-bold text-text">学習レッスンで深掘る</h1>
+        <h1 className="text-xl font-bold text-text">厳密学習で学ぶ</h1>
       </div>
 
       {/* Progress */}
@@ -143,7 +143,9 @@ export default function LearningLessonPage({ params }: { params: Promise<{ sessi
         <div className="space-y-5">
           <div>
             <h2 className="text-lg font-bold text-text mb-2">{step.title}</h2>
-            <p className="text-sm text-text-secondary leading-relaxed">{step.question}</p>
+            <p className="text-sm text-text-secondary leading-relaxed">
+              先生役のAIがこの投稿を教材化して解説します。下の問いは理解確認です。
+            </p>
           </div>
 
           <AiContentCard content={aiContent} />

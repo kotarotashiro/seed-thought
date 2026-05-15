@@ -60,6 +60,10 @@ export function isGeneratedOutputResult(
   );
 }
 
+export function isTranslatedTextResult(value: unknown): value is { translatedText: string } {
+  return isRecord(value) && typeof value.translatedText === "string";
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
