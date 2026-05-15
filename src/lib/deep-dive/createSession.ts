@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db/prisma";
 import { getAiProvider } from "@/lib/ai/provider";
 import type { PostClassificationResult } from "@/lib/ai/types";
+import { createFallbackDeepDiveSession } from "@/lib/ai/fallback";
 
 export async function createDeepDiveSession(
   postId: string,
@@ -42,11 +43,20 @@ export async function createDeepDiveSession(
 
   // Generate all steps via AI at session creation (batch generation)
   const provider = getAiProvider();
-  const result = await provider.generateDeepDiveSession({
-    mode,
-    postText: post.text,
-    classification,
-  });
+  const result = await provider
+    .generateDeepDiveSession({
+      mode,
+      postText: post.text,
+      classification,
+    })
+    .catch((error) => {
+      console.error("Deep-dive generation failed, using fallback:", error);
+      return createFallbackDeepDiveSession({
+        mode,
+        postText: post.text,
+        classification,
+      });
+    });
 
   // Create session and steps in a transaction
   const session = await prisma.deepDiveSession.create({

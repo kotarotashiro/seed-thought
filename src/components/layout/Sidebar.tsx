@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -29,6 +29,51 @@ const menuItems = [
 export function Sidebar() {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
+  const [profile, setProfile] = useState({
+    name: "そら",
+    role: "個人クリエイター",
+  });
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadProfile() {
+      try {
+        const res = await fetch("/api/settings/profile");
+        const data = await res.json();
+        if (!cancelled) {
+          setProfile({
+            name: data.name || "そら",
+            role: data.role || "個人クリエイター",
+          });
+        }
+      } catch {
+        // Keep default profile in the sidebar.
+      }
+    }
+
+    const handleProfileUpdated = (event: Event) => {
+      const detail = (event as CustomEvent<{ name?: string; role?: string }>).detail;
+      if (detail) {
+        setProfile((current) => ({
+          name: detail.name || current.name,
+          role: detail.role || current.role,
+        }));
+      } else {
+        loadProfile();
+      }
+    };
+
+    loadProfile();
+    window.addEventListener("profile-updated", handleProfileUpdated);
+
+    return () => {
+      cancelled = true;
+      window.removeEventListener("profile-updated", handleProfileUpdated);
+    };
+  }, []);
+
+  const profileInitial = profile.name.trim().charAt(0) || "そ";
 
   return (
     <aside
@@ -81,14 +126,14 @@ export function Sidebar() {
       <div className="border-t border-border-light px-4 py-4">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-full bg-accent-light flex items-center justify-center flex-shrink-0">
-            <span className="text-sm font-bold text-accent">そ</span>
+            <span className="text-sm font-bold text-accent">{profileInitial}</span>
           </div>
           {!collapsed && (
             <div className="min-w-0">
               <p className="text-sm font-medium text-text truncate">
-                そら｜ライター
+                {profile.name}
               </p>
-              <p className="text-xs text-text-muted truncate">個人クリエイター</p>
+              <p className="text-xs text-text-muted truncate">{profile.role}</p>
             </div>
           )}
         </div>

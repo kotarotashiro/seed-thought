@@ -4,26 +4,52 @@ import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
-import { Textarea } from "@/components/ui/Textarea";
+import { Select } from "@/components/ui/Select";
 import { Settings, Cpu, User, Save } from "lucide-react";
 
 type ProfileForm = {
   name: string;
   role: string;
-  themes: string;
-  outputChannels: string;
+  themes: string[];
+  outputChannels: string[];
   tone: string;
 };
 
-function listToText(value: string[] | undefined): string {
-  return value?.join("、") || "";
-}
+const roleOptions = [
+  "AI活用・SNS運用・LINE導線設計を発信する個人クリエイター",
+  "AI活用を発信する個人クリエイター",
+  "SNS運用・マーケティング支援者",
+  "LINE導線設計・店舗集客支援者",
+  "セミナー講師・コンテンツ制作者",
+];
 
-function textToList(value: string): string[] {
-  return value
-    .split(/[、,\n]/)
-    .map((item) => item.trim())
-    .filter(Boolean);
+const themeOptions = [
+  "AI活用",
+  "Instagram",
+  "公式LINE",
+  "X運用",
+  "note",
+  "チラシ",
+  "セミナー",
+  "マーケティング",
+  "導線設計",
+  "業務効率化",
+];
+
+const outputChannelOptions = ["X", "Instagram", "note", "ブログ", "セミナー資料", "チラシ"];
+
+const toneOptions = [
+  "やさしく、実用的で、少し本音感のある文章",
+  "短く、わかりやすく、行動につながる文章",
+  "専門的だが、初心者にも伝わる文章",
+  "熱量があり、背中を押す文章",
+  "落ち着いていて、信頼感のある文章",
+];
+
+function toggleListValue(values: string[], value: string): string[] {
+  return values.includes(value)
+    ? values.filter((item) => item !== value)
+    : [...values, value];
 }
 
 export default function SettingsPage() {
@@ -31,8 +57,8 @@ export default function SettingsPage() {
   const [profile, setProfile] = useState<ProfileForm>({
     name: "",
     role: "",
-    themes: "",
-    outputChannels: "",
+    themes: [],
+    outputChannels: [],
     tone: "",
   });
   const [loading, setLoading] = useState(true);
@@ -57,8 +83,8 @@ export default function SettingsPage() {
         setProfile({
           name: profileData.name || "",
           role: profileData.role || "",
-          themes: listToText(profileData.themes),
-          outputChannels: listToText(profileData.outputChannels),
+          themes: profileData.themes || [],
+          outputChannels: profileData.outputChannels || [],
           tone: profileData.tone || "",
         });
       } catch {
@@ -86,8 +112,8 @@ export default function SettingsPage() {
         body: JSON.stringify({
           name: profile.name,
           role: profile.role,
-          themes: textToList(profile.themes),
-          outputChannels: textToList(profile.outputChannels),
+          themes: profile.themes,
+          outputChannels: profile.outputChannels,
           tone: profile.tone,
         }),
       });
@@ -101,10 +127,11 @@ export default function SettingsPage() {
       setProfile({
         name: data.name,
         role: data.role,
-        themes: listToText(data.themes),
-        outputChannels: listToText(data.outputChannels),
+        themes: data.themes || [],
+        outputChannels: data.outputChannels || [],
         tone: data.tone,
       });
+      window.dispatchEvent(new CustomEvent("profile-updated", { detail: data }));
       setMessage("プロフィール設定を保存しました。次回のAI分類・深掘り・アウトプット生成から反映されます。");
     } catch {
       setError("保存に失敗しました");
@@ -182,29 +209,65 @@ export default function SettingsPage() {
                 className="w-full rounded-xl border border-border bg-white px-4 py-3 text-sm text-text outline-none focus:border-accent"
               />
             </label>
-            <Textarea
+            <Select
               label="役割"
               value={profile.role}
               onChange={(e) => setProfile((current) => ({ ...current, role: e.target.value }))}
-              rows={3}
+              options={roleOptions.map((value) => ({ value, label: value }))}
             />
-            <Textarea
-              label="テーマ（読点・カンマ・改行で区切り）"
-              value={profile.themes}
-              onChange={(e) => setProfile((current) => ({ ...current, themes: e.target.value }))}
-              rows={3}
-            />
-            <Textarea
-              label="出力先（読点・カンマ・改行で区切り）"
-              value={profile.outputChannels}
-              onChange={(e) => setProfile((current) => ({ ...current, outputChannels: e.target.value }))}
-              rows={2}
-            />
-            <Textarea
+            <div>
+              <p className="mb-2 text-sm font-medium text-text">テーマ</p>
+              <div className="grid grid-cols-2 gap-2">
+                {themeOptions.map((theme) => (
+                  <label
+                    key={theme}
+                    className="flex items-center gap-2 rounded-xl border border-border bg-white px-3 py-2 text-sm text-text"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={profile.themes.includes(theme)}
+                      onChange={() =>
+                        setProfile((current) => ({
+                          ...current,
+                          themes: toggleListValue(current.themes, theme),
+                        }))
+                      }
+                      className="h-4 w-4 accent-accent"
+                    />
+                    {theme}
+                  </label>
+                ))}
+              </div>
+            </div>
+            <div>
+              <p className="mb-2 text-sm font-medium text-text">出力先</p>
+              <div className="grid grid-cols-2 gap-2">
+                {outputChannelOptions.map((channel) => (
+                  <label
+                    key={channel}
+                    className="flex items-center gap-2 rounded-xl border border-border bg-white px-3 py-2 text-sm text-text"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={profile.outputChannels.includes(channel)}
+                      onChange={() =>
+                        setProfile((current) => ({
+                          ...current,
+                          outputChannels: toggleListValue(current.outputChannels, channel),
+                        }))
+                      }
+                      className="h-4 w-4 accent-accent"
+                    />
+                    {channel}
+                  </label>
+                ))}
+              </div>
+            </div>
+            <Select
               label="トーン"
               value={profile.tone}
               onChange={(e) => setProfile((current) => ({ ...current, tone: e.target.value }))}
-              rows={3}
+              options={toneOptions.map((value) => ({ value, label: value }))}
             />
           </div>
         )}

@@ -5,14 +5,17 @@ import Link from "next/link";
 import { PostFilters } from "@/components/posts/PostFilters";
 import { PostTypeBadge, SavedTypeBadge, Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
-import { Archive, Trash2, Pencil, ArrowRight, Eye, ExternalLink } from "lucide-react";
+import { Card } from "@/components/ui/Card";
+import { Archive, Trash2, Pencil, ArrowRight, Eye, ExternalLink, User } from "lucide-react";
 
 interface PostListItem {
   id: string;
   text: string;
   sourceUrl?: string | null;
   savedType: string;
+  authorName?: string | null;
   authorUsername?: string | null;
+  authorAvatarUrl?: string | null;
   postedAt?: string | null;
   savedAt: string;
   classification?: {
@@ -184,10 +187,9 @@ export default function PostsPage() {
           </Link>
         </div>
       ) : (
-        <div className="bg-white rounded-2xl border border-border overflow-hidden">
-          <div className="divide-y divide-border-light">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
             {posts.map((post) => (
-              <div key={post.id} className="p-4 hover:bg-border-light/50 transition-colors">
+              <Card key={post.id} hoverable className="flex min-h-[300px] flex-col">
                 {editingPost === post.id ? (
                   <div className="space-y-3">
                     <textarea
@@ -201,11 +203,34 @@ export default function PostsPage() {
                     </div>
                   </div>
                 ) : (
-                  <div className="flex items-start gap-4">
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm text-text leading-relaxed line-clamp-2 mb-2">
+                  <>
+                    <div className="mb-4 flex items-start gap-3">
+                      <div className="h-10 w-10 flex-shrink-0 overflow-hidden rounded-full bg-accent-light flex items-center justify-center">
+                        {post.authorAvatarUrl ? (
+                          <img
+                            src={post.authorAvatarUrl}
+                            alt=""
+                            className="h-full w-full object-cover"
+                          />
+                        ) : (
+                          <User className="h-5 w-5 text-accent" />
+                        )}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-semibold text-text">
+                          {post.authorName || "手動追加"}
+                        </p>
+                        <p className="text-xs text-text-muted">
+                          {post.authorUsername ? `@${post.authorUsername}` : "手動入力"}
+                        </p>
+                      </div>
+                    </div>
+
+                    <p className="text-sm text-text leading-relaxed line-clamp-4 mb-4">
                         {post.text}
                       </p>
+
+                    <div className="mt-auto space-y-4">
                       <div className="flex flex-wrap items-center gap-2">
                         {post.classification && (
                           <>
@@ -230,50 +255,51 @@ export default function PostsPage() {
                           <Badge variant="warning">未消化</Badge>
                         )}
                       </div>
-                    </div>
-                    <div className="flex items-center gap-1 flex-shrink-0">
-                      {post.sourceUrl && (
-                        <a href={post.sourceUrl} target="_blank" rel="noreferrer">
-                          <Button variant="ghost" size="sm" title="Xの投稿を開く">
-                            <ExternalLink className="w-4 h-4" />
+
+                      <div className="flex items-center gap-2">
+                        <Link href={`/posts/${post.id}/confirm`} className="flex-1">
+                          <Button size="sm" className="w-full">
+                            深掘る
+                            <ArrowRight className="w-4 h-4 ml-1" />
                           </Button>
-                        </a>
-                      )}
-                      <Link href={`/posts/${post.id}/confirm`}>
-                        <Button variant="ghost" size="sm" title="詳細">
-                          <Eye className="w-4 h-4" />
+                        </Link>
+                        {post.sourceUrl && (
+                          <a href={post.sourceUrl} target="_blank" rel="noreferrer">
+                            <Button variant="ghost" size="sm" title="Xの投稿を開く">
+                              <ExternalLink className="w-4 h-4" />
+                            </Button>
+                          </a>
+                        )}
+                        <Link href={`/posts/${post.id}/confirm`}>
+                          <Button variant="ghost" size="sm" title="詳細">
+                            <Eye className="w-4 h-4" />
+                          </Button>
+                        </Link>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          title="編集"
+                          onClick={() => {
+                            setEditingPost(post.id);
+                            setEditText(post.text);
+                          }}
+                        >
+                          <Pencil className="w-4 h-4" />
                         </Button>
-                      </Link>
-                      <Link href={`/posts/${post.id}/confirm`}>
-                        <Button variant="ghost" size="sm" title="深掘りする">
-                          <ArrowRight className="w-4 h-4" />
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          title="削除"
+                          onClick={() => handleDelete(post.id)}
+                        >
+                          <Trash2 className="w-4 h-4 text-danger" />
                         </Button>
-                      </Link>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        title="編集"
-                        onClick={() => {
-                          setEditingPost(post.id);
-                          setEditText(post.text);
-                        }}
-                      >
-                        <Pencil className="w-4 h-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        title="削除"
-                        onClick={() => handleDelete(post.id)}
-                      >
-                        <Trash2 className="w-4 h-4 text-danger" />
-                      </Button>
+                      </div>
                     </div>
-                  </div>
+                  </>
                 )}
-              </div>
+              </Card>
             ))}
-          </div>
         </div>
       )}
     </div>

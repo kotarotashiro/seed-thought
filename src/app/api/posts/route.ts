@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { getAiProvider } from "@/lib/ai/provider";
 import type { Prisma } from "@/generated/prisma/client";
+import { createFallbackClassification } from "@/lib/ai/fallback";
 
 const sortOptions = {
   savedAt_desc: { savedAt: "desc" },
@@ -115,18 +116,22 @@ export async function POST(request: Request) {
           recommendedMode: classification.recommendedMode,
         },
       });
-    } catch {
-      // Fallback: create basic classification
+    } catch (error) {
+      console.error("Manual post classification failed, using fallback:", error);
+      const classification = createFallbackClassification({ text: text.trim() });
       await prisma.postClassification.create({
         data: {
           postId: post.id,
-          postType: inputPostType || "unknown",
-          primaryCategory: genre || "未分類",
-          tagsJson: "[]",
-          summary: text.substring(0, 100),
-          recommendReason: "新しく追加された投稿です。",
-          difficultyLevel: "unknown",
-          recommendedMode: "unknown",
+          postType: inputPostType || classification.postType,
+          primaryCategory: genre || classification.primaryCategory,
+          tagsJson: JSON.stringify(classification.tags),
+          summary: classification.summary,
+          recommendReason: classification.recommendReason,
+          difficultyLevel: classification.difficultyLevel,
+          outputPotentialScore: classification.outputPotentialScore,
+          learningPotentialScore: classification.learningPotentialScore,
+          thinkingPotentialScore: classification.thinkingPotentialScore,
+          recommendedMode: classification.recommendedMode,
         },
       });
     }

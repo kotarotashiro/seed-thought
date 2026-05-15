@@ -8,6 +8,7 @@ import { Sprout } from "lucide-react";
 export default function HomePage() {
   const [mode, setMode] = useState("latest");
   const [genre, setGenre] = useState("");
+  const [savedType, setSavedType] = useState("");
   const [genres, setGenres] = useState<string[]>([]);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [posts, setPosts] = useState<any[]>([]);
@@ -18,6 +19,7 @@ export default function HomePage() {
     try {
       const params = new URLSearchParams({ mode });
       if (mode === "genre" && genre) params.set("genre", genre);
+      if (savedType) params.set("savedType", savedType);
 
       const res = await fetch(`/api/recommendations?${params}`);
       const data = await res.json();
@@ -37,6 +39,7 @@ export default function HomePage() {
       try {
         const params = new URLSearchParams({ mode });
         if (mode === "genre" && genre) params.set("genre", genre);
+        if (savedType) params.set("savedType", savedType);
 
         const res = await fetch(`/api/recommendations?${params}`);
         const data = await res.json();
@@ -54,7 +57,7 @@ export default function HomePage() {
     return () => {
       cancelled = true;
     };
-  }, [mode, genre]);
+  }, [mode, genre, savedType]);
 
   return (
     <div className="space-y-8">
@@ -78,8 +81,10 @@ export default function HomePage() {
         mode={mode}
         genres={genres}
         selectedGenre={genre}
+        selectedSavedType={savedType}
         onModeChange={setMode}
         onGenreChange={setGenre}
+        onSavedTypeChange={setSavedType}
         onRefresh={() => loadRecommendations()}
         loading={loading}
       />

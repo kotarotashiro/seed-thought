@@ -15,6 +15,7 @@ import {
   isGeneratedOutputResult,
   isPostClassificationResult,
 } from "./validation";
+import { mergeClassificationFallback } from "./fallback";
 
 function getClient(): GoogleGenAI {
   const apiKey = process.env.GEMINI_API_KEY;
@@ -42,7 +43,8 @@ export const geminiProvider: AiProvider = {
   async classifyPost(input: ClassifyPostInput): Promise<PostClassificationResult> {
     const prompt = await buildClassifyPrompt(input);
     const result = await callGemini(prompt);
-    return parseAiJson(result, isPostClassificationResult, "投稿分類");
+    const classification = parseAiJson(result, isPostClassificationResult, "投稿分類");
+    return mergeClassificationFallback(input.text, classification);
   },
 
   async generateDeepDiveSession(input: GenerateDeepDiveSessionInput): Promise<GeneratedDeepDiveSessionResult> {

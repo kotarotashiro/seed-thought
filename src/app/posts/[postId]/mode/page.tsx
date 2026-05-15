@@ -51,14 +51,17 @@ export default function ModeSelectPage({ params }: { params: Promise<{ postId: s
         body: JSON.stringify({ postId, mode: selectedMode }),
       });
 
-      if (!res.ok) throw new Error("Session creation failed");
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        throw new Error(data?.error || "Session creation failed");
+      }
 
       const session = await res.json();
       const path = selectedMode === "thought_lens" ? "thought" : "learning";
       router.push(`/deep-dive/${session.id}/${path}`);
     } catch (error) {
       console.error("Failed to create session:", error);
-      alert("セッションの作成に失敗しました");
+      alert(error instanceof Error ? error.message : "セッションの作成に失敗しました");
     } finally {
       setCreating(false);
     }

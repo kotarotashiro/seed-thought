@@ -1,5 +1,10 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
+import { getAiProvider } from "@/lib/ai/provider";
+import {
+  createFallbackClassification,
+  isWeakClassification,
+} from "@/lib/ai/fallback";
 
 // GET /api/posts/[postId]
 export async function GET(
@@ -8,7 +13,7 @@ export async function GET(
 ) {
   const { postId } = await params;
   try {
-    const post = await prisma.post.findUnique({
+    let post = await prisma.post.findUnique({
       where: { id: postId },
       include: {
         classification: true,
@@ -21,6 +26,61 @@ export async function GET(
 
     if (!post) {
       return NextResponse.json({ error: "投稿が見つかりません" }, { status: 404 });
+    }
+
+    if (!post.classification || isWeakClassification(post.classification)) {
+      const fallback = createFallbackClassification({ text: post.text });
+      let classification = fallback;
+
+      try {
+        classification = await getAiProvider().classifyPost({
+          text: post.text,
+          authorName: post.authorName,
+          authorUsername: post.authorUsername,
+        });
+      } catch (error) {
+        console.error("Post reclassification failed, using fallback:", error);
+      }
+
+      await prisma.postClassification.upsert({
+        where: { postId },
+        create: {
+          postId,
+          postType: classification.postType,
+          primaryCategory: classification.primaryCategory,
+          tagsJson: JSON.stringify(classification.tags),
+          summary: classification.summary,
+          recommendReason: classification.recommendReason,
+          difficultyLevel: classification.difficultyLevel,
+          outputPotentialScore: classification.outputPotentialScore,
+          learningPotentialScore: classification.learningPotentialScore,
+          thinkingPotentialScore: classification.thinkingPotentialScore,
+          recommendedMode: classification.recommendedMode,
+        },
+        update: {
+          postType: classification.postType,
+          primaryCategory: classification.primaryCategory,
+          tagsJson: JSON.stringify(classification.tags),
+          summary: classification.summary,
+          recommendReason: classification.recommendReason,
+          difficultyLevel: classification.difficultyLevel,
+          outputPotentialScore: classification.outputPotentialScore,
+          learningPotentialScore: classification.learningPotentialScore,
+          thinkingPotentialScore: classification.thinkingPotentialScore,
+          recommendedMode: classification.recommendedMode,
+        },
+      });
+
+      post = await prisma.post.findUnique({
+        where: { id: postId },
+        include: {
+          classification: true,
+          deepDiveSessions: {
+            include: { steps: true },
+            orderBy: { createdAt: "desc" },
+          },
+        },
+      });
     }
 
     return NextResponse.json(post);

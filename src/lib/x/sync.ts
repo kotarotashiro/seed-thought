@@ -3,6 +3,7 @@ import { fetchLikedTweets, fetchBookmarkedTweets, type XTweetWithAuthor } from "
 import { refreshAccessToken } from "./oauth";
 import { decryptToken, encryptToken } from "./tokenStore";
 import { getAiProvider } from "@/lib/ai/provider";
+import { createFallbackClassification } from "@/lib/ai/fallback";
 
 interface SyncResult {
   fetchedCount: number;
@@ -94,18 +95,22 @@ async function saveTweets(
           recommendedMode: classification.recommendedMode,
         },
       });
-    } catch {
-      // Create fallback classification
+    } catch (error) {
+      console.error("X post classification failed, using fallback:", error);
+      const classification = createFallbackClassification({ text: tweet.text });
       await prisma.postClassification.create({
         data: {
           postId: post.id,
-          postType: "unknown",
-          primaryCategory: "未分類",
-          tagsJson: "[]",
-          summary: tweet.text.substring(0, 100),
-          recommendReason: "新しく保存された投稿です。",
-          difficultyLevel: "unknown",
-          recommendedMode: "unknown",
+          postType: classification.postType,
+          primaryCategory: classification.primaryCategory,
+          tagsJson: JSON.stringify(classification.tags),
+          summary: classification.summary,
+          recommendReason: classification.recommendReason,
+          difficultyLevel: classification.difficultyLevel,
+          outputPotentialScore: classification.outputPotentialScore,
+          learningPotentialScore: classification.learningPotentialScore,
+          thinkingPotentialScore: classification.thinkingPotentialScore,
+          recommendedMode: classification.recommendedMode,
         },
       });
     }

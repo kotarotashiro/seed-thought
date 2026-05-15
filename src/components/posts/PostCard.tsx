@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Card } from "@/components/ui/Card";
-import { PostTypeBadge, Badge } from "@/components/ui/Badge";
+import { PostTypeBadge, SavedTypeBadge, Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { ArrowRight, User } from "lucide-react";
 
@@ -12,6 +12,7 @@ interface PostCardProps {
     authorUsername?: string | null;
     authorAvatarUrl?: string | null;
     savedAt: Date | string;
+    savedType?: string;
     classification?: {
       postType: string;
       primaryCategory: string;
@@ -64,6 +65,7 @@ export function PostCard({ post, showRecommendReason = false }: PostCardProps) {
         <div className="flex flex-wrap gap-2 mb-3">
           <PostTypeBadge type={post.classification.postType} />
           <Badge>{post.classification.primaryCategory}</Badge>
+          {post.savedType && <SavedTypeBadge type={post.savedType} />}
         </div>
       )}
 

@@ -4,13 +4,16 @@ export type SelectionMode = "latest" | "random" | "genre" | "undigested";
 
 export async function selectRecommendations(
   mode: SelectionMode,
-  genre?: string
+  genre?: string,
+  savedType?: string
 ) {
   const count = 3;
+  const savedTypeWhere = savedType ? { savedType } : {};
 
   switch (mode) {
     case "latest": {
       const posts = await prisma.post.findMany({
+        where: savedTypeWhere,
         orderBy: { savedAt: "desc" },
         take: count,
         include: { classification: true, deepDiveSessions: true },
@@ -21,6 +24,7 @@ export async function selectRecommendations(
     case "random": {
       // SQLite doesn't have RANDOM() in Prisma, so fetch all and shuffle
       const allPosts = await prisma.post.findMany({
+        where: savedTypeWhere,
         include: { classification: true, deepDiveSessions: true },
       });
       return shuffleAndTake(allPosts, count);
@@ -30,12 +34,14 @@ export async function selectRecommendations(
       if (!genre) {
         // Fallback to random
         const allPosts = await prisma.post.findMany({
+          where: savedTypeWhere,
           include: { classification: true, deepDiveSessions: true },
         });
         return shuffleAndTake(allPosts, count);
       }
       const genrePosts = await prisma.post.findMany({
         where: {
+          ...savedTypeWhere,
           classification: {
             primaryCategory: genre,
           },
@@ -48,6 +54,7 @@ export async function selectRecommendations(
     case "undigested": {
       const posts = await prisma.post.findMany({
         where: {
+          ...savedTypeWhere,
           deepDiveSessions: {
             none: {},
           },

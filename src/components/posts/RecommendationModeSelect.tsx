@@ -8,8 +8,10 @@ interface RecommendationModeSelectProps {
   mode: string;
   genres: string[];
   selectedGenre: string;
+  selectedSavedType: string;
   onModeChange: (mode: string) => void;
   onGenreChange: (genre: string) => void;
+  onSavedTypeChange: (savedType: string) => void;
   onRefresh: () => void;
   loading?: boolean;
 }
@@ -18,8 +20,10 @@ export function RecommendationModeSelect({
   mode,
   genres,
   selectedGenre,
+  selectedSavedType,
   onModeChange,
   onGenreChange,
+  onSavedTypeChange,
   onRefresh,
   loading,
 }: RecommendationModeSelectProps) {
@@ -52,6 +56,20 @@ export function RecommendationModeSelect({
           />
         </div>
       )}
+
+      <div className="w-44">
+        <Select
+          label="保存元"
+          value={selectedSavedType}
+          onChange={(e) => onSavedTypeChange(e.target.value)}
+          options={[
+            { value: "", label: "すべて" },
+            { value: "like", label: "いいね" },
+            { value: "bookmark", label: "ブックマーク" },
+            { value: "manual", label: "手動" },
+          ]}
+        />
+      </div>
 
       <Button
         variant="secondary"
