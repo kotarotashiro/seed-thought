@@ -135,8 +135,8 @@ export default function PostsPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex min-w-0 items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-accent-light flex items-center justify-center">
             <Archive className="w-5 h-5 text-accent" />
           </div>
@@ -147,8 +147,8 @@ export default function PostsPage() {
             </p>
           </div>
         </div>
-        <Link href="/posts/new">
-          <Button>投稿を追加</Button>
+        <Link href="/posts/new" className="sm:flex-shrink-0">
+          <Button className="w-full sm:w-auto">投稿を追加</Button>
         </Link>
       </div>
 
@@ -191,9 +191,9 @@ export default function PostsPage() {
           </Link>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 xl:gap-5">
             {posts.map((post) => (
-              <Card key={post.id} hoverable className="flex min-h-[300px] flex-col">
+              <Card key={post.id} hoverable className="flex min-h-[280px] flex-col">
                 {editingPost === post.id ? (
                   <div className="space-y-3">
                     <textarea
@@ -201,9 +201,9 @@ export default function PostsPage() {
                       onChange={(e) => setEditText(e.target.value)}
                       className="w-full rounded-xl border border-border px-4 py-3 text-sm resize-y min-h-[80px] focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent"
                     />
-                    <div className="flex gap-2">
-                      <Button size="sm" onClick={() => handleEdit(post.id)}>保存</Button>
-                      <Button size="sm" variant="ghost" onClick={() => setEditingPost(null)}>キャンセル</Button>
+                      <div className="flex flex-col gap-2 sm:flex-row">
+                      <Button size="sm" onClick={() => handleEdit(post.id)} className="w-full sm:w-auto">保存</Button>
+                      <Button size="sm" variant="ghost" onClick={() => setEditingPost(null)} className="w-full sm:w-auto">キャンセル</Button>
                     </div>
                   </div>
                 ) : (
@@ -274,8 +274,8 @@ export default function PostsPage() {
                         )}
                       </div>
 
-                      <div className="flex items-center gap-2">
-                        <Link href={`/posts/${post.id}/confirm`} className="flex-1">
+                      <div className="flex items-center gap-1.5 sm:gap-2">
+                        <Link href={`/posts/${post.id}/confirm`} className="min-w-0 flex-1">
                           <Button size="sm" className="w-full">
                             深掘る
                             <ArrowRight className="w-4 h-4 ml-1" />

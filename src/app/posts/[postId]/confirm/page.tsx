@@ -141,7 +141,7 @@ export default function ConfirmPage({ params }: { params: Promise<{ postId: stri
   const postMedia = parsePostMedia(post.mediaJson);
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6">
+    <div className="mx-auto max-w-2xl space-y-5 sm:space-y-6">
       {/* Back Button */}
       <button
         onClick={() => router.back()}
@@ -153,7 +153,7 @@ export default function ConfirmPage({ params }: { params: Promise<{ postId: stri
 
       {/* Title */}
       <div>
-        <h1 className="text-2xl font-bold text-text mb-2">この投稿を深掘る？</h1>
+        <h1 className="mb-2 text-xl font-bold text-text sm:text-2xl">この投稿を深掘る？</h1>
         <p className="text-sm text-text-secondary">
           始める前に、投稿の内容と今回得られそうなものを確認します。
         </p>
@@ -161,7 +161,7 @@ export default function ConfirmPage({ params }: { params: Promise<{ postId: stri
 
       {/* Original Post */}
       <Card>
-        <div className="flex items-center gap-3 mb-3">
+        <div className="mb-3 flex items-center gap-3">
           <div className="w-10 h-10 rounded-full bg-accent-light flex items-center justify-center overflow-hidden">
             {post.authorAvatarUrl ? (
               <img src={post.authorAvatarUrl} alt="" className="w-full h-full object-cover" />
@@ -270,7 +270,7 @@ export default function ConfirmPage({ params }: { params: Promise<{ postId: stri
       {/* Gains */}
       <Card>
         <h3 className="text-base font-bold text-text mb-4">この投稿から得られそうなもの</h3>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {gains.map((gain) => {
             const Icon = gain.icon;
             return (
@@ -287,7 +287,7 @@ export default function ConfirmPage({ params }: { params: Promise<{ postId: stri
       </Card>
 
       {/* Actions */}
-      <div className="flex gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row">
         <Link href="/" className="flex-1">
           <Button variant="secondary" className="w-full">
             別の候補を見る

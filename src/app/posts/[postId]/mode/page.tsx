@@ -85,7 +85,7 @@ export default function ModeSelectPage({ params }: { params: Promise<{ postId: s
   const recommendedMode = post.classification?.recommendedMode;
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6">
+    <div className="mx-auto max-w-2xl space-y-5 sm:space-y-6">
       {/* Back */}
       <button
         onClick={() => router.back()}
@@ -96,7 +96,7 @@ export default function ModeSelectPage({ params }: { params: Promise<{ postId: s
       </button>
 
       {/* Title */}
-      <h1 className="text-2xl font-bold text-text">この投稿をどう深掘りますか？</h1>
+      <h1 className="text-xl font-bold text-text sm:text-2xl">この投稿をどう深掘りますか？</h1>
 
       {/* Mini Post Card */}
       <PostMiniCard post={post} />
@@ -135,7 +135,7 @@ export default function ModeSelectPage({ params }: { params: Promise<{ postId: s
       )}
 
       {/* Actions */}
-      <div className="flex gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row">
         <Button
           variant="secondary"
           onClick={() => router.push("/")}

@@ -108,7 +108,7 @@ export default function CompletePage({ params }: { params: Promise<{ sessionId: 
     })) || [];
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6">
+    <div className="mx-auto max-w-2xl space-y-5 sm:space-y-6">
       {/* Header */}
       <div className="flex items-center gap-3">
         <div className="w-12 h-12 rounded-xl bg-success-light flex items-center justify-center">
@@ -170,7 +170,7 @@ export default function CompletePage({ params }: { params: Promise<{ sessionId: 
           深掘りの内容を、発信用コンテンツに変換します。
         </p>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+        <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
           {OUTPUT_TYPES.map((type) => (
             <OutputTypeCard
               key={type}
@@ -243,7 +243,7 @@ export default function CompletePage({ params }: { params: Promise<{ sessionId: 
       )}
 
       {/* Actions */}
-      <div className="flex gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row">
         <Button variant="secondary" onClick={() => router.push("/deep-dives")} className="flex-1">
           深掘り履歴へ
         </Button>

@@ -60,7 +60,7 @@ export default function HomePage() {
   }, [mode, genre, savedType]);
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6 sm:space-y-8">
       {/* Header */}
       <div>
         <div className="flex items-center gap-3 mb-2">
@@ -68,10 +68,10 @@ export default function HomePage() {
             <Sprout className="w-5 h-5 text-accent" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-text">今日の深掘り候補</h1>
+            <h1 className="text-xl font-bold text-text sm:text-2xl">今日の深掘り候補</h1>
           </div>
         </div>
-        <p className="text-sm text-text-secondary mt-2 ml-[52px]">
+        <p className="mt-2 text-sm text-text-secondary sm:ml-[52px]">
           保存した投稿の中から、今日深掘りするのにおすすめの3件を選びました。
         </p>
       </div>
@@ -91,7 +91,7 @@ export default function HomePage() {
 
       {/* Cards */}
       {loading ? (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 xl:gap-6">
           {[1, 2, 3].map((i) => (
             <div
               key={i}
@@ -125,7 +125,7 @@ export default function HomePage() {
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 xl:gap-6">
           {posts.map((post) => (
             <PostCard
               key={post.id}

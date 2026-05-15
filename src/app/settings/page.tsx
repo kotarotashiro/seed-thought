@@ -245,13 +245,13 @@ export default function SettingsPage() {
   };
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6">
-      <div className="flex items-center gap-3">
+    <div className="mx-auto max-w-2xl space-y-5 sm:space-y-6">
+      <div className="flex items-start gap-3 sm:items-center">
         <div className="w-10 h-10 rounded-xl bg-accent-light flex items-center justify-center">
           <Settings className="w-5 h-5 text-accent" />
         </div>
         <div>
-          <h1 className="text-2xl font-bold text-text">設定</h1>
+          <h1 className="text-xl font-bold text-text sm:text-2xl">設定</h1>
           <p className="text-sm text-text-secondary">
             アプリケーションの設定を編集
           </p>
@@ -270,7 +270,7 @@ export default function SettingsPage() {
       )}
 
       <Card>
-        <div className="flex items-center justify-between gap-3 mb-4">
+        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
             <Cpu className="w-5 h-5 text-accent" />
             <h3 className="text-base font-bold text-text">AI Provider</h3>
@@ -337,17 +337,17 @@ export default function SettingsPage() {
               </p>
             </div>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <Button onClick={() => handleSaveAi(false)} disabled={savingAi || testingAi}>
+          <div className="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap">
+            <Button onClick={() => handleSaveAi(false)} disabled={savingAi || testingAi} className="w-full sm:w-auto">
               <Save className="w-4 h-4 mr-1" />
               {savingAi ? "保存中..." : "AI設定を保存"}
             </Button>
-            <Button variant="secondary" onClick={handleTestAi} disabled={savingAi || testingAi}>
+            <Button variant="secondary" onClick={handleTestAi} disabled={savingAi || testingAi} className="w-full sm:w-auto">
               <CheckCircle className="w-4 h-4 mr-1" />
               {testingAi ? "テスト中..." : "接続テスト"}
             </Button>
             {aiSettings.keySource === "ui" && (
-              <Button variant="ghost" onClick={() => handleSaveAi(true)} disabled={savingAi}>
+              <Button variant="ghost" onClick={() => handleSaveAi(true)} disabled={savingAi} className="w-full sm:w-auto">
                 保存済みキーを削除
               </Button>
             )}
@@ -359,12 +359,12 @@ export default function SettingsPage() {
       </Card>
 
       <Card>
-        <div className="flex items-center justify-between gap-3 mb-4">
+        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
             <User className="w-5 h-5 text-accent" />
             <h3 className="text-base font-bold text-text">プロフィール</h3>
           </div>
-          <Button size="sm" onClick={handleSave} disabled={loading || saving}>
+          <Button size="sm" onClick={handleSave} disabled={loading || saving} className="w-full sm:w-auto">
             <Save className="w-4 h-4 mr-1" />
             {saving ? "保存中..." : "保存"}
           </Button>
@@ -394,7 +394,7 @@ export default function SettingsPage() {
             />
             <div>
               <p className="mb-2 text-sm font-medium text-text">テーマ</p>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                 {themeOptions.map((theme) => (
                   <label
                     key={theme}
@@ -418,7 +418,7 @@ export default function SettingsPage() {
             </div>
             <div>
               <p className="mb-2 text-sm font-medium text-text">出力先</p>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                 {outputChannelOptions.map((channel) => (
                   <label
                     key={channel}

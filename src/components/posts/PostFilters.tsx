@@ -45,8 +45,8 @@ export function PostFilters({
       />
 
       {/* Filters */}
-      <div className="flex flex-wrap gap-3">
-        <div className="w-40">
+      <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:gap-3">
+        <div className="min-w-0 sm:w-40">
           <Select
             value={selectedGenre}
             onChange={(e) => onGenreChange(e.target.value)}
@@ -56,7 +56,7 @@ export function PostFilters({
             ]}
           />
         </div>
-        <div className="w-40">
+        <div className="min-w-0 sm:w-40">
           <Select
             value={selectedPostType}
             onChange={(e) => onPostTypeChange(e.target.value)}
@@ -69,7 +69,7 @@ export function PostFilters({
             ]}
           />
         </div>
-        <div className="w-40">
+        <div className="min-w-0 sm:w-40">
           <Select
             value={selectedSavedType}
             onChange={(e) => onSavedTypeChange(e.target.value)}
@@ -81,7 +81,7 @@ export function PostFilters({
             ]}
           />
         </div>
-        <div className="w-40">
+        <div className="min-w-0 sm:w-40">
           <Select
             value={selectedDigestStatus}
             onChange={(e) => onDigestStatusChange(e.target.value)}
@@ -92,7 +92,7 @@ export function PostFilters({
             ]}
           />
         </div>
-        <div className="w-44">
+        <div className="col-span-2 min-w-0 sm:col-span-1 sm:w-44">
           <Select
             value={selectedSort}
             onChange={(e) => onSortChange(e.target.value)}

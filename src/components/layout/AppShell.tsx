@@ -1,13 +1,15 @@
 "use client";
 
 import { Sidebar } from "./Sidebar";
+import { MobileNav } from "./MobileNav";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex min-h-screen">
+    <div className="min-h-screen">
       <Sidebar />
-      <main className="flex-1 ml-[260px] transition-all duration-300">
-        <div className="max-w-5xl mx-auto px-8 py-8">
+      <MobileNav />
+      <main className="min-w-0 transition-all duration-300 md:ml-[260px]">
+        <div className="mx-auto max-w-5xl px-4 pb-24 pt-5 sm:px-6 sm:py-8 md:px-8">
           {children}
         </div>
       </main>

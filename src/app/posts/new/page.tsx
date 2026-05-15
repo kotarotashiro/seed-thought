@@ -57,7 +57,7 @@ export default function NewPostPage() {
   };
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6">
+    <div className="mx-auto max-w-2xl space-y-5 sm:space-y-6">
       {/* Header */}
       <div className="flex items-center gap-3">
         <div className="w-10 h-10 rounded-xl bg-accent-light flex items-center justify-center">
@@ -83,7 +83,7 @@ export default function NewPostPage() {
             className="min-h-[160px]"
           />
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Select
               label="投稿タイプ（任意）"
               value={postType}
@@ -112,7 +112,7 @@ export default function NewPostPage() {
             />
           </div>
 
-          <div className="flex gap-3 pt-2">
+          <div className="flex flex-col gap-3 pt-2 sm:flex-row">
             <Button
               onClick={() => handleSave(false)}
               disabled={saving}

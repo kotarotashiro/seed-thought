@@ -116,13 +116,13 @@ export default function LearningLessonPage({ params }: { params: Promise<{ sessi
   const totalSteps = session.steps.length;
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6">
+    <div className="mx-auto max-w-2xl space-y-5 sm:space-y-6">
       {/* Header */}
       <div className="flex items-center gap-3">
         <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center">
           <BookOpen className="w-5 h-5 text-blue-600" />
         </div>
-        <h1 className="text-xl font-bold text-text">厳密学習で学ぶ</h1>
+        <h1 className="text-lg font-bold text-text sm:text-xl">厳密学習で学ぶ</h1>
       </div>
 
       {/* Progress */}
@@ -186,7 +186,7 @@ export default function LearningLessonPage({ params }: { params: Promise<{ sessi
       )}
 
       {/* Navigation */}
-      <div className="flex items-center justify-between pt-4 border-t border-border-light">
+      <div className="flex flex-col gap-3 border-t border-border-light pt-4 sm:flex-row sm:items-center sm:justify-between">
         <Button
           variant="ghost"
           onClick={handlePrev}
@@ -195,7 +195,7 @@ export default function LearningLessonPage({ params }: { params: Promise<{ sessi
           <ArrowLeft className="w-4 h-4 mr-1" />
           前へ
         </Button>
-        <div className="flex gap-2">
+        <div className="flex flex-col gap-2 sm:flex-row">
           <Button variant="secondary" onClick={handleSaveAndClose} disabled={saving}>
             <Save className="w-4 h-4 mr-1" />
             保存して閉じる

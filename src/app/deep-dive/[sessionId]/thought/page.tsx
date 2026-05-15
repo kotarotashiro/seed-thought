@@ -117,7 +117,7 @@ export default function ThoughtLensPage({ params }: { params: Promise<{ sessionI
   const totalSteps = session.steps.length;
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6">
+    <div className="mx-auto max-w-2xl space-y-5 sm:space-y-6">
       {/* Header */}
       <div className="flex items-center gap-3">
         <div className="w-10 h-10 rounded-xl bg-purple-50 flex items-center justify-center">

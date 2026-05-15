@@ -200,7 +200,7 @@ export default function XSettingsPage() {
 
   if (loading) {
     return (
-      <div className="max-w-2xl mx-auto space-y-6 animate-pulse">
+      <div className="mx-auto max-w-2xl space-y-5 animate-pulse sm:space-y-6">
         <div className="h-8 bg-border-light rounded w-32" />
         <div className="h-40 bg-border-light rounded-2xl" />
       </div>
@@ -208,14 +208,14 @@ export default function XSettingsPage() {
   }
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6">
+    <div className="mx-auto max-w-2xl space-y-5 sm:space-y-6">
       {/* Header */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-start gap-3 sm:items-center">
         <div className="w-10 h-10 rounded-xl bg-accent-light flex items-center justify-center">
           <Link2 className="w-5 h-5 text-accent" />
         </div>
         <div>
-          <h1 className="text-2xl font-bold text-text">X連携</h1>
+          <h1 className="text-xl font-bold text-text sm:text-2xl">X連携</h1>
           <p className="text-sm text-text-secondary">
             Xアカウントを接続して、いいね・ブックマークを同期
           </p>
@@ -313,7 +313,7 @@ export default function XSettingsPage() {
                 </p>
               </div>
             )}
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <Select
                 label="同期対象"
                 value={syncType}
@@ -367,7 +367,7 @@ export default function XSettingsPage() {
             {syncResult && (
               <div className="bg-success-light rounded-xl p-4">
                 <p className="text-sm font-medium text-success mb-2">同期完了</p>
-                <div className="grid grid-cols-3 gap-3 text-center">
+                <div className="grid grid-cols-3 gap-2 text-center sm:gap-3">
                   <div>
                     <p className="text-lg font-bold text-text">{syncResult.fetchedCount}</p>
                     <p className="text-xs text-text-muted">取得</p>
@@ -407,7 +407,7 @@ export default function XSettingsPage() {
             {xStatus.syncRuns.map((run) => (
               <div
                 key={run.id}
-                className="flex items-center justify-between bg-border-light rounded-lg px-4 py-3"
+                className="flex flex-col gap-3 rounded-lg bg-border-light px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
               >
                 <div className="flex items-center gap-3">
                   {run.status === "success" ? (
@@ -430,7 +430,7 @@ export default function XSettingsPage() {
                     </p>
                   </div>
                 </div>
-                <div className="text-right">
+                <div className="text-left sm:text-right">
                   <Badge
                     variant={
                       run.status === "success"

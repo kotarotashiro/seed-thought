@@ -20,8 +20,8 @@ export const Card = forwardRef<HTMLDivElement, CardProps>(
           hoverable && !selected && "hover:border-accent/30 hover:shadow-sm cursor-pointer",
           {
             "p-4": padding === "sm",
-            "p-6": padding === "md",
-            "p-8": padding === "lg",
+            "p-4 sm:p-6": padding === "md",
+            "p-5 sm:p-8": padding === "lg",
           },
           className
         )}

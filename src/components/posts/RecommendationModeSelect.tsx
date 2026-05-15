@@ -28,8 +28,8 @@ export function RecommendationModeSelect({
   loading,
 }: RecommendationModeSelectProps) {
   return (
-    <div className="flex flex-wrap items-end gap-3">
-      <div className="w-48">
+    <div className="grid grid-cols-1 gap-3 sm:flex sm:flex-wrap sm:items-end">
+      <div className="min-w-0 sm:w-48">
         <Select
           label="候補選定モード"
           value={mode}
@@ -44,7 +44,7 @@ export function RecommendationModeSelect({
       </div>
 
       {mode === "genre" && (
-        <div className="w-48">
+        <div className="min-w-0 sm:w-48">
           <Select
             label="ジャンル"
             value={selectedGenre}
@@ -57,7 +57,7 @@ export function RecommendationModeSelect({
         </div>
       )}
 
-      <div className="w-44">
+      <div className="min-w-0 sm:w-44">
         <Select
           label="保存元"
           value={selectedSavedType}
@@ -75,7 +75,7 @@ export function RecommendationModeSelect({
         variant="secondary"
         onClick={onRefresh}
         disabled={loading}
-        className="gap-2"
+        className="w-full gap-2 sm:w-auto"
       >
         <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
         候補を引き直す
