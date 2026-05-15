@@ -1,8 +1,9 @@
 import { clsx } from "clsx";
+import { Bookmark, Heart, PenLine } from "lucide-react";
 
 interface BadgeProps {
   children: React.ReactNode;
-  variant?: "default" | "thought" | "learning" | "output" | "success" | "warning";
+  variant?: "default" | "thought" | "learning" | "output" | "success" | "warning" | "like" | "bookmark" | "manual";
   size?: "sm" | "md";
   className?: string;
 }
@@ -14,6 +15,9 @@ const variantStyles = {
   output: "bg-amber-50 text-amber-700",
   success: "bg-success-light text-success",
   warning: "bg-warning-light text-warning",
+  like: "bg-rose-50 text-rose-700",
+  bookmark: "bg-sky-50 text-sky-700",
+  manual: "bg-slate-100 text-slate-700",
 };
 
 export function Badge({ children, variant = "default", size = "sm", className }: BadgeProps) {
@@ -50,11 +54,26 @@ export function PostTypeBadge({ type }: { type: string }) {
 export function SavedTypeBadge({ type }: { type: string }) {
   switch (type) {
     case "like":
-      return <Badge variant="default">❤️ いいね</Badge>;
+      return (
+        <Badge variant="like" className="gap-1">
+          <Heart className="h-3 w-3 fill-current" />
+          いいね
+        </Badge>
+      );
     case "bookmark":
-      return <Badge variant="default">🔖 ブックマーク</Badge>;
+      return (
+        <Badge variant="bookmark" className="gap-1">
+          <Bookmark className="h-3 w-3 fill-current" />
+          ブックマーク
+        </Badge>
+      );
     case "manual":
-      return <Badge variant="default">✍️ 手動</Badge>;
+      return (
+        <Badge variant="manual" className="gap-1">
+          <PenLine className="h-3 w-3" />
+          手動
+        </Badge>
+      );
     default:
       return <Badge>{type}</Badge>;
   }

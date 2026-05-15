@@ -1,6 +1,21 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { getAiProvider } from "@/lib/ai/provider";
+import type { Prisma } from "@/generated/prisma/client";
+
+const sortOptions = {
+  savedAt_desc: { savedAt: "desc" },
+  savedAt_asc: { savedAt: "asc" },
+  postedAt_desc: { postedAt: { sort: "desc", nulls: "last" } },
+  postedAt_asc: { postedAt: { sort: "asc", nulls: "last" } },
+} satisfies Record<string, Prisma.PostOrderByWithRelationInput>;
+
+function getPostOrderBy(sort: string): Prisma.PostOrderByWithRelationInput {
+  if (sort in sortOptions) {
+    return sortOptions[sort as keyof typeof sortOptions];
+  }
+  return sortOptions.postedAt_desc;
+}
 
 // GET /api/posts - List all posts with filters
 export async function GET(request: Request) {
@@ -10,6 +25,7 @@ export async function GET(request: Request) {
   const postType = searchParams.get("postType") || "";
   const savedType = searchParams.get("savedType") || "";
   const digestStatus = searchParams.get("digestStatus") || "";
+  const sort = searchParams.get("sort") || "postedAt_desc";
 
   try {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -38,7 +54,10 @@ export async function GET(request: Request) {
         classification: true,
         deepDiveSessions: { select: { id: true, status: true } },
       },
-      orderBy: { savedAt: "desc" },
+      orderBy: [
+        getPostOrderBy(sort),
+        { savedAt: "desc" },
+      ],
     });
 
     const genres = await prisma.postClassification.findMany({

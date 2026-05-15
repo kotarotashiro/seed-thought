@@ -6,10 +6,31 @@ import { getAiProvider } from "@/lib/ai/provider";
 
 interface SyncResult {
   fetchedCount: number;
+  matchedCount: number;
   insertedCount: number;
   skippedDuplicateCount: number;
   errorMessage?: string;
   partialErrors?: string[];
+}
+
+interface SyncDateRange {
+  from?: Date | null;
+  to?: Date | null;
+}
+
+function filterTweetsByPostedAt(
+  tweets: XTweetWithAuthor[],
+  dateRange?: SyncDateRange
+): XTweetWithAuthor[] {
+  if (!dateRange?.from && !dateRange?.to) return tweets;
+
+  return tweets.filter((tweet) => {
+    if (!tweet.createdAt) return false;
+    const postedAt = new Date(tweet.createdAt).getTime();
+    const from = dateRange.from?.getTime() ?? Number.NEGATIVE_INFINITY;
+    const to = dateRange.to?.getTime() ?? Number.POSITIVE_INFINITY;
+    return postedAt >= from && postedAt <= to;
+  });
 }
 
 async function saveTweets(
@@ -97,7 +118,8 @@ async function saveTweets(
 
 export async function syncXPosts(
   syncType: "likes" | "bookmarks" | "both",
-  limit: number = 25
+  limit: number = 25,
+  dateRange?: SyncDateRange
 ): Promise<{ syncRunId: string; results: SyncResult }> {
   // Get the connected X account
   const xAccount = await prisma.xAccount.findFirst();
@@ -119,6 +141,7 @@ export async function syncXPosts(
 
   try {
     let totalFetched = 0;
+    let totalMatched = 0;
     let totalInserted = 0;
     let totalSkipped = 0;
     const partialErrors: string[] = [];
@@ -126,8 +149,10 @@ export async function syncXPosts(
     if (syncType === "likes" || syncType === "both") {
       try {
         const tweets = await fetchLikedTweets(xAccount.xUserId, accessToken, limit);
+        const matchedTweets = filterTweetsByPostedAt(tweets, dateRange);
         totalFetched += tweets.length;
-        const result = await saveTweets(tweets, "like");
+        totalMatched += matchedTweets.length;
+        const result = await saveTweets(matchedTweets, "like");
         totalInserted += result.insertedCount;
         totalSkipped += result.skippedDuplicateCount;
       } catch (error) {
@@ -138,8 +163,10 @@ export async function syncXPosts(
     if (syncType === "bookmarks" || syncType === "both") {
       try {
         const tweets = await fetchBookmarkedTweets(xAccount.xUserId, accessToken, limit);
+        const matchedTweets = filterTweetsByPostedAt(tweets, dateRange);
         totalFetched += tweets.length;
-        const result = await saveTweets(tweets, "bookmark");
+        totalMatched += matchedTweets.length;
+        const result = await saveTweets(matchedTweets, "bookmark");
         totalInserted += result.insertedCount;
         totalSkipped += result.skippedDuplicateCount;
       } catch (error) {
@@ -168,6 +195,7 @@ export async function syncXPosts(
       syncRunId: syncRun.id,
       results: {
         fetchedCount: totalFetched,
+        matchedCount: totalMatched,
         insertedCount: totalInserted,
         skippedDuplicateCount: totalSkipped,
         partialErrors: partialErrors.length > 0 ? partialErrors : undefined,
@@ -189,6 +217,7 @@ export async function syncXPosts(
       syncRunId: syncRun.id,
       results: {
         fetchedCount: 0,
+        matchedCount: 0,
         insertedCount: 0,
         skippedDuplicateCount: 0,
         errorMessage,

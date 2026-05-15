@@ -8,11 +8,13 @@ interface PostFiltersProps {
   selectedPostType: string;
   selectedSavedType: string;
   selectedDigestStatus: string;
+  selectedSort: string;
   searchQuery: string;
   onGenreChange: (value: string) => void;
   onPostTypeChange: (value: string) => void;
   onSavedTypeChange: (value: string) => void;
   onDigestStatusChange: (value: string) => void;
+  onSortChange: (value: string) => void;
   onSearchChange: (value: string) => void;
 }
 
@@ -22,11 +24,13 @@ export function PostFilters({
   selectedPostType,
   selectedSavedType,
   selectedDigestStatus,
+  selectedSort,
   searchQuery,
   onGenreChange,
   onPostTypeChange,
   onSavedTypeChange,
   onDigestStatusChange,
+  onSortChange,
   onSearchChange,
 }: PostFiltersProps) {
   return (
@@ -85,6 +89,18 @@ export function PostFilters({
               { value: "", label: "すべての状態" },
               { value: "undigested", label: "未消化" },
               { value: "digested", label: "深掘り済み" },
+            ]}
+          />
+        </div>
+        <div className="w-44">
+          <Select
+            value={selectedSort}
+            onChange={(e) => onSortChange(e.target.value)}
+            options={[
+              { value: "postedAt_desc", label: "投稿日が新しい順" },
+              { value: "postedAt_asc", label: "投稿日が古い順" },
+              { value: "savedAt_desc", label: "保存日が新しい順" },
+              { value: "savedAt_asc", label: "保存日が古い順" },
             ]}
           />
         </div>

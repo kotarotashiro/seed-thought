@@ -92,14 +92,7 @@ export async function fetchLikedTweets(
   accessToken: string,
   maxResults: number = 10
 ): Promise<XTweetWithAuthor[]> {
-  const response = await fetchFromX(`/users/${userId}/liked_tweets`, accessToken, {
-    max_results: String(Math.min(maxResults, 100)),
-    "tweet.fields": TWEET_FIELDS,
-    "user.fields": USER_FIELDS,
-    expansions: EXPANSIONS,
-  });
-
-  return mapTweetsWithAuthors(response);
+  return fetchTweetCollection(`/users/${userId}/liked_tweets`, accessToken, maxResults);
 }
 
 export async function fetchBookmarkedTweets(
@@ -107,14 +100,34 @@ export async function fetchBookmarkedTweets(
   accessToken: string,
   maxResults: number = 10
 ): Promise<XTweetWithAuthor[]> {
-  const response = await fetchFromX(`/users/${userId}/bookmarks`, accessToken, {
-    max_results: String(Math.min(maxResults, 100)),
-    "tweet.fields": TWEET_FIELDS,
-    "user.fields": USER_FIELDS,
-    expansions: EXPANSIONS,
-  });
+  return fetchTweetCollection(`/users/${userId}/bookmarks`, accessToken, maxResults);
+}
 
-  return mapTweetsWithAuthors(response);
+async function fetchTweetCollection(
+  endpoint: string,
+  accessToken: string,
+  maxResults: number
+): Promise<XTweetWithAuthor[]> {
+  const targetCount = Math.min(Math.max(maxResults, 10), 500);
+  const tweets: XTweetWithAuthor[] = [];
+  let nextToken: string | undefined;
+
+  while (tweets.length < targetCount) {
+    const pageSize = Math.min(100, Math.max(10, targetCount - tweets.length));
+    const response = await fetchFromX(endpoint, accessToken, {
+      max_results: String(pageSize),
+      "tweet.fields": TWEET_FIELDS,
+      "user.fields": USER_FIELDS,
+      expansions: EXPANSIONS,
+      ...(nextToken ? { pagination_token: nextToken } : {}),
+    });
+
+    tweets.push(...mapTweetsWithAuthors(response));
+    nextToken = response.meta?.next_token;
+    if (!nextToken || !response.data?.length) break;
+  }
+
+  return tweets.slice(0, targetCount);
 }
 
 export async function fetchAuthenticatedUser(

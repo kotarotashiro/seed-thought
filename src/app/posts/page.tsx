@@ -5,11 +5,34 @@ import Link from "next/link";
 import { PostFilters } from "@/components/posts/PostFilters";
 import { PostTypeBadge, SavedTypeBadge, Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
-import { Archive, Trash2, Pencil, ArrowRight, Eye } from "lucide-react";
+import { Archive, Trash2, Pencil, ArrowRight, Eye, ExternalLink } from "lucide-react";
+
+interface PostListItem {
+  id: string;
+  text: string;
+  sourceUrl?: string | null;
+  savedType: string;
+  authorUsername?: string | null;
+  postedAt?: string | null;
+  savedAt: string;
+  classification?: {
+    postType: string;
+    primaryCategory: string;
+  } | null;
+  deepDiveSessions?: { id: string; status: string }[];
+}
+
+function formatDate(value?: string | null) {
+  if (!value) return null;
+  return new Date(value).toLocaleDateString("ja-JP", {
+    year: "numeric",
+    month: "numeric",
+    day: "numeric",
+  });
+}
 
 export default function PostsPage() {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [posts, setPosts] = useState<any[]>([]);
+  const [posts, setPosts] = useState<PostListItem[]>([]);
   const [genres, setGenres] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -19,6 +42,7 @@ export default function PostsPage() {
   const [selectedPostType, setSelectedPostType] = useState("");
   const [selectedSavedType, setSelectedSavedType] = useState("");
   const [selectedDigestStatus, setSelectedDigestStatus] = useState("");
+  const [selectedSort, setSelectedSort] = useState("postedAt_desc");
 
   // Edit modal state
   const [editingPost, setEditingPost] = useState<string | null>(null);
@@ -33,6 +57,7 @@ export default function PostsPage() {
       if (selectedPostType) params.set("postType", selectedPostType);
       if (selectedSavedType) params.set("savedType", selectedSavedType);
       if (selectedDigestStatus) params.set("digestStatus", selectedDigestStatus);
+      params.set("sort", selectedSort);
 
       const res = await fetch(`/api/posts?${params}`);
       const data = await res.json();
@@ -56,6 +81,7 @@ export default function PostsPage() {
         if (selectedPostType) params.set("postType", selectedPostType);
         if (selectedSavedType) params.set("savedType", selectedSavedType);
         if (selectedDigestStatus) params.set("digestStatus", selectedDigestStatus);
+        params.set("sort", selectedSort);
 
         const res = await fetch(`/api/posts?${params}`);
         const data = await res.json();
@@ -73,7 +99,7 @@ export default function PostsPage() {
     return () => {
       cancelled = true;
     };
-  }, [searchQuery, selectedGenre, selectedPostType, selectedSavedType, selectedDigestStatus]);
+  }, [searchQuery, selectedGenre, selectedPostType, selectedSavedType, selectedDigestStatus, selectedSort]);
 
   const handleDelete = async (postId: string) => {
     if (!confirm("この投稿を削除しますか？")) return;
@@ -126,11 +152,13 @@ export default function PostsPage() {
         selectedPostType={selectedPostType}
         selectedSavedType={selectedSavedType}
         selectedDigestStatus={selectedDigestStatus}
+        selectedSort={selectedSort}
         searchQuery={searchQuery}
         onGenreChange={setSelectedGenre}
         onPostTypeChange={setSelectedPostType}
         onSavedTypeChange={setSelectedSavedType}
         onDigestStatusChange={setSelectedDigestStatus}
+        onSortChange={setSelectedSort}
         onSearchChange={setSearchQuery}
       />
 
@@ -192,9 +220,11 @@ export default function PostsPage() {
                           </span>
                         )}
                         <span className="text-xs text-text-muted">
-                          {new Date(post.savedAt).toLocaleDateString("ja-JP")}
+                          {post.postedAt
+                            ? `投稿日 ${formatDate(post.postedAt)}`
+                            : `保存日 ${formatDate(post.savedAt)}`}
                         </span>
-                        {post.deepDiveSessions?.length > 0 ? (
+                        {(post.deepDiveSessions?.length ?? 0) > 0 ? (
                           <Badge variant="success">深掘り済み</Badge>
                         ) : (
                           <Badge variant="warning">未消化</Badge>
@@ -202,6 +232,13 @@ export default function PostsPage() {
                       </div>
                     </div>
                     <div className="flex items-center gap-1 flex-shrink-0">
+                      {post.sourceUrl && (
+                        <a href={post.sourceUrl} target="_blank" rel="noreferrer">
+                          <Button variant="ghost" size="sm" title="Xの投稿を開く">
+                            <ExternalLink className="w-4 h-4" />
+                          </Button>
+                        </a>
+                      )}
                       <Link href={`/posts/${post.id}/confirm`}>
                         <Button variant="ghost" size="sm" title="詳細">
                           <Eye className="w-4 h-4" />

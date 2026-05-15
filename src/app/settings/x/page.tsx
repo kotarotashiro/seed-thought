@@ -38,6 +38,34 @@ function toSyncErrorMessage(message: string): string {
   return message;
 }
 
+function formatDateInput(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function getPostedDateRange(preset: string): { from: string; to: string } | null {
+  if (preset === "all") return null;
+
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const to = new Date(today);
+  const from = new Date(today);
+
+  if (preset === "yesterday") {
+    from.setDate(from.getDate() - 1);
+    to.setDate(to.getDate() - 1);
+  } else if (preset === "last7") {
+    from.setDate(from.getDate() - 6);
+  }
+
+  return {
+    from: formatDateInput(from),
+    to: formatDateInput(to),
+  };
+}
+
 export default function XSettingsPage() {
   const [xStatus, setXStatus] = useState<{
     connected: boolean;
@@ -56,8 +84,9 @@ export default function XSettingsPage() {
     };
   } | null>(null);
 
-  const [syncType, setSyncType] = useState("both");
+  const [syncType, setSyncType] = useState("likes");
   const [limit, setLimit] = useState("25");
+  const [datePreset, setDatePreset] = useState("all");
   const [syncing, setSyncing] = useState(false);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [syncResult, setSyncResult] = useState<any>(null);
@@ -136,6 +165,8 @@ export default function XSettingsPage() {
     setSyncResult(null);
     setError(null);
 
+    const dateRange = getPostedDateRange(datePreset);
+
     try {
       const res = await fetch("/api/x/sync", {
         method: "POST",
@@ -143,6 +174,8 @@ export default function XSettingsPage() {
         body: JSON.stringify({
           syncType,
           limit: parseInt(limit),
+          postedFrom: dateRange?.from,
+          postedTo: dateRange?.to,
         }),
       });
 
@@ -300,9 +333,26 @@ export default function XSettingsPage() {
                   { value: "25", label: "25件" },
                   { value: "50", label: "50件" },
                   { value: "100", label: "100件" },
+                  { value: "200", label: "200件" },
+                  { value: "500", label: "500件" },
                 ]}
               />
             </div>
+            <Select
+              label="日付範囲"
+              value={datePreset}
+              onChange={(e) => setDatePreset(e.target.value)}
+              options={[
+                { value: "all", label: "すべて" },
+                { value: "today", label: "今日投稿された分" },
+                { value: "yesterday", label: "昨日投稿された分" },
+                { value: "last7", label: "直近7日投稿分" },
+              ]}
+            />
+            <p className="text-xs text-text-muted">
+              X APIは「いいねした日時」を返さないため、日付範囲はX投稿の投稿日で絞り込みます。
+              最近いいねした古い投稿も拾いたい場合は、日付範囲を「すべて」にして取得件数を増やしてください。
+            </p>
 
             <Button
               onClick={handleSync}
@@ -323,14 +373,17 @@ export default function XSettingsPage() {
                     <p className="text-xs text-text-muted">取得</p>
                   </div>
                   <div>
+                    <p className="text-lg font-bold text-text">{syncResult.matchedCount ?? syncResult.fetchedCount}</p>
+                    <p className="text-xs text-text-muted">日付一致</p>
+                  </div>
+                  <div>
                     <p className="text-lg font-bold text-text">{syncResult.insertedCount}</p>
                     <p className="text-xs text-text-muted">新規保存</p>
                   </div>
-                  <div>
-                    <p className="text-lg font-bold text-text">{syncResult.skippedDuplicateCount}</p>
-                    <p className="text-xs text-text-muted">重複スキップ</p>
-                  </div>
                 </div>
+                <p className="mt-2 text-center text-xs text-text-muted">
+                  重複スキップ {syncResult.skippedDuplicateCount}件
+                </p>
                 {syncResult.partialErrors?.length > 0 && (
                   <div className="mt-3 space-y-1">
                     {syncResult.partialErrors.map((message: string) => (
