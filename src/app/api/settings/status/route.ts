@@ -1,13 +1,11 @@
 import { NextResponse } from "next/server";
+import { getAiPublicSettings } from "@/lib/ai/settings";
 
 export async function GET() {
-  const configuredProvider = process.env.AI_PROVIDER || "gemini";
-  const aiProvider =
-    process.env.NODE_ENV === "production" && configuredProvider === "mock"
-      ? "gemini"
-      : configuredProvider;
+  const ai = await getAiPublicSettings();
 
   return NextResponse.json({
-    aiProvider,
+    aiProvider: ai.provider,
+    ai,
   });
 }

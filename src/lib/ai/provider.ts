@@ -1,22 +1,147 @@
-import type { AiProvider } from "./types";
+import { GoogleGenAI } from "@google/genai";
+import OpenAI from "openai";
+import type {
+  AiProvider,
+  ClassifyPostInput,
+  GenerateDeepDiveSessionInput,
+  GeneratedDeepDiveSessionResult,
+  GenerateOutputInput,
+  GeneratedOutputResult,
+  PostClassificationResult,
+} from "./types";
+import { buildClassifyPrompt, buildDeepDivePrompt, buildOutputPrompt } from "./prompts";
+import { parseAiJson } from "./json";
+import {
+  isGeneratedDeepDiveSessionResult,
+  isGeneratedOutputResult,
+  isPostClassificationResult,
+} from "./validation";
+import { mergeClassificationFallback } from "./fallback";
+import { getAiRuntimeSettings, type AiProviderName, type AiRuntimeSettings } from "./settings";
 import { mockProvider } from "./mockProvider";
-import { openaiProvider } from "./openaiProvider";
-import { geminiProvider } from "./geminiProvider";
 
-export function getAiProvider(): AiProvider {
-  const configuredProvider = process.env.AI_PROVIDER || "gemini";
-  const provider =
-    process.env.NODE_ENV === "production" && configuredProvider === "mock"
-      ? "gemini"
-      : configuredProvider;
+async function callGemini(prompt: string, settings: AiRuntimeSettings): Promise<string> {
+  if (!settings.apiKey) throw new Error("GEMINI_API_KEY is not set");
+  const client = new GoogleGenAI({ apiKey: settings.apiKey });
+  const response = await client.models.generateContent({
+    model: settings.model,
+    contents: prompt,
+    config: {
+      responseMimeType: "application/json",
+    },
+  });
+  return response.text || "{}";
+}
 
-  switch (provider) {
-    case "openai":
-      return openaiProvider;
+function getOpenAiBaseUrl(provider: AiProviderName): string | undefined {
+  if (provider === "grok") return "https://api.x.ai/v1";
+  if (provider === "kimi") return "https://api.moonshot.ai/v1";
+  return undefined;
+}
+
+async function callOpenAiCompatible(prompt: string, settings: AiRuntimeSettings): Promise<string> {
+  if (!settings.apiKey) {
+    if (settings.provider === "openai") throw new Error("OPENAI_API_KEY is not set");
+    if (settings.provider === "grok") throw new Error("GROK_API_KEY is not set");
+    if (settings.provider === "kimi") throw new Error("KIMI_API_KEY is not set");
+    throw new Error("AI API key is not set");
+  }
+
+  const client = new OpenAI({
+    apiKey: settings.apiKey,
+    baseURL: getOpenAiBaseUrl(settings.provider),
+  });
+
+  const response = await client.chat.completions.create({
+    model: settings.model,
+    messages: [{ role: "user", content: prompt }],
+    temperature: 0.4,
+    response_format: { type: "json_object" },
+  });
+
+  return response.choices[0]?.message?.content || "{}";
+}
+
+async function callClaude(prompt: string, settings: AiRuntimeSettings): Promise<string> {
+  if (!settings.apiKey) throw new Error("CLAUDE_API_KEY is not set");
+
+  const response = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-api-key": settings.apiKey,
+      "anthropic-version": "2023-06-01",
+    },
+    body: JSON.stringify({
+      model: settings.model,
+      max_tokens: 4096,
+      temperature: 0.4,
+      messages: [{ role: "user", content: prompt }],
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Claude API error: ${response.status} - ${errorText}`);
+  }
+
+  const data = await response.json();
+  const textBlocks = Array.isArray(data.content)
+    ? data.content
+        .filter((block: { type?: string; text?: string }) => block.type === "text")
+        .map((block: { text?: string }) => block.text || "")
+    : [];
+  return textBlocks.join("\n").trim() || "{}";
+}
+
+async function callConfiguredAi(prompt: string): Promise<string> {
+  const settings = await getAiRuntimeSettings();
+
+  switch (settings.provider) {
     case "gemini":
-      return geminiProvider;
+      return callGemini(prompt, settings);
+    case "openai":
+    case "grok":
+    case "kimi":
+      return callOpenAiCompatible(prompt, settings);
+    case "claude":
+      return callClaude(prompt, settings);
     case "mock":
     default:
-      return mockProvider;
+      throw new Error("mock provider does not support direct calls");
   }
+}
+
+export function getAiProvider(): AiProvider {
+  return {
+    async classifyPost(input: ClassifyPostInput): Promise<PostClassificationResult> {
+      const settings = await getAiRuntimeSettings();
+      if (settings.provider === "mock") return mockProvider.classifyPost(input);
+
+      const prompt = await buildClassifyPrompt(input);
+      const result = await callConfiguredAi(prompt);
+      const classification = parseAiJson(result, isPostClassificationResult, "投稿分類");
+      return mergeClassificationFallback(input.text, classification);
+    },
+
+    async generateDeepDiveSession(
+      input: GenerateDeepDiveSessionInput
+    ): Promise<GeneratedDeepDiveSessionResult> {
+      const settings = await getAiRuntimeSettings();
+      if (settings.provider === "mock") return mockProvider.generateDeepDiveSession(input);
+
+      const prompt = await buildDeepDivePrompt(input);
+      const result = await callConfiguredAi(prompt);
+      return parseAiJson(result, isGeneratedDeepDiveSessionResult, "深掘りセッション");
+    },
+
+    async generateOutput(input: GenerateOutputInput): Promise<GeneratedOutputResult> {
+      const settings = await getAiRuntimeSettings();
+      if (settings.provider === "mock") return mockProvider.generateOutput(input);
+
+      const prompt = await buildOutputPrompt(input);
+      const result = await callConfiguredAi(prompt);
+      return parseAiJson(result, isGeneratedOutputResult, "アウトプット生成");
+    },
+  };
 }

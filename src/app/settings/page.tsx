@@ -5,7 +5,7 @@ import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Select } from "@/components/ui/Select";
-import { Settings, Cpu, User, Save } from "lucide-react";
+import { AlertCircle, CheckCircle, Cpu, KeyRound, Settings, User, Save } from "lucide-react";
 
 type ProfileForm = {
   name: string;
@@ -13,6 +13,21 @@ type ProfileForm = {
   themes: string[];
   outputChannels: string[];
   tone: string;
+};
+
+type AiProviderOption = {
+  value: string;
+  label: string;
+  defaultModel: string;
+};
+
+type AiSettingsForm = {
+  provider: string;
+  model: string;
+  apiKey: string;
+  hasApiKey: boolean;
+  keySource: string;
+  providers: AiProviderOption[];
 };
 
 const roleOptions = [
@@ -54,6 +69,14 @@ function toggleListValue(values: string[], value: string): string[] {
 
 export default function SettingsPage() {
   const [aiProvider, setAiProvider] = useState("loading");
+  const [aiSettings, setAiSettings] = useState<AiSettingsForm>({
+    provider: "gemini",
+    model: "gemini-2.0-flash",
+    apiKey: "",
+    hasApiKey: false,
+    keySource: "none",
+    providers: [],
+  });
   const [profile, setProfile] = useState<ProfileForm>({
     name: "",
     role: "",
@@ -63,6 +86,8 @@ export default function SettingsPage() {
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [savingAi, setSavingAi] = useState(false);
+  const [testingAi, setTestingAi] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -71,15 +96,25 @@ export default function SettingsPage() {
 
     async function loadSettings() {
       try {
-        const [statusRes, profileRes] = await Promise.all([
+        const [statusRes, profileRes, aiRes] = await Promise.all([
           fetch("/api/settings/status"),
           fetch("/api/settings/profile"),
+          fetch("/api/settings/ai"),
         ]);
         const statusData = await statusRes.json();
         const profileData = await profileRes.json();
+        const aiData = await aiRes.json();
         if (cancelled) return;
 
         setAiProvider(statusData.aiProvider || "mock");
+        setAiSettings({
+          provider: aiData.provider || "gemini",
+          model: aiData.model || "gemini-2.0-flash",
+          apiKey: "",
+          hasApiKey: Boolean(aiData.hasApiKey),
+          keySource: aiData.keySource || "none",
+          providers: aiData.providers || [],
+        });
         setProfile({
           name: profileData.name || "",
           role: profileData.role || "",
@@ -140,6 +175,75 @@ export default function SettingsPage() {
     }
   };
 
+  const handleAiProviderChange = (provider: string) => {
+    const option = aiSettings.providers.find((item) => item.value === provider);
+    setAiSettings((current) => ({
+      ...current,
+      provider,
+      model: option?.defaultModel || current.model,
+    }));
+  };
+
+  const handleSaveAi = async (clearApiKey = false) => {
+    setSavingAi(true);
+    setError(null);
+    setMessage(null);
+
+    try {
+      const res = await fetch("/api/settings/ai", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          provider: aiSettings.provider,
+          model: aiSettings.model,
+          apiKey: clearApiKey ? "" : aiSettings.apiKey,
+          clearApiKey,
+        }),
+      });
+      const data = await res.json();
+
+      if (!res.ok || data.error) {
+        setError(data.error || "AI設定の保存に失敗しました");
+        return;
+      }
+
+      setAiProvider(data.provider);
+      setAiSettings((current) => ({
+        ...current,
+        provider: data.provider,
+        model: data.model,
+        apiKey: "",
+        hasApiKey: Boolean(data.hasApiKey),
+        keySource: data.keySource || "none",
+      }));
+      setMessage(clearApiKey ? "保存済みAPIキーを削除しました。" : "AI設定を保存しました。");
+    } catch {
+      setError("AI設定の保存に失敗しました");
+    } finally {
+      setSavingAi(false);
+    }
+  };
+
+  const handleTestAi = async () => {
+    setTestingAi(true);
+    setError(null);
+    setMessage(null);
+
+    try {
+      const res = await fetch("/api/settings/ai", { method: "POST" });
+      const data = await res.json();
+      if (!res.ok || data.error) {
+        setError(data.error || "AI接続テストに失敗しました");
+        return;
+      }
+      setMessage(`AI接続テストに成功しました。カテゴリ: ${data.category}`);
+    } catch {
+      setError("AI接続テストに失敗しました");
+    } finally {
+      setTestingAi(false);
+    }
+  };
+
   return (
     <div className="max-w-2xl mx-auto space-y-6">
       <div className="flex items-center gap-3">
@@ -166,17 +270,90 @@ export default function SettingsPage() {
       )}
 
       <Card>
-        <div className="flex items-center gap-3 mb-4">
-          <Cpu className="w-5 h-5 text-accent" />
-          <h3 className="text-base font-bold text-text">AI Provider</h3>
+        <div className="flex items-center justify-between gap-3 mb-4">
+          <div className="flex items-center gap-3">
+            <Cpu className="w-5 h-5 text-accent" />
+            <h3 className="text-base font-bold text-text">AI Provider</h3>
+          </div>
+          <Badge variant={aiSettings.hasApiKey ? "success" : "warning"}>
+            {aiSettings.hasApiKey
+              ? aiSettings.keySource === "ui"
+                ? "UIキー設定済み"
+                : "環境変数キー使用中"
+              : "APIキー未設定"}
+          </Badge>
         </div>
-        <div className="space-y-3">
+        <div className="space-y-4">
           <div className="flex items-center justify-between bg-border-light rounded-xl px-4 py-3">
             <span className="text-sm text-text">現在のProvider</span>
             <Badge variant="success">{aiProvider}</Badge>
           </div>
+          <div className="grid gap-4 md:grid-cols-2">
+            <Select
+              label="Provider"
+              value={aiSettings.provider}
+              onChange={(e) => handleAiProviderChange(e.target.value)}
+              options={aiSettings.providers.map((provider) => ({
+                value: provider.value,
+                label: provider.label,
+              }))}
+            />
+            <label className="block">
+              <span className="block text-sm font-medium text-text mb-1.5">モデル</span>
+              <input
+                value={aiSettings.model}
+                onChange={(e) =>
+                  setAiSettings((current) => ({ ...current, model: e.target.value }))
+                }
+                className="w-full rounded-xl border border-border bg-white px-4 py-3 text-sm text-text outline-none focus:border-accent"
+              />
+            </label>
+          </div>
+          <label className="block">
+            <span className="block text-sm font-medium text-text mb-1.5">APIキー</span>
+            <div className="relative">
+              <KeyRound className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted" />
+              <input
+                type="password"
+                value={aiSettings.apiKey}
+                placeholder={
+                  aiSettings.hasApiKey
+                    ? "変更する場合だけ新しいAPIキーを入力"
+                    : "APIキーを入力"
+                }
+                onChange={(e) =>
+                  setAiSettings((current) => ({ ...current, apiKey: e.target.value }))
+                }
+                className="w-full rounded-xl border border-border bg-white py-3 pl-10 pr-4 text-sm text-text outline-none focus:border-accent"
+              />
+            </div>
+          </label>
+          <div className="rounded-xl border border-warning/20 bg-warning-light px-4 py-3 text-sm text-text-secondary">
+            <div className="flex items-start gap-2">
+              <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0 text-warning" />
+              <p>
+                APIキーは暗号化してDBに保存し、ブラウザには再表示しません。
+                公開運用ではVercel Deployment Protectionを有効にしたまま使ってください。
+              </p>
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button onClick={() => handleSaveAi(false)} disabled={savingAi || testingAi}>
+              <Save className="w-4 h-4 mr-1" />
+              {savingAi ? "保存中..." : "AI設定を保存"}
+            </Button>
+            <Button variant="secondary" onClick={handleTestAi} disabled={savingAi || testingAi}>
+              <CheckCircle className="w-4 h-4 mr-1" />
+              {testingAi ? "テスト中..." : "接続テスト"}
+            </Button>
+            {aiSettings.keySource === "ui" && (
+              <Button variant="ghost" onClick={() => handleSaveAi(true)} disabled={savingAi}>
+                保存済みキーを削除
+              </Button>
+            )}
+          </div>
           <p className="text-xs text-text-muted">
-            AI ProviderはVercel環境変数またはローカル.envの AI_PROVIDER で切り替えます。
+            対応Provider: Gemini / OpenAI / Claude / Grok / Kimi。APIキーはサーバー側だけで使用します。
           </p>
         </div>
       </Card>

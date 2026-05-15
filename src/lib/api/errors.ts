@@ -10,6 +10,15 @@ export function getUserFacingError(error: unknown, fallback: string): string {
   if (error.message.includes("OPENAI_API_KEY")) {
     return "OpenAI APIキーが設定されていません。.env の OPENAI_API_KEY を確認してください。";
   }
+  if (error.message.includes("CLAUDE_API_KEY")) {
+    return "Claude APIキーが設定されていません。設定画面またはVercel環境変数を確認してください。";
+  }
+  if (error.message.includes("GROK_API_KEY")) {
+    return "Grok APIキーが設定されていません。設定画面またはVercel環境変数を確認してください。";
+  }
+  if (error.message.includes("KIMI_API_KEY")) {
+    return "Kimi APIキーが設定されていません。設定画面またはVercel環境変数を確認してください。";
+  }
   if (error.message.includes("X_CLIENT_ID")) {
     return "X_CLIENT_ID が設定されていません。.env と X Developer Portal の設定を確認してください。";
   }
