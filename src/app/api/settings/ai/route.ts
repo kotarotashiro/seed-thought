@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import {
-  getAiPublicSettings,
-  getModelPresets,
-  getRecommendedModel,
+  getAiRuntimeSettings,
+  getEnvApiKey,
+  getProviderModelOptions,
   saveAiSettings,
   type AiProviderName,
 } from "@/lib/ai/settings";
@@ -18,27 +18,40 @@ function normalizeProvider(value: unknown): AiProviderName | null {
 
 export async function GET() {
   try {
-    const settings = await getAiPublicSettings();
+    const settings = await getAiRuntimeSettings();
+    const providerOptions = await Promise.all(
+      providers.map(async (provider) => {
+        const apiKey = provider === settings.provider ? settings.apiKey : getEnvApiKey(provider);
+        const options = await getProviderModelOptions(provider, apiKey);
+
+        return {
+          value: provider,
+          label:
+            provider === "gemini"
+              ? "Gemini"
+              : provider === "openai"
+              ? "OpenAI"
+              : provider === "claude"
+              ? "Claude"
+              : provider === "grok"
+              ? "Grok"
+              : "Kimi",
+          defaultModel: options.defaultModel,
+          modelsSource: options.source,
+          models: options.models.map((model) => ({
+            value: model,
+            label: model,
+          })),
+        };
+      })
+    );
+
     return NextResponse.json({
-      ...settings,
-      providers: providers.map((provider) => ({
-        value: provider,
-        label:
-          provider === "gemini"
-            ? "Gemini"
-            : provider === "openai"
-            ? "OpenAI"
-            : provider === "claude"
-            ? "Claude"
-            : provider === "grok"
-            ? "Grok"
-            : "Kimi",
-        defaultModel: getRecommendedModel(provider),
-        models: getModelPresets(provider).map((model) => ({
-          value: model,
-          label: model,
-        })),
-      })),
+      provider: settings.provider,
+      model: settings.model,
+      hasApiKey: settings.hasApiKey,
+      keySource: settings.keySource,
+      providers: providerOptions,
     });
   } catch (error) {
     console.error("Failed to load AI settings:", error);

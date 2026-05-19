@@ -19,6 +19,7 @@ type AiProviderOption = {
   value: string;
   label: string;
   defaultModel: string;
+  modelsSource?: "live" | "fallback";
   models: { value: string; label: string }[];
 };
 
@@ -75,6 +76,10 @@ function getModelOptions(settings: AiSettingsForm): { value: string; label: stri
     return [{ value: settings.model, label: settings.model }, ...options];
   }
   return options;
+}
+
+function getCurrentProviderOption(settings: AiSettingsForm): AiProviderOption | undefined {
+  return settings.providers.find((item) => item.value === settings.provider);
 }
 
 export default function SettingsPage() {
@@ -308,14 +313,21 @@ export default function SettingsPage() {
                 label: provider.label,
               }))}
             />
-            <Select
-              label="モデル"
-              value={aiSettings.model}
-              onChange={(e) =>
-                setAiSettings((current) => ({ ...current, model: e.target.value }))
-              }
-              options={getModelOptions(aiSettings)}
-            />
+            <div>
+              <Select
+                label="モデル"
+                value={aiSettings.model}
+                onChange={(e) =>
+                  setAiSettings((current) => ({ ...current, model: e.target.value }))
+                }
+                options={getModelOptions(aiSettings)}
+              />
+              <p className="mt-1.5 text-xs text-text-muted">
+                {getCurrentProviderOption(aiSettings)?.modelsSource === "live"
+                  ? "公式APIから取得した最新候補です。"
+                  : "公式APIで取得できない場合の推奨候補です。"}
+              </p>
+            </div>
           </div>
           <label className="block">
             <span className="block text-sm font-medium text-text mb-1.5">APIキー</span>
