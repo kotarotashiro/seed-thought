@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import {
   getAiPublicSettings,
-  getDefaultModel,
   getModelPresets,
+  getRecommendedModel,
   saveAiSettings,
   type AiProviderName,
 } from "@/lib/ai/settings";
@@ -33,7 +33,7 @@ export async function GET() {
             : provider === "grok"
             ? "Grok"
             : "Kimi",
-        defaultModel: getDefaultModel(provider),
+        defaultModel: getRecommendedModel(provider),
         models: getModelPresets(provider).map((model) => ({
           value: model,
           label: model,

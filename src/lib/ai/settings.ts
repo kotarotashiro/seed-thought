@@ -23,32 +23,62 @@ interface StoredAiSettings {
 }
 
 const defaultModels: Record<AiProviderName, string> = {
-  gemini: "gemini-2.5-flash",
-  openai: "gpt-4o-mini",
-  claude: "claude-sonnet-4-5",
-  grok: "grok-4",
-  kimi: "kimi-k2-0711-preview",
+  gemini: "gemini-3.1-pro-preview",
+  openai: "gpt-5.5",
+  claude: "claude-sonnet-4-6",
+  grok: "grok-4.3",
+  kimi: "kimi-k2.6",
   mock: "mock",
 };
 
 const modelPresets: Record<AiProviderName, string[]> = {
   gemini: [
-    "gemini-2.5-flash",
+    "gemini-3.1-pro-preview",
+    "gemini-3-flash-preview",
+    "gemini-3.1-flash-lite",
+    "gemini-3.1-flash-lite-preview",
     "gemini-2.5-pro",
+    "gemini-2.5-flash",
+    "gemini-2.5-flash-lite",
     "gemini-2.0-flash",
     "gemini-2.0-flash-lite",
     "gemini-1.5-flash",
     "gemini-1.5-pro",
   ],
-  openai: ["gpt-4o-mini", "gpt-4o", "gpt-4.1-mini", "gpt-4.1"],
+  openai: [
+    "gpt-5.5",
+    "gpt-5.4",
+    "gpt-5.4-mini",
+    "gpt-5.4-nano",
+    "gpt-5.2",
+    "gpt-5.1",
+    "gpt-5",
+    "gpt-4.1",
+    "gpt-4.1-mini",
+    "gpt-4o",
+    "gpt-4o-mini",
+  ],
   claude: [
+    "claude-opus-4-7",
+    "claude-sonnet-4-6",
+    "claude-haiku-4-5",
     "claude-sonnet-4-5",
-    "claude-opus-4-1",
     "claude-3-7-sonnet-latest",
     "claude-3-5-haiku-latest",
   ],
-  grok: ["grok-4", "grok-3", "grok-3-mini"],
-  kimi: ["kimi-k2-0711-preview", "moonshot-v1-8k", "moonshot-v1-32k", "moonshot-v1-128k"],
+  grok: ["grok-4.3", "grok-4.20", "grok-3", "grok-3-mini"],
+  kimi: [
+    "kimi-k2.6",
+    "kimi-k2.5",
+    "kimi-k2-thinking",
+    "kimi-k2-thinking-turbo",
+    "kimi-k2-0905-preview",
+    "kimi-k2-turbo-preview",
+    "kimi-k2-0711-preview",
+    "moonshot-v1-8k",
+    "moonshot-v1-32k",
+    "moonshot-v1-128k",
+  ],
   mock: ["mock"],
 };
 
@@ -93,9 +123,13 @@ export function getDefaultModel(provider: AiProviderName): string {
   return envModels[provider] || defaultModels[provider];
 }
 
+export function getRecommendedModel(provider: AiProviderName): string {
+  return defaultModels[provider];
+}
+
 export function getModelPresets(provider: AiProviderName): string[] {
-  const current = getDefaultModel(provider);
-  return Array.from(new Set([current, ...modelPresets[provider]]));
+  const envModel = envModels[provider];
+  return Array.from(new Set([...modelPresets[provider], ...(envModel ? [envModel] : [])]));
 }
 
 export async function getAiRuntimeSettings(): Promise<AiRuntimeSettings> {
