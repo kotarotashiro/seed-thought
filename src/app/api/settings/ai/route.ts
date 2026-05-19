@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import {
   getAiPublicSettings,
   getDefaultModel,
+  getModelPresets,
   saveAiSettings,
   type AiProviderName,
 } from "@/lib/ai/settings";
@@ -33,6 +34,10 @@ export async function GET() {
             ? "Grok"
             : "Kimi",
         defaultModel: getDefaultModel(provider),
+        models: getModelPresets(provider).map((model) => ({
+          value: model,
+          label: model,
+        })),
       })),
     });
   } catch (error) {

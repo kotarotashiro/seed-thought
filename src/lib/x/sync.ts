@@ -37,7 +37,8 @@ function filterTweetsByPostedAt(
 
 async function saveTweets(
   tweets: XTweetWithAuthor[],
-  savedType: "like" | "bookmark"
+  savedType: "like" | "bookmark",
+  options: { enrichWithAi: boolean }
 ): Promise<{ insertedCount: number; skippedDuplicateCount: number }> {
   let insertedCount = 0;
   let skippedDuplicateCount = 0;
@@ -57,7 +58,7 @@ async function saveTweets(
     }
 
     let translatedText: string | null = null;
-    if (needsJapaneseTranslation(tweet.text)) {
+    if (options.enrichWithAi && needsJapaneseTranslation(tweet.text)) {
       try {
         translatedText = await getAiProvider().translateText({ text: tweet.text });
       } catch (error) {
@@ -83,49 +84,38 @@ async function saveTweets(
       },
     });
 
-    // Attempt AI classification
-    try {
-      const provider = getAiProvider();
-      const classification = await provider.classifyPost({
-        text: tweet.text,
-        authorName: tweet.authorName,
-        authorUsername: tweet.authorUsername,
-      });
+    const fallbackClassification = createFallbackClassification({ text: tweet.text });
+    let classification = fallbackClassification;
 
-      await prisma.postClassification.create({
-        data: {
-          postId: post.id,
-          postType: classification.postType,
-          primaryCategory: classification.primaryCategory,
-          tagsJson: JSON.stringify(classification.tags),
-          summary: classification.summary,
-          recommendReason: classification.recommendReason,
-          difficultyLevel: classification.difficultyLevel,
-          outputPotentialScore: classification.outputPotentialScore,
-          learningPotentialScore: classification.learningPotentialScore,
-          thinkingPotentialScore: classification.thinkingPotentialScore,
-          recommendedMode: classification.recommendedMode,
-        },
-      });
+    // Large X syncs must stay fast enough for serverless time limits.
+    try {
+      if (options.enrichWithAi) {
+        const provider = getAiProvider();
+        classification = await provider.classifyPost({
+          text: tweet.text,
+          authorName: tweet.authorName,
+          authorUsername: tweet.authorUsername,
+        });
+      }
     } catch (error) {
       console.error("X post classification failed, using fallback:", error);
-      const classification = createFallbackClassification({ text: tweet.text });
-      await prisma.postClassification.create({
-        data: {
-          postId: post.id,
-          postType: classification.postType,
-          primaryCategory: classification.primaryCategory,
-          tagsJson: JSON.stringify(classification.tags),
-          summary: classification.summary,
-          recommendReason: classification.recommendReason,
-          difficultyLevel: classification.difficultyLevel,
-          outputPotentialScore: classification.outputPotentialScore,
-          learningPotentialScore: classification.learningPotentialScore,
-          thinkingPotentialScore: classification.thinkingPotentialScore,
-          recommendedMode: classification.recommendedMode,
-        },
-      });
     }
+
+    await prisma.postClassification.create({
+      data: {
+        postId: post.id,
+        postType: classification.postType,
+        primaryCategory: classification.primaryCategory,
+        tagsJson: JSON.stringify(classification.tags),
+        summary: classification.summary,
+        recommendReason: classification.recommendReason,
+        difficultyLevel: classification.difficultyLevel,
+        outputPotentialScore: classification.outputPotentialScore,
+        learningPotentialScore: classification.learningPotentialScore,
+        thinkingPotentialScore: classification.thinkingPotentialScore,
+        recommendedMode: classification.recommendedMode,
+      },
+    });
 
     insertedCount++;
   }
@@ -145,6 +135,7 @@ export async function syncXPosts(
   }
 
   const accessToken = await getFreshAccessToken(xAccount);
+  const enrichWithAi = limit <= 25;
 
   // Create sync run record
   const syncRun = await prisma.xSyncRun.create({
@@ -169,7 +160,7 @@ export async function syncXPosts(
         const matchedTweets = filterTweetsByPostedAt(tweets, dateRange);
         totalFetched += tweets.length;
         totalMatched += matchedTweets.length;
-        const result = await saveTweets(matchedTweets, "like");
+        const result = await saveTweets(matchedTweets, "like", { enrichWithAi });
         totalInserted += result.insertedCount;
         totalSkipped += result.skippedDuplicateCount;
       } catch (error) {
@@ -183,7 +174,7 @@ export async function syncXPosts(
         const matchedTweets = filterTweetsByPostedAt(tweets, dateRange);
         totalFetched += tweets.length;
         totalMatched += matchedTweets.length;
-        const result = await saveTweets(matchedTweets, "bookmark");
+        const result = await saveTweets(matchedTweets, "bookmark", { enrichWithAi });
         totalInserted += result.insertedCount;
         totalSkipped += result.skippedDuplicateCount;
       } catch (error) {

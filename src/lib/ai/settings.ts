@@ -23,12 +23,33 @@ interface StoredAiSettings {
 }
 
 const defaultModels: Record<AiProviderName, string> = {
-  gemini: "gemini-2.0-flash",
+  gemini: "gemini-2.5-flash",
   openai: "gpt-4o-mini",
   claude: "claude-sonnet-4-5",
   grok: "grok-4",
   kimi: "kimi-k2-0711-preview",
   mock: "mock",
+};
+
+const modelPresets: Record<AiProviderName, string[]> = {
+  gemini: [
+    "gemini-2.5-flash",
+    "gemini-2.5-pro",
+    "gemini-2.0-flash",
+    "gemini-2.0-flash-lite",
+    "gemini-1.5-flash",
+    "gemini-1.5-pro",
+  ],
+  openai: ["gpt-4o-mini", "gpt-4o", "gpt-4.1-mini", "gpt-4.1"],
+  claude: [
+    "claude-sonnet-4-5",
+    "claude-opus-4-1",
+    "claude-3-7-sonnet-latest",
+    "claude-3-5-haiku-latest",
+  ],
+  grok: ["grok-4", "grok-3", "grok-3-mini"],
+  kimi: ["kimi-k2-0711-preview", "moonshot-v1-8k", "moonshot-v1-32k", "moonshot-v1-128k"],
+  mock: ["mock"],
 };
 
 const envKeys: Record<AiProviderName, string | undefined> = {
@@ -70,6 +91,11 @@ function readStoredSettings(valueJson: string | null | undefined): StoredAiSetti
 
 export function getDefaultModel(provider: AiProviderName): string {
   return envModels[provider] || defaultModels[provider];
+}
+
+export function getModelPresets(provider: AiProviderName): string[] {
+  const current = getDefaultModel(provider);
+  return Array.from(new Set([current, ...modelPresets[provider]]));
 }
 
 export async function getAiRuntimeSettings(): Promise<AiRuntimeSettings> {

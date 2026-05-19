@@ -19,6 +19,7 @@ type AiProviderOption = {
   value: string;
   label: string;
   defaultModel: string;
+  models: { value: string; label: string }[];
 };
 
 type AiSettingsForm = {
@@ -65,6 +66,15 @@ function toggleListValue(values: string[], value: string): string[] {
   return values.includes(value)
     ? values.filter((item) => item !== value)
     : [...values, value];
+}
+
+function getModelOptions(settings: AiSettingsForm): { value: string; label: string }[] {
+  const provider = settings.providers.find((item) => item.value === settings.provider);
+  const options = provider?.models || [];
+  if (settings.model && !options.some((option) => option.value === settings.model)) {
+    return [{ value: settings.model, label: settings.model }, ...options];
+  }
+  return options;
 }
 
 export default function SettingsPage() {
@@ -298,16 +308,14 @@ export default function SettingsPage() {
                 label: provider.label,
               }))}
             />
-            <label className="block">
-              <span className="block text-sm font-medium text-text mb-1.5">モデル</span>
-              <input
-                value={aiSettings.model}
-                onChange={(e) =>
-                  setAiSettings((current) => ({ ...current, model: e.target.value }))
-                }
-                className="w-full rounded-xl border border-border bg-white px-4 py-3 text-sm text-text outline-none focus:border-accent"
-              />
-            </label>
+            <Select
+              label="モデル"
+              value={aiSettings.model}
+              onChange={(e) =>
+                setAiSettings((current) => ({ ...current, model: e.target.value }))
+              }
+              options={getModelOptions(aiSettings)}
+            />
           </div>
           <label className="block">
             <span className="block text-sm font-medium text-text mb-1.5">APIキー</span>

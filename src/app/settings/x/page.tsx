@@ -12,6 +12,7 @@ import {
   RefreshCw,
   AlertCircle,
   Unplug,
+  AlertTriangle,
 } from "lucide-react";
 
 function parseAccountScopes(account: { scopesJson?: string | null } | null | undefined): string[] {
@@ -414,6 +415,8 @@ export default function XSettingsPage() {
                     <CheckCircle className="w-4 h-4 text-success" />
                   ) : run.status === "failed" ? (
                     <XCircle className="w-4 h-4 text-danger" />
+                  ) : run.status === "partial" ? (
+                    <AlertTriangle className="w-4 h-4 text-warning" />
                   ) : (
                     <RefreshCw className="w-4 h-4 text-warning animate-spin" />
                   )}

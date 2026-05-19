@@ -4,6 +4,20 @@ import { prisma } from "@/lib/db/prisma";
 // GET /api/x/status - Get X account connection status and sync history
 export async function GET() {
   try {
+    const staleThreshold = new Date(Date.now() - 15 * 60 * 1000);
+    await prisma.xSyncRun.updateMany({
+      where: {
+        status: "running",
+        startedAt: { lt: staleThreshold },
+      },
+      data: {
+        status: "failed",
+        errorMessage:
+          "同期がタイムアウトしました。500件など大きい件数では保存を優先するよう改善済みです。もう一度同期してください。",
+        finishedAt: new Date(),
+      },
+    });
+
     const account = await prisma.xAccount.findFirst({
       select: {
         id: true,
