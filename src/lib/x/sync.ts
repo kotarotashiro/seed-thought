@@ -78,6 +78,7 @@ async function saveTweets(
         text: tweet.text,
         translatedText,
         mediaJson: tweet.media.length > 0 ? JSON.stringify(tweet.media) : null,
+        urlCardJson: tweet.urlCard ? JSON.stringify(tweet.urlCard) : null,
         postedAt: tweet.createdAt ? new Date(tweet.createdAt) : null,
         savedAt: new Date(),
         rawJson: JSON.stringify(tweet),

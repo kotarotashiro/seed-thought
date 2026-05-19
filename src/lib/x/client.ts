@@ -2,6 +2,15 @@
 
 const BASE_URL = "https://api.twitter.com/2";
 
+interface TweetUrlEntity {
+  url: string;
+  expanded_url?: string;
+  unwound_url?: string;
+  title?: string;
+  description?: string;
+  images?: Array<{ url: string; width?: number; height?: number }>;
+}
+
 interface TweetData {
   id: string;
   text: string;
@@ -10,6 +19,9 @@ interface TweetData {
   conversation_id?: string;
   attachments?: {
     media_keys?: string[];
+  };
+  entities?: {
+    urls?: TweetUrlEntity[];
   };
 }
 
@@ -40,6 +52,13 @@ interface XApiResponse {
   };
 }
 
+export interface XTweetUrlCard {
+  expandedUrl: string;
+  title: string | null;
+  description: string | null;
+  imageUrl: string | null;
+}
+
 export interface XTweetWithAuthor {
   id: string;
   text: string;
@@ -50,6 +69,7 @@ export interface XTweetWithAuthor {
   authorAvatarUrl: string | null;
   sourceUrl: string;
   media: XTweetMedia[];
+  urlCard: XTweetUrlCard | null;
 }
 
 export interface XTweetMedia {
@@ -59,7 +79,7 @@ export interface XTweetMedia {
   altText: string | null;
 }
 
-const TWEET_FIELDS = "created_at,author_id,text,conversation_id,attachments";
+const TWEET_FIELDS = "created_at,author_id,text,conversation_id,attachments,entities";
 const USER_FIELDS = "name,username,profile_image_url";
 const MEDIA_FIELDS = "type,url,preview_image_url,alt_text";
 const EXPANSIONS = "author_id,attachments.media_keys";
@@ -111,6 +131,17 @@ function mapTweetsWithAuthors(response: XApiResponse): XTweetWithAuthor[] {
         previewUrl: item.preview_image_url || item.url || null,
         altText: item.alt_text || null,
       }));
+    const urlEntities = tweet.entities?.urls ?? [];
+    const cardEntity = urlEntities.find((e) => e.title || e.description);
+    const urlCard = cardEntity
+      ? {
+          expandedUrl: cardEntity.unwound_url ?? cardEntity.expanded_url ?? cardEntity.url,
+          title: cardEntity.title ?? null,
+          description: cardEntity.description ?? null,
+          imageUrl: cardEntity.images?.[0]?.url ?? null,
+        }
+      : null;
+
     return {
       id: tweet.id,
       text: tweet.text,
@@ -121,6 +152,7 @@ function mapTweetsWithAuthors(response: XApiResponse): XTweetWithAuthor[] {
       authorAvatarUrl: author?.profile_image_url || null,
       sourceUrl: `https://x.com/${author?.username || "i"}/status/${tweet.id}`,
       media,
+      urlCard,
     };
   });
 }

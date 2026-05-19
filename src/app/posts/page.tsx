@@ -30,6 +30,7 @@ interface PostListItem {
   text: string;
   translatedText?: string | null;
   mediaJson?: string | null;
+  urlCardJson?: string | null;
   sourceUrl?: string | null;
   savedType: string;
   authorName?: string | null;
@@ -312,7 +313,31 @@ export default function PostsPage() {
               </div>
 
               {/* Content */}
-              <p className="text-sm text-text leading-relaxed line-clamp-4 mb-4">{post.text}</p>
+              {(() => {
+                const urlCard = post.urlCardJson ? (() => { try { return JSON.parse(post.urlCardJson); } catch { return null; } })() : null;
+                const isUrlOnly = /^https?:\/\/\S+$/.test(post.text.trim());
+                if (urlCard && isUrlOnly) {
+                  return (
+                    <a
+                      href={urlCard.expandedUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="mb-3 block rounded-xl border border-border overflow-hidden hover:border-accent/40 transition-colors"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {urlCard.imageUrl && (
+                        <img src={urlCard.imageUrl} alt="" className="w-full h-32 object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+                      )}
+                      <div className="px-3 py-2">
+                        {urlCard.title && <p className="text-sm font-medium text-text line-clamp-2 mb-1">{urlCard.title}</p>}
+                        {urlCard.description && <p className="text-xs text-text-secondary line-clamp-2">{urlCard.description}</p>}
+                        <p className="text-xs text-text-muted mt-1 truncate">{urlCard.expandedUrl}</p>
+                      </div>
+                    </a>
+                  );
+                }
+                return <p className="text-sm text-text leading-relaxed line-clamp-4 mb-4">{post.text}</p>;
+              })()}
               {post.translatedText && (
                 <p className="mb-4 rounded-xl bg-accent-subtle px-3 py-2 text-xs leading-relaxed text-text-secondary">
                   日本語訳: {post.translatedText}

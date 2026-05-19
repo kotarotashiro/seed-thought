@@ -22,6 +22,7 @@ model Post {
   text            String
   translatedText  String?
   mediaJson       String?
+  urlCardJson     String?
   postedAt        DateTime?
   savedAt         DateTime @default(now())
   rawJson         String?

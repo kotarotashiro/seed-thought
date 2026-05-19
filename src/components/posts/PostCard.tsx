@@ -31,6 +31,7 @@ interface PostCardProps {
     text: string;
     translatedText?: string | null;
     mediaJson?: string | null;
+    urlCardJson?: string | null;
     sourceUrl?: string | null;
     authorName?: string | null;
     authorUsername?: string | null;
@@ -54,7 +55,13 @@ const URL_ONLY_RE = /^https?:\/\/\S+$/;
 export function PostCard({ post, showRecommendReason = false }: PostCardProps) {
   const router = useRouter();
   const [chatOpen, setChatOpen] = useState(false);
-  const [article, setArticle] = useState<ArticlePreview | null>(null);
+  const [article, setArticle] = useState<ArticlePreview | null>(() => {
+    if (!post.urlCardJson) return null;
+    try {
+      const c = JSON.parse(post.urlCardJson);
+      return { finalUrl: c.expandedUrl, title: c.title, description: c.description, image: c.imageUrl };
+    } catch { return null; }
+  });
   const [articleLoading, setArticleLoading] = useState(false);
 
   const savedDate = new Date(post.savedAt).toLocaleDateString("ja-JP", {
