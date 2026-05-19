@@ -38,6 +38,16 @@ async function callOpenAI(prompt: string): Promise<string> {
   return response.choices[0]?.message?.content || "{}";
 }
 
+async function callOpenAIText(prompt: string): Promise<string> {
+  const client = getClient();
+  const response = await client.chat.completions.create({
+    model: getModel(),
+    messages: [{ role: "user", content: prompt }],
+    temperature: 0.7,
+  });
+  return response.choices[0]?.message?.content || "";
+}
+
 export const openaiProvider: AiProvider = {
   async classifyPost(input: ClassifyPostInput): Promise<PostClassificationResult> {
     const prompt = await buildClassifyPrompt(input);
@@ -77,6 +87,6 @@ export const openaiProvider: AiProvider = {
 
   async chat(message: string, history: ChatMessage[], posts: PostContext[]): Promise<string> {
     const prompt = await buildChatPrompt(message, history, posts);
-    return callOpenAI(prompt);
+    return callOpenAIText(prompt);
   },
 };

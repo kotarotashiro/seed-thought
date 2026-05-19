@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { MessageCircle, Send, Bot, User, Loader2, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { MarkdownText } from "@/components/ui/MarkdownText";
 
 interface Message {
   role: "user" | "assistant";
@@ -25,13 +26,13 @@ function MessageBubble({ message }: { message: Message }) {
         )}
       </div>
       <div
-        className={`max-w-[80%] rounded-2xl px-4 py-3 text-sm leading-relaxed whitespace-pre-wrap ${
+        className={`max-w-[80%] rounded-2xl px-4 py-3 ${
           isUser
-            ? "bg-accent text-white rounded-tr-sm"
+            ? "bg-accent text-white rounded-tr-sm text-sm leading-relaxed"
             : "bg-white border border-border text-text rounded-tl-sm"
         }`}
       >
-        {message.content}
+        {isUser ? message.content : <MarkdownText content={message.content} />}
       </div>
     </div>
   );

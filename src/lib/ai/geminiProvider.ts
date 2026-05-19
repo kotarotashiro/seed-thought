@@ -49,6 +49,15 @@ async function callGemini(prompt: string): Promise<string> {
   return response.text || "{}";
 }
 
+async function callGeminiText(prompt: string): Promise<string> {
+  const client = getClient();
+  const response = await client.models.generateContent({
+    model: getModel(),
+    contents: prompt,
+  });
+  return response.text || "";
+}
+
 export const geminiProvider: AiProvider = {
   async classifyPost(input: ClassifyPostInput): Promise<PostClassificationResult> {
     const prompt = await buildClassifyPrompt(input);
@@ -89,6 +98,6 @@ export const geminiProvider: AiProvider = {
 
   async chat(message: string, history: ChatMessage[], posts: PostContext[]): Promise<string> {
     const prompt = await buildChatPrompt(message, history, posts);
-    return callGemini(prompt);
+    return callGeminiText(prompt);
   },
 };
