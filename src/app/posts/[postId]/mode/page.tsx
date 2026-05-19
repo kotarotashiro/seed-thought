@@ -146,9 +146,11 @@ export default function ModeSelectPage({ params }: { params: Promise<{ postId: s
         <Button
           onClick={handleStart}
           disabled={!selectedMode || creating}
+          loading={creating}
+          loadingLabel="作成中..."
           className="flex-1"
         >
-          {creating ? "作成中..." : "このモードで進む"}
+          このモードで進む
         </Button>
       </div>
     </div>

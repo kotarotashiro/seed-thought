@@ -358,10 +358,12 @@ export default function XSettingsPage() {
             <Button
               onClick={handleSync}
               disabled={syncing || missingSyncScopes.length > 0}
+              loading={syncing}
+              loadingLabel="同期中..."
               className="w-full"
             >
-              <RefreshCw className={`w-4 h-4 mr-2 ${syncing ? "animate-spin" : ""}`} />
-              {syncing ? "同期中..." : "手動同期を実行"}
+              <RefreshCw className="w-4 h-4 mr-2" />
+              手動同期を実行
             </Button>
 
             {/* Sync Result */}

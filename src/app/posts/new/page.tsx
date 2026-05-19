@@ -116,17 +116,21 @@ export default function NewPostPage() {
             <Button
               onClick={() => handleSave(false)}
               disabled={saving}
+              loading={saving}
+              loadingLabel="保存中..."
               variant="secondary"
               className="flex-1"
             >
-              {saving ? "保存中..." : "保存する"}
+              保存する
             </Button>
             <Button
               onClick={() => handleSave(true)}
               disabled={saving}
+              loading={saving}
+              loadingLabel="保存中..."
               className="flex-1"
             >
-              {saving ? "保存中..." : "保存して深掘りする"}
+              保存して深掘りする
             </Button>
           </div>
         </div>

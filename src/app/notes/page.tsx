@@ -3,7 +3,8 @@
 import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
-import { FileText, Search } from "lucide-react";
+import { Button } from "@/components/ui/Button";
+import { FileText, Search, Trash2 } from "lucide-react";
 
 export default function NotesPage() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -11,24 +12,69 @@ export default function NotesPage() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedGenre, setSelectedGenre] = useState("");
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [deleting, setDeleting] = useState(false);
+
+  const reloadSessions = async () => {
+    try {
+      const res = await fetch("/api/deep-dive/sessions");
+      const data = await res.json();
+      const completedSessions = (data || []).filter(
+        (s: { status: string }) => s.status === "completed"
+      );
+      setSessions(completedSessions);
+    } catch (error) {
+      console.error("Failed to fetch sessions:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    async function fetchSessions() {
+    let cancelled = false;
+
+    async function fetchInitialSessions() {
       try {
         const res = await fetch("/api/deep-dive/sessions");
         const data = await res.json();
         const completedSessions = (data || []).filter(
           (s: { status: string }) => s.status === "completed"
         );
-        setSessions(completedSessions);
+        if (!cancelled) setSessions(completedSessions);
       } catch (error) {
         console.error("Failed to fetch sessions:", error);
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     }
-    fetchSessions();
+
+    fetchInitialSessions();
+    return () => {
+      cancelled = true;
+    };
   }, []);
+
+  const toggleSession = (id: string) => {
+    setSelectedIds((current) =>
+      current.includes(id) ? current.filter((item) => item !== id) : [...current, id]
+    );
+  };
+
+  const deleteSelected = async () => {
+    if (selectedIds.length === 0) return;
+    if (!confirm(`選択した要点まとめ ${selectedIds.length}件を削除しますか？`)) return;
+
+    setDeleting(true);
+    try {
+      await Promise.all(
+        selectedIds.map((id) => fetch(`/api/deep-dive/sessions/${id}`, { method: "DELETE" }))
+      );
+      setSelectedIds([]);
+      await reloadSessions();
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   const genres = [
     ...new Set(
@@ -66,6 +112,26 @@ export default function NotesPage() {
           </p>
         </div>
       </div>
+
+      {sessions.length > 0 && (
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm text-text-muted">
+            {selectedIds.length > 0 ? `${selectedIds.length}件を選択中` : "削除したい要点まとめを選択できます"}
+          </p>
+          <Button
+            variant="danger"
+            size="sm"
+            onClick={deleteSelected}
+            disabled={selectedIds.length === 0}
+            loading={deleting}
+            loadingLabel="削除中..."
+            className="w-full sm:w-auto"
+          >
+            <Trash2 className="mr-1 h-4 w-4" />
+            選択した要点を削除
+          </Button>
+        </div>
+      )}
 
       {/* Filters */}
       <div className="flex gap-3">
@@ -122,6 +188,16 @@ export default function NotesPage() {
 
             return (
               <Card key={session.id}>
+                <div className="mb-3 flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={selectedIds.includes(session.id)}
+                    onChange={() => toggleSession(session.id)}
+                    className="h-4 w-4 accent-accent"
+                    aria-label="要点まとめを選択"
+                  />
+                  <span className="text-xs text-text-muted">選択</span>
+                </div>
                 {/* Genre and Date */}
                 <div className="flex items-center gap-2 mb-3">
                   {session.post?.classification && (

@@ -1,13 +1,19 @@
 import { clsx } from "clsx";
 import { type ButtonHTMLAttributes, forwardRef } from "react";
+import { Loader2 } from "lucide-react";
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: "primary" | "secondary" | "ghost" | "danger";
   size?: "sm" | "md" | "lg";
+  loading?: boolean;
+  loadingLabel?: string;
 }
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant = "primary", size = "md", children, ...props }, ref) => {
+  (
+    { className, variant = "primary", size = "md", loading = false, loadingLabel, children, disabled, ...props },
+    ref
+  ) => {
     return (
       <button
         ref={ref}
@@ -29,9 +35,11 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
           },
           className
         )}
+        disabled={disabled || loading}
         {...props}
       >
-        {children}
+        {loading && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />}
+        {loading ? loadingLabel || children : children}
       </button>
     );
   }

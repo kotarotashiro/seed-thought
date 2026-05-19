@@ -5,27 +5,69 @@ import Link from "next/link";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
-import { Layers, Brain, BookOpen, ArrowRight, CheckCircle, Clock } from "lucide-react";
+import { Layers, Brain, BookOpen, ArrowRight, CheckCircle, Clock, Trash2 } from "lucide-react";
 
 export default function DeepDivesPage() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [sessions, setSessions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [deleting, setDeleting] = useState(false);
+
+  const reloadSessions = async () => {
+    try {
+      const res = await fetch("/api/deep-dive/sessions");
+      const data = await res.json();
+      setSessions(data || []);
+    } catch (error) {
+      console.error("Failed to fetch sessions:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    async function fetchSessions() {
+    let cancelled = false;
+
+    async function fetchInitialSessions() {
       try {
         const res = await fetch("/api/deep-dive/sessions");
         const data = await res.json();
-        setSessions(data || []);
+        if (!cancelled) setSessions(data || []);
       } catch (error) {
         console.error("Failed to fetch sessions:", error);
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     }
-    fetchSessions();
+
+    fetchInitialSessions();
+    return () => {
+      cancelled = true;
+    };
   }, []);
+
+  const toggleSession = (id: string) => {
+    setSelectedIds((current) =>
+      current.includes(id) ? current.filter((item) => item !== id) : [...current, id]
+    );
+  };
+
+  const deleteSelected = async () => {
+    if (selectedIds.length === 0) return;
+    if (!confirm(`選択した深掘り履歴 ${selectedIds.length}件を削除しますか？`)) return;
+
+    setDeleting(true);
+    try {
+      await Promise.all(
+        selectedIds.map((id) => fetch(`/api/deep-dive/sessions/${id}`, { method: "DELETE" }))
+      );
+      setSelectedIds([]);
+      await reloadSessions();
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -41,6 +83,26 @@ export default function DeepDivesPage() {
           </p>
         </div>
       </div>
+
+      {sessions.length > 0 && (
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm text-text-muted">
+            {selectedIds.length > 0 ? `${selectedIds.length}件を選択中` : "削除したい履歴を選択できます"}
+          </p>
+          <Button
+            variant="danger"
+            size="sm"
+            onClick={deleteSelected}
+            disabled={selectedIds.length === 0}
+            loading={deleting}
+            loadingLabel="削除中..."
+            className="w-full sm:w-auto"
+          >
+            <Trash2 className="mr-1 h-4 w-4" />
+            選択した履歴を削除
+          </Button>
+        </div>
+      )}
 
       {loading ? (
         <div className="space-y-3">
@@ -73,6 +135,13 @@ export default function DeepDivesPage() {
             return (
               <Card key={session.id} hoverable>
                 <div className="flex items-start justify-between gap-4">
+                  <input
+                    type="checkbox"
+                    checked={selectedIds.includes(session.id)}
+                    onChange={() => toggleSession(session.id)}
+                    className="mt-1 h-4 w-4 flex-shrink-0 accent-accent"
+                    aria-label="深掘り履歴を選択"
+                  />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-2">
                       {session.mode === "thought_lens" ? (

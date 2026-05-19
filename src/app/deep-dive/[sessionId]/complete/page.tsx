@@ -187,9 +187,11 @@ export default function CompletePage({ params }: { params: Promise<{ sessionId: 
         <Button
           onClick={handleGenerate}
           disabled={!selectedOutput || generating}
+          loading={generating}
+          loadingLabel="生成中..."
           className="w-full"
         >
-          {generating ? "生成中..." : "アウトプットを生成する"}
+          アウトプットを生成する
         </Button>
 
         {error && (

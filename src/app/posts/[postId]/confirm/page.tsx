@@ -15,7 +15,6 @@ import {
   BookOpen,
   GitBranch,
   Lightbulb,
-  RefreshCw,
   User,
   Zap,
 } from "lucide-react";
@@ -56,6 +55,8 @@ export default function ConfirmPage({ params }: { params: Promise<{ postId: stri
   const [post, setPost] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [fetchingThread, setFetchingThread] = useState(false);
+  const [deletingThread, setDeletingThread] = useState(false);
+  const [selectedThreadIds, setSelectedThreadIds] = useState<string[]>([]);
   const [threadMessage, setThreadMessage] = useState<string | null>(null);
   const [threadError, setThreadError] = useState<string | null>(null);
 
@@ -110,10 +111,46 @@ export default function ConfirmPage({ params }: { params: Promise<{ postId: stri
           : "続きの投稿は見つかりませんでした。"
       );
       await loadPost();
+      setSelectedThreadIds([]);
     } catch {
       setThreadError("ツリーの取得に失敗しました");
     } finally {
       setFetchingThread(false);
+    }
+  };
+
+  const handleToggleThread = (id: string) => {
+    setSelectedThreadIds((current) =>
+      current.includes(id) ? current.filter((item) => item !== id) : [...current, id]
+    );
+  };
+
+  const handleDeleteSelectedThreads = async () => {
+    if (selectedThreadIds.length === 0) return;
+    if (!confirm(`選択したツリー投稿 ${selectedThreadIds.length}件を削除しますか？`)) return;
+
+    setDeletingThread(true);
+    setThreadMessage(null);
+    setThreadError(null);
+
+    try {
+      const res = await fetch(`/api/posts/${postId}/thread`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: selectedThreadIds }),
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) {
+        setThreadError(data.error || "ツリー投稿の削除に失敗しました");
+        return;
+      }
+      setThreadMessage(`ツリー投稿を${data.deletedCount}件削除しました。`);
+      setSelectedThreadIds([]);
+      await loadPost();
+    } catch {
+      setThreadError("ツリー投稿の削除に失敗しました");
+    } finally {
+      setDeletingThread(false);
     }
   };
 
@@ -199,13 +236,11 @@ export default function ConfirmPage({ params }: { params: Promise<{ postId: stri
                 variant="secondary"
                 size="sm"
                 onClick={handleFetchThread}
-                disabled={fetchingThread}
+                disabled={fetchingThread || deletingThread}
+                loading={fetchingThread}
+                loadingLabel="取得中..."
               >
-                {fetchingThread ? (
-                  <RefreshCw className="w-4 h-4 mr-1 animate-spin" />
-                ) : (
-                  <GitBranch className="w-4 h-4 mr-1" />
-                )}
+                <GitBranch className="w-4 h-4 mr-1" />
                 {threadPosts.length > 0 ? "ツリーを再取得" : "ツリーを追加"}
               </Button>
               {threadPosts.length > 0 && (
@@ -230,13 +265,36 @@ export default function ConfirmPage({ params }: { params: Promise<{ postId: stri
           <div className="mb-4 flex items-center gap-2">
             <GitBranch className="h-5 w-5 text-accent" />
             <h3 className="text-base font-bold text-text">取得済みツリー</h3>
+            <Badge variant="success">{threadPosts.length + 1}投稿</Badge>
+          </div>
+          <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-xs text-text-muted">
+              選択した続き投稿だけ削除できます。深掘り作成時は、残っているツリー全体を含めます。
+            </p>
+            <Button
+              variant="danger"
+              size="sm"
+              onClick={handleDeleteSelectedThreads}
+              disabled={selectedThreadIds.length === 0}
+              loading={deletingThread}
+              loadingLabel="削除中..."
+              className="w-full sm:w-auto"
+            >
+              選択したツリーを削除
+            </Button>
           </div>
           <div className="space-y-4">
             {threadPosts.map((threadPost: { id: string; text: string; translatedText?: string | null; mediaJson?: string | null; threadOrder: number }) => (
               <div key={threadPost.id} className="rounded-xl bg-border-light px-4 py-3">
-                <p className="mb-1 text-xs font-medium text-text-muted">
+                <label className="mb-2 flex items-center gap-2 text-xs font-medium text-text-muted">
+                  <input
+                    type="checkbox"
+                    checked={selectedThreadIds.includes(threadPost.id)}
+                    onChange={() => handleToggleThread(threadPost.id)}
+                    className="h-4 w-4 accent-accent"
+                  />
                   {threadPost.threadOrder + 1}投稿目
-                </p>
+                </label>
                 <p className="whitespace-pre-wrap text-sm leading-relaxed text-text">
                   {threadPost.text}
                 </p>

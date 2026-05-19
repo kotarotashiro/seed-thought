@@ -196,12 +196,18 @@ export default function LearningLessonPage({ params }: { params: Promise<{ sessi
           前へ
         </Button>
         <div className="flex flex-col gap-2 sm:flex-row">
-          <Button variant="secondary" onClick={handleSaveAndClose} disabled={saving}>
+          <Button
+            variant="secondary"
+            onClick={handleSaveAndClose}
+            disabled={saving}
+            loading={saving}
+            loadingLabel="保存中..."
+          >
             <Save className="w-4 h-4 mr-1" />
             保存して閉じる
           </Button>
-          <Button onClick={handleNext} disabled={saving}>
-            {saving ? "保存中..." : isLastStep ? "完了する" : "次へ"}
+          <Button onClick={handleNext} disabled={saving} loading={saving} loadingLabel="保存中...">
+            {isLastStep ? "完了する" : "次へ"}
             {!isLastStep && <ArrowRight className="w-4 h-4 ml-1" />}
           </Button>
         </div>

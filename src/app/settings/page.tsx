@@ -358,13 +358,26 @@ export default function SettingsPage() {
             </div>
           </div>
           <div className="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap">
-            <Button onClick={() => handleSaveAi(false)} disabled={savingAi || testingAi} className="w-full sm:w-auto">
+            <Button
+              onClick={() => handleSaveAi(false)}
+              disabled={savingAi || testingAi}
+              loading={savingAi}
+              loadingLabel="保存中..."
+              className="w-full sm:w-auto"
+            >
               <Save className="w-4 h-4 mr-1" />
-              {savingAi ? "保存中..." : "AI設定を保存"}
+              AI設定を保存
             </Button>
-            <Button variant="secondary" onClick={handleTestAi} disabled={savingAi || testingAi} className="w-full sm:w-auto">
+            <Button
+              variant="secondary"
+              onClick={handleTestAi}
+              disabled={savingAi || testingAi}
+              loading={testingAi}
+              loadingLabel="テスト中..."
+              className="w-full sm:w-auto"
+            >
               <CheckCircle className="w-4 h-4 mr-1" />
-              {testingAi ? "テスト中..." : "接続テスト"}
+              接続テスト
             </Button>
             {aiSettings.keySource === "ui" && (
               <Button variant="ghost" onClick={() => handleSaveAi(true)} disabled={savingAi} className="w-full sm:w-auto">
@@ -384,9 +397,16 @@ export default function SettingsPage() {
             <User className="w-5 h-5 text-accent" />
             <h3 className="text-base font-bold text-text">プロフィール</h3>
           </div>
-          <Button size="sm" onClick={handleSave} disabled={loading || saving} className="w-full sm:w-auto">
+          <Button
+            size="sm"
+            onClick={handleSave}
+            disabled={loading || saving}
+            loading={saving}
+            loadingLabel="保存中..."
+            className="w-full sm:w-auto"
+          >
             <Save className="w-4 h-4 mr-1" />
-            {saving ? "保存中..." : "保存"}
+            保存
           </Button>
         </div>
 

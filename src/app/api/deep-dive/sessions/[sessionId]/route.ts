@@ -70,3 +70,22 @@ export async function PUT(
     );
   }
 }
+
+// DELETE /api/deep-dive/sessions/[sessionId]
+export async function DELETE(
+  request: Request,
+  { params }: { params: Promise<{ sessionId: string }> }
+) {
+  const { sessionId } = await params;
+
+  try {
+    await prisma.deepDiveSession.delete({ where: { id: sessionId } });
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("Failed to delete session:", error);
+    return NextResponse.json(
+      { error: "セッションの削除に失敗しました" },
+      { status: 500 }
+    );
+  }
+}

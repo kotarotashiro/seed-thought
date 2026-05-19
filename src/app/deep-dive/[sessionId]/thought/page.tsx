@@ -175,12 +175,18 @@ export default function ThoughtLensPage({ params }: { params: Promise<{ sessionI
           </Button>
         </div>
         <div className="flex gap-2">
-          <Button variant="secondary" onClick={handleSaveAndClose} disabled={saving}>
+          <Button
+            variant="secondary"
+            onClick={handleSaveAndClose}
+            disabled={saving}
+            loading={saving}
+            loadingLabel="保存中..."
+          >
             <Save className="w-4 h-4 mr-1" />
             あとで続ける
           </Button>
-          <Button onClick={handleNext} disabled={saving}>
-            {saving ? "保存中..." : isLastStep ? "完了する" : "次へ"}
+          <Button onClick={handleNext} disabled={saving} loading={saving} loadingLabel="保存中...">
+            {isLastStep ? "完了する" : "次へ"}
             {!isLastStep && <ArrowRight className="w-4 h-4 ml-1" />}
           </Button>
         </div>
