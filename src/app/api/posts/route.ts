@@ -26,7 +26,8 @@ export async function GET(request: Request) {
   const postType = searchParams.get("postType") || "";
   const savedType = searchParams.get("savedType") || "";
   const digestStatus = searchParams.get("digestStatus") || "";
-  const sort = searchParams.get("sort") || "postedAt_desc";
+  const author = searchParams.get("author") || "";
+  const sort = searchParams.get("sort") || "savedAt_desc";
 
   try {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -37,6 +38,9 @@ export async function GET(request: Request) {
     }
     if (savedType) {
       where.savedType = savedType;
+    }
+    if (author) {
+      where.authorUsername = author;
     }
     if (genre || postType) {
       where.classification = {};
@@ -67,9 +71,19 @@ export async function GET(request: Request) {
       distinct: ["primaryCategory"],
     });
 
+    const authors = await prisma.post.findMany({
+      where: { authorUsername: { not: null } },
+      select: { authorUsername: true, authorName: true },
+      distinct: ["authorUsername"],
+      orderBy: { authorUsername: "asc" },
+    });
+
     return NextResponse.json({
       posts,
       genres: genres.map((g) => g.primaryCategory),
+      authors: authors
+        .filter((a) => a.authorUsername)
+        .map((a) => ({ username: a.authorUsername!, name: a.authorName })),
     });
   } catch (error) {
     console.error("Failed to fetch posts:", error);

@@ -25,7 +25,13 @@ export function parsePostMedia(mediaJson?: string | null): PostMediaItem[] {
   }
 }
 
-export function PostMediaGrid({ media }: { media: PostMediaItem[] }) {
+export function PostMediaGrid({
+  media,
+  sourceUrl,
+}: {
+  media: PostMediaItem[];
+  sourceUrl?: string | null;
+}) {
   if (media.length === 0) return null;
 
   const isSingle = media.length === 1;
@@ -35,23 +41,13 @@ export function PostMediaGrid({ media }: { media: PostMediaItem[] }) {
       {media.slice(0, 4).map((item, index) => {
         const isVideo = item.type === "video" || item.type === "animated_gif";
         const previewSrc = item.previewUrl || item.url;
-        const videoSrc = item.url;
 
         return (
           <div
             key={`${previewSrc}-${index}`}
             className={`relative overflow-hidden bg-border-light ${isSingle ? "aspect-[16/9]" : "aspect-square"}`}
           >
-            {isVideo && videoSrc ? (
-              <video
-                src={videoSrc}
-                poster={previewSrc ?? undefined}
-                controls
-                preload="none"
-                playsInline
-                className="h-full w-full object-cover"
-              />
-            ) : previewSrc ? (
+            {previewSrc ? (
               <img
                 src={previewSrc}
                 alt={item.altText || ""}
@@ -59,9 +55,20 @@ export function PostMediaGrid({ media }: { media: PostMediaItem[] }) {
                 loading="lazy"
               />
             ) : (
-              <div className="h-full w-full flex items-center justify-center bg-border-light">
-                {isVideo && <Play className="w-8 h-8 text-text-muted" />}
-              </div>
+              <div className="h-full w-full flex items-center justify-center bg-border-light" />
+            )}
+            {isVideo && (
+              <a
+                href={sourceUrl || "#"}
+                target="_blank"
+                rel="noreferrer"
+                className="absolute inset-0 flex items-center justify-center bg-black/30 hover:bg-black/40 transition-colors"
+                onClick={(e) => { if (!sourceUrl) e.preventDefault(); }}
+              >
+                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white/90 shadow-md">
+                  <Play className="w-5 h-5 text-text ml-0.5" />
+                </div>
+              </a>
             )}
           </div>
         );

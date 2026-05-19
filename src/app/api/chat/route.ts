@@ -6,21 +6,36 @@ import type { ChatMessage } from "@/lib/ai/types";
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { message, history = [] } = body as { message: string; history: ChatMessage[] };
+    const { message, history = [], postId } = body as {
+      message: string;
+      history: ChatMessage[];
+      postId?: string;
+    };
 
     if (!message || typeof message !== "string" || message.trim().length === 0) {
       return NextResponse.json({ error: "メッセージを入力してください" }, { status: 400 });
     }
 
-    // Fetch recent posts with classification as context (latest 30)
+    // If a specific postId is given, fetch it first so it leads the context
+    const focusPost = postId
+      ? await prisma.post.findUnique({
+          where: { id: postId },
+          include: { classification: true },
+        })
+      : null;
+
     const posts = await prisma.post.findMany({
-      where: { classification: { isNot: null } },
+      where: {
+        classification: { isNot: null },
+        ...(postId ? { id: { not: postId } } : {}),
+      },
       include: { classification: true },
       orderBy: { savedAt: "desc" },
       take: 30,
     });
 
-    const postContexts = posts.map((p) => ({
+    type PostWithClassification = (typeof posts)[0];
+    const toContext = (p: PostWithClassification) => ({
       id: p.id,
       text: p.text,
       summary: p.classification?.summary,
@@ -28,7 +43,12 @@ export async function POST(request: Request) {
       tags: p.classification ? (JSON.parse(p.classification.tagsJson || "[]") as string[]) : [],
       sourceUrl: p.sourceUrl,
       authorUsername: p.authorUsername,
-    }));
+    });
+
+    const postContexts = [
+      ...(focusPost ? [toContext(focusPost)] : []),
+      ...posts.map(toContext),
+    ];
 
     const reply = await getAiProvider().chat(message.trim(), history, postContexts);
 
