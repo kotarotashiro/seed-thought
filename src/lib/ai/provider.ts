@@ -36,11 +36,19 @@ async function callGemini(prompt: string, settings: AiRuntimeSettings): Promise<
   const response = await client.models.generateContent({
     model: settings.model,
     contents: prompt,
-    config: {
-      responseMimeType: "application/json",
-    },
+    config: { responseMimeType: "application/json" },
   });
   return response.text || "{}";
+}
+
+async function callGeminiText(prompt: string, settings: AiRuntimeSettings): Promise<string> {
+  if (!settings.apiKey) throw new Error("GEMINI_API_KEY is not set");
+  const client = new GoogleGenAI({ apiKey: settings.apiKey });
+  const response = await client.models.generateContent({
+    model: settings.model,
+    contents: prompt,
+  });
+  return response.text || "";
 }
 
 function getOpenAiBaseUrl(provider: AiProviderName): string | undefined {
@@ -70,6 +78,23 @@ async function callOpenAiCompatible(prompt: string, settings: AiRuntimeSettings)
   });
 
   return response.choices[0]?.message?.content || "{}";
+}
+
+async function callOpenAiCompatibleText(prompt: string, settings: AiRuntimeSettings): Promise<string> {
+  if (!settings.apiKey) throw new Error("AI API key is not set");
+
+  const client = new OpenAI({
+    apiKey: settings.apiKey,
+    baseURL: getOpenAiBaseUrl(settings.provider),
+  });
+
+  const response = await client.chat.completions.create({
+    model: settings.model,
+    messages: [{ role: "user", content: prompt }],
+    temperature: 0.7,
+  });
+
+  return response.choices[0]?.message?.content || "";
 }
 
 async function callClaude(prompt: string, settings: AiRuntimeSettings): Promise<string> {
@@ -119,6 +144,24 @@ async function callConfiguredAi(prompt: string): Promise<string> {
     case "mock":
     default:
       throw new Error("mock provider does not support direct calls");
+  }
+}
+
+async function callConfiguredAiText(prompt: string): Promise<string> {
+  const settings = await getAiRuntimeSettings();
+
+  switch (settings.provider) {
+    case "gemini":
+      return callGeminiText(prompt, settings);
+    case "openai":
+    case "grok":
+    case "kimi":
+      return callOpenAiCompatibleText(prompt, settings);
+    case "claude":
+      return callClaude(prompt, settings);
+    case "mock":
+    default:
+      return "（モックプロバイダーはチャット非対応です）";
   }
 }
 
@@ -177,7 +220,7 @@ export function getAiProvider(): AiProvider {
 
     async chat(message: string, history: ChatMessage[], posts: PostContext[]): Promise<string> {
       const prompt = await buildChatPrompt(message, history, posts);
-      return callConfiguredAi(prompt);
+      return callConfiguredAiText(prompt);
     },
   };
 }
