@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { BookOpen, ArrowRight, ExternalLink, ChevronDown } from "lucide-react";
+import { BookOpen, ArrowRight, ExternalLink, ChevronDown, MessageCircle } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
+import { PostChatModal } from "@/components/posts/PostChatModal";
 
 interface KnowhowPost {
   id: string;
@@ -39,6 +40,7 @@ export default function KnowhowPage() {
   const [posts, setPosts] = useState<KnowhowPost[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState("");
+  const [chatPost, setChatPost] = useState<KnowhowPost | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -149,6 +151,13 @@ export default function KnowhowPage() {
                       )}
                       <p className="min-w-0 flex-1 truncate text-sm text-text">{summary}</p>
                       <div className="flex flex-shrink-0 items-center gap-2">
+                        <button
+                          onClick={() => setChatPost(post)}
+                          title="チャット"
+                          className="rounded-lg p-1 text-text-muted hover:text-text hover:bg-border-light transition-colors"
+                        >
+                          <MessageCircle className="w-4 h-4" />
+                        </button>
                         {post.sourceUrl && (
                           <a href={post.sourceUrl} target="_blank" rel="noreferrer">
                             <ExternalLink className="w-3.5 h-3.5 text-text-muted hover:text-text" />
@@ -168,6 +177,13 @@ export default function KnowhowPage() {
             </div>
           ))}
         </div>
+      )}
+
+      {chatPost && (
+        <PostChatModal
+          post={{ id: chatPost.id, text: chatPost.text, authorName: chatPost.authorName, classification: chatPost.classification ?? null }}
+          onClose={() => setChatPost(null)}
+        />
       )}
     </div>
   );

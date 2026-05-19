@@ -26,7 +26,7 @@ ${input.authorUsername ? `アカウント: @${input.authorUsername}` : ""}
   "postType": "thought" | "learning" | "output_material" | "unknown",
   "primaryCategory": "カテゴリ名",
   "tags": ["タグ1", "タグ2", "タグ3"],
-  "summary": "投稿の要点を、本文のコピペではなく自分の言葉で要約（80-120文字）",
+  "summary": "投稿の要点を40-60文字で簡潔に要約。ツール名・技術名（Claude, ChatGPT, Cursor等）は省略せず記載。「●●を使って○○する方法」「●●で○○が可能」のような具体的・実用的な一文にする。抽象的な表現は避ける",
   "recommendReason": "ユーザーのプロフィールに照らして、なぜ深掘りする価値があるか（80-120文字）",
   "difficultyLevel": "beginner" | "intermediate" | "advanced" | "unknown",
   "thinkingPotentialScore": 0-100,
