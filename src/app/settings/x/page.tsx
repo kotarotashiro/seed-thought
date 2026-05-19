@@ -406,7 +406,7 @@ export default function XSettingsPage() {
       {xStatus?.syncRuns && xStatus.syncRuns.length > 0 && (
         <Card>
           <h3 className="text-base font-bold text-text mb-4">同期履歴</h3>
-          <div className="space-y-2">
+          <div className="max-h-72 overflow-y-auto space-y-2 pr-1">
             {xStatus.syncRuns.map((run) => (
               <div
                 key={run.id}

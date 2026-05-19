@@ -86,9 +86,22 @@ export default function DeepDivesPage() {
 
       {sessions.length > 0 && (
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-sm text-text-muted">
-            {selectedIds.length > 0 ? `${selectedIds.length}件を選択中` : "削除したい履歴を選択できます"}
-          </p>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() =>
+                selectedIds.length === sessions.length
+                  ? setSelectedIds([])
+                  : setSelectedIds(sessions.map((s) => s.id))
+              }
+            >
+              {selectedIds.length === sessions.length && sessions.length > 0 ? "全解除" : "全選択"}
+            </Button>
+            <p className="text-sm text-text-muted">
+              {selectedIds.length > 0 ? `${selectedIds.length}件選択中` : ""}
+            </p>
+          </div>
           <Button
             variant="danger"
             size="sm"
@@ -99,7 +112,7 @@ export default function DeepDivesPage() {
             className="w-full sm:w-auto"
           >
             <Trash2 className="mr-1 h-4 w-4" />
-            選択した履歴を削除
+            削除 ({selectedIds.length})
           </Button>
         </div>
       )}

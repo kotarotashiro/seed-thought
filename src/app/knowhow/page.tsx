@@ -5,7 +5,6 @@ import Link from "next/link";
 import { BookOpen, ArrowRight, ExternalLink, ChevronDown } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
-import { Card } from "@/components/ui/Card";
 
 interface KnowhowPost {
   id: string;
@@ -108,12 +107,11 @@ export default function KnowhowPage() {
       )}
 
       {loading ? (
-        <div className="space-y-3">
-          {[1, 2, 3].map((i) => (
-            <div key={i} className="bg-white rounded-xl border border-border p-4 animate-pulse">
-              <div className="h-4 bg-border-light rounded w-1/4 mb-3" />
-              <div className="h-3 bg-border-light rounded w-3/4 mb-2" />
-              <div className="h-3 bg-border-light rounded w-1/2" />
+        <div className="space-y-2">
+          {[1, 2, 3, 4, 5].map((i) => (
+            <div key={i} className="bg-white rounded-xl border border-border px-4 py-3 animate-pulse flex gap-3">
+              <div className="h-5 w-10 bg-border-light rounded" />
+              <div className="flex-1 h-4 bg-border-light rounded" />
             </div>
           ))}
         </div>
@@ -129,57 +127,41 @@ export default function KnowhowPage() {
           </Link>
         </div>
       ) : (
-        <div className="space-y-8">
+        <div className="space-y-6">
           {Object.entries(grouped).map(([category, categoryPosts]) => (
             <div key={category}>
-              <div className="flex items-center gap-2 mb-3">
-                <h2 className="text-base font-bold text-text">{category}</h2>
+              <div className="flex items-center gap-2 mb-2 px-1">
+                <h2 className="text-sm font-bold text-text">{category}</h2>
                 <span className="text-xs text-text-muted">{categoryPosts.length}件</span>
               </div>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              <div className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-white">
                 {categoryPosts.map((post) => {
-                  const tags = JSON.parse(post.classification?.tagsJson || "[]") as string[];
+                  const summary = post.classification?.summary || post.text;
                   return (
-                    <Card key={post.id} hoverable className="flex flex-col gap-3">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex flex-wrap gap-1.5">
-                          {post.classification && (
-                            <DifficultyBadge level={post.classification.difficultyLevel} />
-                          )}
-                          {tags.slice(0, 2).map((tag) => (
-                            <Badge key={tag}>{tag}</Badge>
-                          ))}
+                    <div
+                      key={post.id}
+                      className="flex items-center gap-3 px-4 py-3 hover:bg-border-light/40 transition-colors"
+                    >
+                      {post.classification && (
+                        <div className="flex-shrink-0">
+                          <DifficultyBadge level={post.classification.difficultyLevel} />
                         </div>
+                      )}
+                      <p className="min-w-0 flex-1 truncate text-sm text-text">{summary}</p>
+                      <div className="flex flex-shrink-0 items-center gap-2">
                         {post.sourceUrl && (
-                          <a href={post.sourceUrl} target="_blank" rel="noreferrer" className="flex-shrink-0">
-                            <ExternalLink className="w-4 h-4 text-text-muted hover:text-text" />
+                          <a href={post.sourceUrl} target="_blank" rel="noreferrer">
+                            <ExternalLink className="w-3.5 h-3.5 text-text-muted hover:text-text" />
                           </a>
                         )}
-                      </div>
-
-                      {post.classification?.summary ? (
-                        <p className="text-sm text-text leading-relaxed line-clamp-3">
-                          {post.classification.summary}
-                        </p>
-                      ) : (
-                        <p className="text-sm text-text leading-relaxed line-clamp-3">
-                          {post.text}
-                        </p>
-                      )}
-
-                      {post.authorUsername && (
-                        <p className="text-xs text-text-muted">@{post.authorUsername}</p>
-                      )}
-
-                      <div className="mt-auto">
                         <Link href={`/posts/${post.id}/confirm`}>
-                          <Button size="sm" className="w-full">
+                          <Button size="sm" variant="secondary">
                             深掘る
-                            <ArrowRight className="w-4 h-4 ml-1" />
+                            <ArrowRight className="w-3.5 h-3.5 ml-1" />
                           </Button>
                         </Link>
                       </div>
-                    </Card>
+                    </div>
                   );
                 })}
               </div>
