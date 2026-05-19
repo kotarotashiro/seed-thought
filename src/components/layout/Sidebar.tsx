@@ -16,6 +16,7 @@ import {
   BookOpen,
   Search,
   TrendingUp,
+  MessageCircle,
 } from "lucide-react";
 import { clsx } from "clsx";
 
@@ -24,6 +25,7 @@ const menuItems = [
   { href: "/posts", label: "保存一覧", icon: Archive },
   { href: "/knowhow", label: "ノウハウ一覧", icon: BookOpen },
   { href: "/search", label: "ノウハウ検索", icon: Search },
+  { href: "/chat", label: "投稿チャット", icon: MessageCircle },
   { href: "/insights", label: "いいね傾向分析", icon: TrendingUp },
   { href: "/posts/new", label: "投稿を追加", icon: PenSquare },
   { href: "/deep-dives", label: "深掘り履歴", icon: Layers },

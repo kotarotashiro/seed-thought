@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Archive, BookOpen, Home, Search, Settings, Sprout, TrendingUp } from "lucide-react";
+import { Archive, BookOpen, Home, MessageCircle, Search, Settings, Sprout } from "lucide-react";
 import { clsx } from "clsx";
 
 const mobileItems = [
@@ -10,7 +10,7 @@ const mobileItems = [
   { href: "/posts", label: "保存", icon: Archive },
   { href: "/knowhow", label: "ノウハウ", icon: BookOpen },
   { href: "/search", label: "検索", icon: Search },
-  { href: "/insights", label: "分析", icon: TrendingUp },
+  { href: "/chat", label: "チャット", icon: MessageCircle },
   { href: "/settings", label: "設定", icon: Settings },
 ];
 

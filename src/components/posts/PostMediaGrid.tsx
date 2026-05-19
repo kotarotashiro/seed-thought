@@ -28,25 +28,39 @@ export function parsePostMedia(mediaJson?: string | null): PostMediaItem[] {
 export function PostMediaGrid({ media }: { media: PostMediaItem[] }) {
   if (media.length === 0) return null;
 
+  const isSingle = media.length === 1;
+
   return (
-    <div className="mt-3 grid grid-cols-2 gap-2 overflow-hidden rounded-xl">
+    <div className={`mt-3 overflow-hidden rounded-xl ${isSingle ? "" : "grid grid-cols-2 gap-1"}`}>
       {media.slice(0, 4).map((item, index) => {
-        const src = item.previewUrl || item.url;
-        if (!src) return null;
         const isVideo = item.type === "video" || item.type === "animated_gif";
+        const previewSrc = item.previewUrl || item.url;
+        const videoSrc = item.url;
 
         return (
-          <div key={`${src}-${index}`} className="relative aspect-video overflow-hidden bg-border-light">
-            <img
-              src={src}
-              alt={item.altText || ""}
-              className="h-full w-full object-cover"
-            />
-            {isVideo && (
-              <div className="absolute inset-0 flex items-center justify-center bg-black/20">
-                <span className="flex h-9 w-9 items-center justify-center rounded-full bg-black/65 text-white">
-                  <Play className="h-4 w-4 fill-current" />
-                </span>
+          <div
+            key={`${previewSrc}-${index}`}
+            className={`relative overflow-hidden bg-border-light ${isSingle ? "aspect-[16/9]" : "aspect-square"}`}
+          >
+            {isVideo && videoSrc ? (
+              <video
+                src={videoSrc}
+                poster={previewSrc ?? undefined}
+                controls
+                preload="none"
+                playsInline
+                className="h-full w-full object-cover"
+              />
+            ) : previewSrc ? (
+              <img
+                src={previewSrc}
+                alt={item.altText || ""}
+                className="h-full w-full object-cover"
+                loading="lazy"
+              />
+            ) : (
+              <div className="h-full w-full flex items-center justify-center bg-border-light">
+                {isVideo && <Play className="w-8 h-8 text-text-muted" />}
               </div>
             )}
           </div>

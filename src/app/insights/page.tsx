@@ -16,6 +16,7 @@ interface TrendInsight {
 interface InsightData {
   insight: TrendInsight | null;
   count: number;
+  cachedAt?: string;
   stats: {
     categoryCount: Record<string, number>;
     typeCount: Record<string, number>;
@@ -57,16 +58,32 @@ const typeLabels: Record<string, string> = {
   unknown: "未分類",
 };
 
+function formatCachedAt(dateStr: string): string {
+  const date = new Date(dateStr);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMin = Math.floor(diffMs / 60000);
+  const diffH = Math.floor(diffMin / 60);
+  const diffD = Math.floor(diffH / 24);
+  if (diffMin < 1) return "たった今";
+  if (diffMin < 60) return `${diffMin}分前`;
+  if (diffH < 24) return `${diffH}時間前`;
+  return `${diffD}日前`;
+}
+
 export default function InsightsPage() {
   const [data, setData] = useState<InsightData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [reanalyzing, setReanalyzing] = useState(false);
   const [error, setError] = useState("");
 
-  const load = async () => {
-    setLoading(true);
+  const load = async (force = false) => {
+    if (force) setReanalyzing(true);
+    else setLoading(true);
     setError("");
     try {
-      const res = await fetch("/api/insights/likes");
+      const url = force ? "/api/insights/likes?force=true" : "/api/insights/likes";
+      const res = await fetch(url);
       if (!res.ok) {
         const d = await res.json();
         throw new Error(d.error || "取得に失敗しました");
@@ -77,6 +94,7 @@ export default function InsightsPage() {
       setError(e instanceof Error ? e.message : "取得に失敗しました");
     } finally {
       setLoading(false);
+      setReanalyzing(false);
     }
   };
 
@@ -92,13 +110,15 @@ export default function InsightsPage() {
           <div>
             <h1 className="text-2xl font-bold text-text">いいね傾向分析</h1>
             <p className="text-sm text-text-secondary">
-              {data ? `${data.count}件のいいねを分析` : "いいねした投稿から傾向を分析"}
+              {data
+                ? `${data.count}件のいいねを分析${data.cachedAt ? ` • 最終分析: ${formatCachedAt(data.cachedAt)}` : ""}`
+                : "いいねした投稿から傾向を分析"}
             </p>
           </div>
         </div>
-        <Button variant="ghost" size="sm" onClick={load} disabled={loading}>
-          <RefreshCw className={`w-4 h-4 mr-1.5 ${loading ? "animate-spin" : ""}`} />
-          再分析
+        <Button variant="ghost" size="sm" onClick={() => load(true)} disabled={loading || reanalyzing}>
+          <RefreshCw className={`w-4 h-4 mr-1.5 ${reanalyzing ? "animate-spin" : ""}`} />
+          {reanalyzing ? "分析中..." : "再分析"}
         </Button>
       </div>
 
@@ -135,7 +155,6 @@ export default function InsightsPage() {
 
       {!loading && data?.insight && (
         <div className="space-y-4">
-          {/* Summary */}
           <div className="bg-gradient-to-br from-rose-50 to-pink-50 rounded-2xl border border-rose-100 p-5">
             <div className="flex items-center gap-2 mb-2">
               <Heart className="w-5 h-5 text-rose-500 fill-rose-200" />
@@ -144,7 +163,6 @@ export default function InsightsPage() {
             <p className="text-sm text-text leading-relaxed">{data.insight.summary}</p>
           </div>
 
-          {/* Learning style */}
           <div className="bg-white rounded-2xl border border-border p-5">
             <div className="flex items-center gap-2 mb-2">
               <Lightbulb className="w-5 h-5 text-amber-500" />
@@ -153,26 +171,10 @@ export default function InsightsPage() {
             <p className="text-sm text-text-secondary leading-relaxed">{data.insight.learningStyle}</p>
           </div>
 
-          <InsightSection
-            title="よく見るカテゴリ"
-            icon={Star}
-            items={data.insight.topCategories}
-            color="text-blue-500"
-          />
-          <InsightSection
-            title="好きなテーマ"
-            icon={Heart}
-            items={data.insight.favoriteThemes}
-            color="text-rose-500"
-          />
-          <InsightSection
-            title="あなたの強み"
-            icon={TrendingUp}
-            items={data.insight.strengths}
-            color="text-green-500"
-          />
+          <InsightSection title="よく見るカテゴリ" icon={Star} items={data.insight.topCategories} color="text-blue-500" />
+          <InsightSection title="好きなテーマ" icon={Heart} items={data.insight.favoriteThemes} color="text-rose-500" />
+          <InsightSection title="あなたの強み" icon={TrendingUp} items={data.insight.strengths} color="text-green-500" />
 
-          {/* Recommended next topics */}
           <div className="bg-white rounded-2xl border border-border p-5">
             <div className="flex items-center gap-2 mb-3">
               <ArrowRight className="w-5 h-5 text-accent" />
@@ -188,7 +190,6 @@ export default function InsightsPage() {
             </ul>
           </div>
 
-          {/* Stats */}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="bg-white rounded-2xl border border-border p-5">
               <h3 className="text-sm font-semibold text-text mb-3">カテゴリ分布</h3>
@@ -197,18 +198,13 @@ export default function InsightsPage() {
                   .sort((a, b) => b[1] - a[1])
                   .slice(0, 5)
                   .map(([cat, count]) => (
-                    <div key={cat} className="flex items-center gap-2">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between mb-0.5">
-                          <span className="text-xs text-text truncate">{cat}</span>
-                          <span className="text-xs text-text-muted ml-2">{count}</span>
-                        </div>
-                        <div className="h-1.5 bg-border-light rounded-full overflow-hidden">
-                          <div
-                            className="h-full bg-accent rounded-full"
-                            style={{ width: `${(count / data.count) * 100}%` }}
-                          />
-                        </div>
+                    <div key={cat} className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between mb-0.5">
+                        <span className="text-xs text-text truncate">{cat}</span>
+                        <span className="text-xs text-text-muted ml-2">{count}</span>
+                      </div>
+                      <div className="h-1.5 bg-border-light rounded-full overflow-hidden">
+                        <div className="h-full bg-accent rounded-full" style={{ width: `${(count / data.count) * 100}%` }} />
                       </div>
                     </div>
                   ))}
@@ -221,18 +217,13 @@ export default function InsightsPage() {
                 {Object.entries(data.stats.typeCount)
                   .sort((a, b) => b[1] - a[1])
                   .map(([type, count]) => (
-                    <div key={type} className="flex items-center gap-2">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between mb-0.5">
-                          <span className="text-xs text-text">{typeLabels[type] ?? type}</span>
-                          <span className="text-xs text-text-muted">{count}</span>
-                        </div>
-                        <div className="h-1.5 bg-border-light rounded-full overflow-hidden">
-                          <div
-                            className="h-full bg-rose-400 rounded-full"
-                            style={{ width: `${(count / data.count) * 100}%` }}
-                          />
-                        </div>
+                    <div key={type} className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between mb-0.5">
+                        <span className="text-xs text-text">{typeLabels[type] ?? type}</span>
+                        <span className="text-xs text-text-muted">{count}</span>
+                      </div>
+                      <div className="h-1.5 bg-border-light rounded-full overflow-hidden">
+                        <div className="h-full bg-rose-400 rounded-full" style={{ width: `${(count / data.count) * 100}%` }} />
                       </div>
                     </div>
                   ))}

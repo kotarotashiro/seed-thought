@@ -102,6 +102,21 @@ export interface TrendInsight {
   summary: string;
 }
 
+export interface ChatMessage {
+  role: "user" | "assistant";
+  content: string;
+}
+
+export interface PostContext {
+  id: string;
+  text: string;
+  summary?: string;
+  primaryCategory?: string;
+  tags?: string[];
+  sourceUrl?: string | null;
+  authorUsername?: string | null;
+}
+
 export interface AiProvider {
   classifyPost(input: ClassifyPostInput): Promise<PostClassificationResult>;
   translateText(input: TranslateTextInput): Promise<string>;
@@ -109,6 +124,7 @@ export interface AiProvider {
   generateOutput(input: GenerateOutputInput): Promise<GeneratedOutputResult>;
   searchSemantically(query: string, posts: PostSummaryForSearch[]): Promise<SemanticSearchResult>;
   analyzeLikeTrends(posts: PostSummaryForTrend[]): Promise<TrendInsight>;
+  chat(message: string, history: ChatMessage[], posts: PostContext[]): Promise<string>;
 }
 
 export interface ConfirmationInsight {

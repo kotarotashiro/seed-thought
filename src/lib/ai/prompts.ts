@@ -1,5 +1,5 @@
 import { getProfile } from "@/lib/profile/fixedProfile";
-import type { ClassifyPostInput, GenerateDeepDiveSessionInput, GenerateOutputInput, PostSummaryForSearch, PostSummaryForTrend, TranslateTextInput } from "./types";
+import type { ChatMessage, ClassifyPostInput, GenerateDeepDiveSessionInput, GenerateOutputInput, PostContext, PostSummaryForSearch, PostSummaryForTrend, TranslateTextInput } from "./types";
 import { beginnerTeachingRules, strictLearningKnowledge } from "./knowledge";
 
 export async function buildClassifyPrompt(input: ClassifyPostInput): Promise<string> {
@@ -282,4 +282,51 @@ ${postsJson}
 }
 
 JSONのみ返してください。`;
+}
+
+export async function buildChatPrompt(
+  message: string,
+  history: import("./types").ChatMessage[],
+  posts: import("./types").PostContext[]
+): Promise<string> {
+  const profile = await getProfile();
+  const postsContext = posts
+    .map((p, i) => {
+      const parts = [`[投稿${i + 1}] ID:${p.id}`];
+      if (p.primaryCategory) parts.push(`カテゴリ: ${p.primaryCategory}`);
+      if (p.tags?.length) parts.push(`タグ: ${p.tags.join(", ")}`);
+      if (p.summary) parts.push(`要約: ${p.summary}`);
+      parts.push(`本文: ${p.text.slice(0, 300)}${p.text.length > 300 ? "..." : ""}`);
+      if (p.authorUsername) parts.push(`投稿者: @${p.authorUsername}`);
+      if (p.sourceUrl) parts.push(`URL: ${p.sourceUrl}`);
+      return parts.join("\n");
+    })
+    .join("\n\n---\n\n");
+
+  const historyText = history
+    .map((m) => `${m.role === "user" ? "ユーザー" : "AI"}: ${m.content}`)
+    .join("\n");
+
+  return `あなたはSeedThoughtのAIアシスタントです。ユーザーが保存した投稿をもとに、質問に答えたり、ノウハウを解説したりします。
+
+## ユーザープロフィール
+名前: ${profile.name}
+役割: ${profile.role}
+テーマ: ${profile.themes.join("、")}
+
+## 参照できる保存投稿
+${postsContext}
+
+## 会話履歴
+${historyText || "（なし）"}
+
+## ユーザーの質問
+${message}
+
+## 回答ルール
+- 上記の保存投稿を参考にして回答してください
+- 投稿の内容に触れるときは「投稿1によると」「@username の投稿では」のように出典を明示してください
+- 投稿に関係ない質問も、プロフィールのテーマに沿って答えてください
+- マークダウンで読みやすく整理してください
+- 回答は日本語で、${profile.name}さんに向けた丁寧なトーンで書いてください`;
 }

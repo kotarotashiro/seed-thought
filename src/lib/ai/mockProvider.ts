@@ -1,11 +1,13 @@
 import type {
   AiProvider,
+  ChatMessage,
   ClassifyPostInput,
   PostClassificationResult,
   GenerateDeepDiveSessionInput,
   GeneratedDeepDiveSessionResult,
   GenerateOutputInput,
   GeneratedOutputResult,
+  PostContext,
   PostSummaryForSearch,
   PostSummaryForTrend,
   SemanticSearchResult,
@@ -293,6 +295,12 @@ export const mockProvider: AiProvider = {
       recommendedNextTopics: ["動画コンテンツ制作", "コミュニティ運営", "ライティング"],
       summary: "AI・SNS・学習系のコンテンツを多く保存しており、実践的なスキルアップへの関心が高いです",
     };
+  },
+
+  async chat(_message: string, _history: ChatMessage[], posts: PostContext[]): Promise<string> {
+    await delay(700);
+    const postCount = posts.length;
+    return `${postCount}件の保存投稿を参照して回答します。\n\nこれはモックレスポンスです。実際のAIプロバイダーを設定すると、保存した投稿の内容をもとに詳しく回答します。`;
   },
 };
 

@@ -2,19 +2,21 @@ import { GoogleGenAI } from "@google/genai";
 import OpenAI from "openai";
 import type {
   AiProvider,
+  ChatMessage,
   ClassifyPostInput,
   GenerateDeepDiveSessionInput,
   GeneratedDeepDiveSessionResult,
   GenerateOutputInput,
   GeneratedOutputResult,
   PostClassificationResult,
+  PostContext,
   PostSummaryForSearch,
   PostSummaryForTrend,
   SemanticSearchResult,
   TranslateTextInput,
   TrendInsight,
 } from "./types";
-import { buildClassifyPrompt, buildDeepDivePrompt, buildOutputPrompt, buildSemanticSearchPrompt, buildTranslatePrompt, buildTrendAnalysisPrompt } from "./prompts";
+import { buildChatPrompt, buildClassifyPrompt, buildDeepDivePrompt, buildOutputPrompt, buildSemanticSearchPrompt, buildTranslatePrompt, buildTrendAnalysisPrompt } from "./prompts";
 import { parseAiJson } from "./json";
 import {
   isGeneratedDeepDiveSessionResult,
@@ -171,6 +173,11 @@ export function getAiProvider(): AiProvider {
       const prompt = await buildTrendAnalysisPrompt(posts);
       const result = await callConfiguredAi(prompt);
       return parseAiJson(result, isTrendInsight, "傾向分析");
+    },
+
+    async chat(message: string, history: ChatMessage[], posts: PostContext[]): Promise<string> {
+      const prompt = await buildChatPrompt(message, history, posts);
+      return callConfiguredAi(prompt);
     },
   };
 }

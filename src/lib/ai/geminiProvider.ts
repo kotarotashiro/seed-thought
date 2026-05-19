@@ -1,19 +1,21 @@
 import { GoogleGenAI } from "@google/genai";
 import type {
   AiProvider,
+  ChatMessage,
   ClassifyPostInput,
   PostClassificationResult,
   GenerateDeepDiveSessionInput,
   GeneratedDeepDiveSessionResult,
   GenerateOutputInput,
   GeneratedOutputResult,
+  PostContext,
   PostSummaryForSearch,
   PostSummaryForTrend,
   SemanticSearchResult,
   TranslateTextInput,
   TrendInsight,
 } from "./types";
-import { buildClassifyPrompt, buildDeepDivePrompt, buildOutputPrompt, buildSemanticSearchPrompt, buildTranslatePrompt, buildTrendAnalysisPrompt } from "./prompts";
+import { buildChatPrompt, buildClassifyPrompt, buildDeepDivePrompt, buildOutputPrompt, buildSemanticSearchPrompt, buildTranslatePrompt, buildTrendAnalysisPrompt } from "./prompts";
 import { parseAiJson } from "./json";
 import {
   isGeneratedDeepDiveSessionResult,
@@ -83,5 +85,10 @@ export const geminiProvider: AiProvider = {
     const prompt = await buildTrendAnalysisPrompt(posts);
     const result = await callGemini(prompt);
     return parseAiJson(result, isTrendInsight, "傾向分析");
+  },
+
+  async chat(message: string, history: ChatMessage[], posts: PostContext[]): Promise<string> {
+    const prompt = await buildChatPrompt(message, history, posts);
+    return callGemini(prompt);
   },
 };

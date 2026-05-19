@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
-import { Search, ArrowRight, ExternalLink, Sparkles } from "lucide-react";
+import { Search, ArrowRight, ExternalLink, Sparkles, Clock, X } from "lucide-react";
 import { Badge, PostTypeBadge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -25,15 +25,39 @@ interface SearchResultItem {
   };
 }
 
+const HISTORY_KEY = "knowhow-search-history";
+const MAX_HISTORY = 8;
+
+function loadHistory(): string[] {
+  try {
+    return JSON.parse(localStorage.getItem(HISTORY_KEY) || "[]");
+  } catch {
+    return [];
+  }
+}
+
+function saveHistory(query: string, current: string[]): string[] {
+  const next = [query, ...current.filter((q) => q !== query)].slice(0, MAX_HISTORY);
+  localStorage.setItem(HISTORY_KEY, JSON.stringify(next));
+  return next;
+}
+
 export default function SearchPage() {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResultItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
   const [error, setError] = useState("");
+  const [history, setHistory] = useState<string[]>([]);
 
-  const handleSearch = async () => {
-    if (!query.trim()) return;
+  useEffect(() => {
+    setHistory(loadHistory());
+  }, []);
+
+  const handleSearch = async (q?: string) => {
+    const searchQuery = (q ?? query).trim();
+    if (!searchQuery) return;
+    setQuery(searchQuery);
     setLoading(true);
     setError("");
     setSearched(false);
@@ -42,7 +66,7 @@ export default function SearchPage() {
       const res = await fetch("/api/search/semantic", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query: query.trim() }),
+        body: JSON.stringify({ query: searchQuery }),
       });
 
       if (!res.ok) {
@@ -53,11 +77,18 @@ export default function SearchPage() {
       const data = await res.json();
       setResults(data.results || []);
       setSearched(true);
+      setHistory(saveHistory(searchQuery, history));
     } catch (e) {
       setError(e instanceof Error ? e.message : "検索に失敗しました");
     } finally {
       setLoading(false);
     }
+  };
+
+  const removeHistory = (q: string) => {
+    const next = history.filter((h) => h !== q);
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(next));
+    setHistory(next);
   };
 
   return (
@@ -83,18 +114,46 @@ export default function SearchPage() {
           onKeyDown={(e) => {
             if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) handleSearch();
           }}
-          placeholder="例: SNSのフォロワーを増やすには？&#10;例: 文章を読みやすくするコツが知りたい"
+          placeholder={"例: SNSのフォロワーを増やすには？\n例: 文章を読みやすくするコツが知りたい"}
           className="w-full rounded-xl border border-border px-4 py-3 text-sm resize-none min-h-[100px] focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent"
           rows={3}
         />
         <div className="flex items-center justify-between">
           <span className="text-xs text-text-muted">Cmd+Enter で検索</span>
-          <Button onClick={handleSearch} loading={loading} loadingLabel="検索中...">
+          <Button onClick={() => handleSearch()} loading={loading} loadingLabel="検索中...">
             <Search className="w-4 h-4 mr-1.5" />
             検索する
           </Button>
         </div>
       </div>
+
+      {/* Search history */}
+      {history.length > 0 && !searched && (
+        <div className="space-y-2">
+          <p className="text-xs font-medium text-text-muted flex items-center gap-1">
+            <Clock className="w-3.5 h-3.5" />
+            検索履歴
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {history.map((q) => (
+              <div key={q} className="flex items-center gap-1 bg-white border border-border rounded-full px-3 py-1 group">
+                <button
+                  onClick={() => handleSearch(q)}
+                  className="text-xs text-text-secondary hover:text-text max-w-[200px] truncate"
+                >
+                  {q}
+                </button>
+                <button
+                  onClick={() => removeHistory(q)}
+                  className="text-text-muted hover:text-danger opacity-0 group-hover:opacity-100 transition-opacity"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {error && (
         <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-sm text-red-700">

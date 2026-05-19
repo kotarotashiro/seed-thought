@@ -65,7 +65,7 @@ export function PostCard({ post, showRecommendReason = false }: PostCardProps) {
         {post.text}
       </p>
       {post.translatedText && (
-        <p className="mb-4 line-clamp-2 rounded-xl bg-accent-subtle px-3 py-2 text-xs leading-relaxed text-text-secondary">
+        <p className="mb-4 rounded-xl bg-accent-subtle px-3 py-2 text-xs leading-relaxed text-text-secondary">
           日本語訳: {post.translatedText}
         </p>
       )}

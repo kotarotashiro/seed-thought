@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { BookOpen, ArrowRight, ExternalLink } from "lucide-react";
+import { BookOpen, ArrowRight, ExternalLink, ChevronDown } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -85,32 +85,25 @@ export default function KnowhowPage() {
         </div>
       </div>
 
-      {/* Category filter */}
+      {/* Category dropdown */}
       {categories.length > 0 && (
-        <div className="flex flex-wrap gap-2">
-          <button
-            onClick={() => setSelectedCategory("")}
-            className={`text-xs px-3 py-1.5 rounded-full font-medium transition-colors ${
-              selectedCategory === ""
-                ? "bg-blue-600 text-white"
-                : "bg-border-light text-text-secondary hover:bg-border"
-            }`}
+        <div className="relative inline-block w-full sm:w-auto">
+          <select
+            value={selectedCategory}
+            onChange={(e) => setSelectedCategory(e.target.value)}
+            className="w-full sm:w-64 appearance-none bg-white border border-border rounded-xl px-4 py-2.5 text-sm text-text pr-9 focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent cursor-pointer"
           >
-            すべて
-          </button>
-          {categories.map((cat) => (
-            <button
-              key={cat}
-              onClick={() => setSelectedCategory(cat === selectedCategory ? "" : cat)}
-              className={`text-xs px-3 py-1.5 rounded-full font-medium transition-colors ${
-                selectedCategory === cat
-                  ? "bg-blue-600 text-white"
-                  : "bg-border-light text-text-secondary hover:bg-border"
-              }`}
-            >
-              {cat}
-            </button>
-          ))}
+            <option value="">すべてのカテゴリ ({posts.length}件)</option>
+            {categories.map((cat) => {
+              const count = posts.filter((p) => p.classification?.primaryCategory === cat).length;
+              return (
+                <option key={cat} value={cat}>
+                  {cat} ({count}件)
+                </option>
+              );
+            })}
+          </select>
+          <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
         </div>
       )}
 
