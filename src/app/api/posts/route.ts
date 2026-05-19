@@ -77,6 +77,22 @@ export async function GET(request: Request) {
   }
 }
 
+// DELETE /api/posts - Bulk delete posts
+export async function DELETE(request: Request) {
+  try {
+    const body = await request.json();
+    const { ids } = body as { ids: string[] };
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return NextResponse.json({ error: "削除するIDを指定してください" }, { status: 400 });
+    }
+    await prisma.post.deleteMany({ where: { id: { in: ids } } });
+    return NextResponse.json({ success: true, deleted: ids.length });
+  } catch (error) {
+    console.error("Failed to bulk delete posts:", error);
+    return NextResponse.json({ error: "投稿の削除に失敗しました" }, { status: 500 });
+  }
+}
+
 // POST /api/posts - Create a new post manually
 export async function POST(request: Request) {
   try {

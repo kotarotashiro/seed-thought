@@ -7,7 +7,7 @@ import { PostMediaGrid, parsePostMedia } from "@/components/posts/PostMediaGrid"
 import { PostTypeBadge, SavedTypeBadge, Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
-import { Archive, Trash2, Pencil, ArrowRight, Eye, ExternalLink, User, CheckCircle2 } from "lucide-react";
+import { Archive, Trash2, Pencil, ArrowRight, Eye, ExternalLink, User, CheckCircle2, CheckSquare, Square } from "lucide-react";
 
 interface PostListItem {
   id: string;
@@ -50,6 +50,11 @@ export default function PostsPage() {
   const [selectedSavedType, setSelectedSavedType] = useState("");
   const [selectedDigestStatus, setSelectedDigestStatus] = useState("");
   const [selectedSort, setSelectedSort] = useState("postedAt_desc");
+
+  // Selection state
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkDeleting, setBulkDeleting] = useState(false);
 
   // Edit modal state
   const [editingPost, setEditingPost] = useState<string | null>(null);
@@ -118,6 +123,48 @@ export default function PostsPage() {
     }
   };
 
+  const toggleSelectMode = () => {
+    setSelectMode((v) => !v);
+    setSelectedIds(new Set());
+  };
+
+  const toggleSelectPost = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const selectAll = () => {
+    setSelectedIds(new Set(posts.map((p) => p.id)));
+  };
+
+  const deselectAll = () => {
+    setSelectedIds(new Set());
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.size === 0) return;
+    if (!confirm(`選択した${selectedIds.size}件の投稿を削除しますか？`)) return;
+    setBulkDeleting(true);
+    try {
+      await fetch("/api/posts", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: Array.from(selectedIds) }),
+      });
+      setSelectedIds(new Set());
+      setSelectMode(false);
+      loadPosts();
+    } catch (error) {
+      console.error("Failed to bulk delete:", error);
+    } finally {
+      setBulkDeleting(false);
+    }
+  };
+
   const handleEdit = async (postId: string) => {
     try {
       await fetch(`/api/posts/${postId}`, {
@@ -147,9 +194,39 @@ export default function PostsPage() {
             </p>
           </div>
         </div>
-        <Link href="/posts/new" className="sm:flex-shrink-0">
-          <Button className="w-full sm:w-auto">投稿を追加</Button>
-        </Link>
+        <div className="flex gap-2 sm:flex-shrink-0">
+          {selectMode ? (
+            <>
+              <Button variant="ghost" size="sm" onClick={selectedIds.size === posts.length ? deselectAll : selectAll}>
+                {selectedIds.size === posts.length ? "全解除" : "全選択"}
+              </Button>
+              <Button
+                variant="danger"
+                size="sm"
+                onClick={handleBulkDelete}
+                loading={bulkDeleting}
+                loadingLabel="削除中..."
+                disabled={selectedIds.size === 0}
+              >
+                <Trash2 className="w-4 h-4 mr-1" />
+                削除 ({selectedIds.size})
+              </Button>
+              <Button variant="secondary" size="sm" onClick={toggleSelectMode}>
+                キャンセル
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button variant="secondary" className="w-full sm:w-auto" onClick={toggleSelectMode}>
+                <CheckSquare className="w-4 h-4 mr-1.5" />
+                選択
+              </Button>
+              <Link href="/posts/new" className="sm:flex-shrink-0">
+                <Button className="w-full sm:w-auto">投稿を追加</Button>
+              </Link>
+            </>
+          )}
+        </div>
       </div>
 
       {/* Filters */}
@@ -193,7 +270,24 @@ export default function PostsPage() {
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 xl:gap-5">
             {posts.map((post) => (
-              <Card key={post.id} hoverable className="flex min-h-[280px] flex-col">
+              <Card
+              key={post.id}
+              hoverable
+              className={`flex min-h-[280px] flex-col ${selectMode && selectedIds.has(post.id) ? "ring-2 ring-accent" : ""}`}
+              onClick={selectMode ? () => toggleSelectPost(post.id) : undefined}
+            >
+                {selectMode && (
+                  <div className="flex items-center gap-2 mb-3 -mt-1">
+                    {selectedIds.has(post.id) ? (
+                      <CheckSquare className="w-5 h-5 text-accent" />
+                    ) : (
+                      <Square className="w-5 h-5 text-text-muted" />
+                    )}
+                    <span className="text-xs text-text-secondary">
+                      {selectedIds.has(post.id) ? "選択中" : "クリックして選択"}
+                    </span>
+                  </div>
+                )}
                 {editingPost === post.id ? (
                   <div className="space-y-3">
                     <textarea

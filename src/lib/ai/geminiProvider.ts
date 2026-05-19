@@ -7,14 +7,20 @@ import type {
   GeneratedDeepDiveSessionResult,
   GenerateOutputInput,
   GeneratedOutputResult,
+  PostSummaryForSearch,
+  PostSummaryForTrend,
+  SemanticSearchResult,
   TranslateTextInput,
+  TrendInsight,
 } from "./types";
-import { buildClassifyPrompt, buildDeepDivePrompt, buildOutputPrompt, buildTranslatePrompt } from "./prompts";
+import { buildClassifyPrompt, buildDeepDivePrompt, buildOutputPrompt, buildSemanticSearchPrompt, buildTranslatePrompt, buildTrendAnalysisPrompt } from "./prompts";
 import { parseAiJson } from "./json";
 import {
   isGeneratedDeepDiveSessionResult,
   isGeneratedOutputResult,
   isPostClassificationResult,
+  isSemanticSearchResult,
+  isTrendInsight,
   isTranslatedTextResult,
 } from "./validation";
 import { mergeClassificationFallback } from "./fallback";
@@ -65,5 +71,17 @@ export const geminiProvider: AiProvider = {
     const prompt = await buildOutputPrompt(input);
     const result = await callGemini(prompt);
     return parseAiJson(result, isGeneratedOutputResult, "アウトプット生成");
+  },
+
+  async searchSemantically(query: string, posts: PostSummaryForSearch[]): Promise<SemanticSearchResult> {
+    const prompt = buildSemanticSearchPrompt(query, posts);
+    const result = await callGemini(prompt);
+    return parseAiJson(result, isSemanticSearchResult, "セマンティック検索");
+  },
+
+  async analyzeLikeTrends(posts: PostSummaryForTrend[]): Promise<TrendInsight> {
+    const prompt = await buildTrendAnalysisPrompt(posts);
+    const result = await callGemini(prompt);
+    return parseAiJson(result, isTrendInsight, "傾向分析");
   },
 };

@@ -7,9 +7,13 @@ import type {
   GeneratedDeepDiveSessionResult,
   GenerateOutputInput,
   GeneratedOutputResult,
+  PostSummaryForSearch,
+  PostSummaryForTrend,
+  SemanticSearchResult,
   TranslateTextInput,
+  TrendInsight,
 } from "./types";
-import { buildClassifyPrompt, buildDeepDivePrompt, buildOutputPrompt, buildTranslatePrompt } from "./prompts";
+import { buildClassifyPrompt, buildDeepDivePrompt, buildOutputPrompt, buildSemanticSearchPrompt, buildTranslatePrompt, buildTrendAnalysisPrompt } from "./prompts";
 
 function getClient(): OpenAI {
   const apiKey = process.env.OPENAI_API_KEY;
@@ -55,5 +59,17 @@ export const openaiProvider: AiProvider = {
     const prompt = await buildOutputPrompt(input);
     const result = await callOpenAI(prompt);
     return JSON.parse(result) as GeneratedOutputResult;
+  },
+
+  async searchSemantically(query: string, posts: PostSummaryForSearch[]): Promise<SemanticSearchResult> {
+    const prompt = buildSemanticSearchPrompt(query, posts);
+    const result = await callOpenAI(prompt);
+    return JSON.parse(result) as SemanticSearchResult;
+  },
+
+  async analyzeLikeTrends(posts: PostSummaryForTrend[]): Promise<TrendInsight> {
+    const prompt = await buildTrendAnalysisPrompt(posts);
+    const result = await callOpenAI(prompt);
+    return JSON.parse(result) as TrendInsight;
   },
 };

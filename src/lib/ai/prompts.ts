@@ -1,5 +1,5 @@
 import { getProfile } from "@/lib/profile/fixedProfile";
-import type { ClassifyPostInput, GenerateDeepDiveSessionInput, GenerateOutputInput, TranslateTextInput } from "./types";
+import type { ClassifyPostInput, GenerateDeepDiveSessionInput, GenerateOutputInput, PostSummaryForSearch, PostSummaryForTrend, TranslateTextInput } from "./types";
 import { beginnerTeachingRules, strictLearningKnowledge } from "./knowledge";
 
 export async function buildClassifyPrompt(input: ClassifyPostInput): Promise<string> {
@@ -205,6 +205,81 @@ Instagramカルーセルの場合、contentJsonに以下を含めてください
 ${input.outputType === "x" ? "X投稿は280文字以内に収めてください。ハッシュタグは2-3個にしてください。" : ""}
 
 ${input.outputType === "markdown_log" ? "Markdownの学習ログとして、見出し・箇条書き・コードブロック等を活用してください。" : ""}
+
+JSONのみ返してください。`;
+}
+
+export function buildSemanticSearchPrompt(query: string, posts: PostSummaryForSearch[]): string {
+  const postsJson = JSON.stringify(
+    posts.map((p) => ({
+      id: p.id,
+      summary: p.summary,
+      tags: p.tags,
+      category: p.primaryCategory,
+      type: p.postType,
+    }))
+  );
+
+  return `あなたはユーザーの悩みや目標に合った投稿を見つける検索エキスパートです。
+
+## ユーザーの検索クエリ
+${query}
+
+## 投稿一覧（JSON）
+${postsJson}
+
+## タスク
+ユーザーの検索クエリに対して、最も関連性の高い投稿を最大10件選んでください。
+キーワードの一致ではなく、「この投稿がユーザーの悩みや目標を解決するか」という観点で評価してください。
+
+## 出力形式（JSONのみ）
+{
+  "results": [
+    {
+      "postId": "投稿のid",
+      "relevanceScore": 1-100,
+      "reason": "なぜこの投稿がクエリに関連するか（40-60文字）"
+    }
+  ]
+}
+
+関連性スコアの高い順に並べてください。JSONのみ返してください。`;
+}
+
+export async function buildTrendAnalysisPrompt(posts: PostSummaryForTrend[]): Promise<string> {
+  const profile = await getProfile();
+  const postsJson = JSON.stringify(
+    posts.map((p) => ({
+      category: p.primaryCategory,
+      type: p.postType,
+      tags: p.tags,
+      difficulty: p.difficultyLevel,
+      summary: p.summary,
+    }))
+  );
+
+  return `あなたはユーザーの学習傾向を分析するアナリストです。
+
+## ユーザープロフィール
+名前: ${profile.name}
+役割: ${profile.role}
+テーマ: ${profile.themes.join("、")}
+
+## いいねした投稿一覧（${posts.length}件）
+${postsJson}
+
+## タスク
+ユーザーがいいねした投稿のパターンを分析し、学習傾向・興味・強みを明らかにしてください。
+
+## 出力形式（JSONのみ）
+{
+  "topCategories": ["最も多いカテゴリ1", "カテゴリ2", "カテゴリ3"],
+  "favoriteThemes": ["好きなテーマ1", "テーマ2", "テーマ3"],
+  "learningStyle": "学習スタイルの説明（50-80文字）",
+  "strengths": ["強み・得意分野1", "強み2", "強み3"],
+  "recommendedNextTopics": ["次に学ぶと良いトピック1", "トピック2", "トピック3"],
+  "summary": "全体的な傾向のまとめ（100-150文字）"
+}
 
 JSONのみ返してください。`;
 }

@@ -67,11 +67,48 @@ export interface GeneratedOutputResult {
   contentJson?: Record<string, unknown>;
 }
 
+export interface PostSummaryForSearch {
+  id: string;
+  summary: string;
+  tags: string[];
+  primaryCategory: string;
+  postType: string;
+}
+
+export interface SemanticSearchResultItem {
+  postId: string;
+  relevanceScore: number;
+  reason: string;
+}
+
+export interface SemanticSearchResult {
+  results: SemanticSearchResultItem[];
+}
+
+export interface PostSummaryForTrend {
+  summary: string;
+  primaryCategory: string;
+  postType: string;
+  tags: string[];
+  difficultyLevel: string;
+}
+
+export interface TrendInsight {
+  topCategories: string[];
+  favoriteThemes: string[];
+  learningStyle: string;
+  strengths: string[];
+  recommendedNextTopics: string[];
+  summary: string;
+}
+
 export interface AiProvider {
   classifyPost(input: ClassifyPostInput): Promise<PostClassificationResult>;
   translateText(input: TranslateTextInput): Promise<string>;
   generateDeepDiveSession(input: GenerateDeepDiveSessionInput): Promise<GeneratedDeepDiveSessionResult>;
   generateOutput(input: GenerateOutputInput): Promise<GeneratedOutputResult>;
+  searchSemantically(query: string, posts: PostSummaryForSearch[]): Promise<SemanticSearchResult>;
+  analyzeLikeTrends(posts: PostSummaryForTrend[]): Promise<TrendInsight>;
 }
 
 export interface ConfirmationInsight {

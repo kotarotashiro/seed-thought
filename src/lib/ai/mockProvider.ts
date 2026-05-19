@@ -6,7 +6,11 @@ import type {
   GeneratedDeepDiveSessionResult,
   GenerateOutputInput,
   GeneratedOutputResult,
+  PostSummaryForSearch,
+  PostSummaryForTrend,
+  SemanticSearchResult,
   TranslateTextInput,
+  TrendInsight,
 } from "./types";
 
 /**
@@ -266,6 +270,29 @@ export const mockProvider: AiProvider = {
       default:
         return { title: "出力", content: context };
     }
+  },
+
+  async searchSemantically(_query: string, posts: PostSummaryForSearch[]): Promise<SemanticSearchResult> {
+    await delay(400);
+    return {
+      results: posts.slice(0, 3).map((p, i) => ({
+        postId: p.id,
+        relevanceScore: 90 - i * 10,
+        reason: `${p.primaryCategory}に関連するノウハウです`,
+      })),
+    };
+  },
+
+  async analyzeLikeTrends(_posts: PostSummaryForTrend[]): Promise<TrendInsight> {
+    await delay(600);
+    return {
+      topCategories: ["AI活用", "SNS運用", "コンテンツ制作"],
+      favoriteThemes: ["発信力", "効率化", "学習法"],
+      learningStyle: "実践的なノウハウより抽象的な思考系コンテンツを好む傾向があります",
+      strengths: ["情報収集力", "パターン認識", "発信力"],
+      recommendedNextTopics: ["動画コンテンツ制作", "コミュニティ運営", "ライティング"],
+      summary: "AI・SNS・学習系のコンテンツを多く保存しており、実践的なスキルアップへの関心が高いです",
+    };
   },
 };
 

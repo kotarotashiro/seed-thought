@@ -2,6 +2,8 @@ import type {
   GeneratedDeepDiveSessionResult,
   GeneratedOutputResult,
   PostClassificationResult,
+  SemanticSearchResult,
+  TrendInsight,
 } from "./types";
 
 const postTypes = ["thought", "learning", "output_material", "unknown"];
@@ -62,6 +64,29 @@ export function isGeneratedOutputResult(
 
 export function isTranslatedTextResult(value: unknown): value is { translatedText: string } {
   return isRecord(value) && typeof value.translatedText === "string";
+}
+
+export function isSemanticSearchResult(value: unknown): value is SemanticSearchResult {
+  if (!isRecord(value) || !Array.isArray(value.results)) return false;
+  return value.results.every(
+    (r) =>
+      isRecord(r) &&
+      typeof r.postId === "string" &&
+      typeof r.relevanceScore === "number" &&
+      typeof r.reason === "string"
+  );
+}
+
+export function isTrendInsight(value: unknown): value is TrendInsight {
+  if (!isRecord(value)) return false;
+  return (
+    isStringArray(value.topCategories) &&
+    isStringArray(value.favoriteThemes) &&
+    typeof value.learningStyle === "string" &&
+    isStringArray(value.strengths) &&
+    isStringArray(value.recommendedNextTopics) &&
+    typeof value.summary === "string"
+  );
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
