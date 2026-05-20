@@ -6,10 +6,13 @@ import {
   ArrowRight,
   BookOpen,
   Calendar,
+  CheckSquare,
   ExternalLink,
   FileText,
   Layers,
   Search,
+  Square,
+  Trash2,
 } from "lucide-react";
 import { Badge, LearningStatusBadge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -49,6 +52,9 @@ export default function KnowhowPage() {
   const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -92,6 +98,53 @@ export default function KnowhowPage() {
     });
   }, [cards, searchQuery, selectedCategory]);
 
+  const allFilteredSelected =
+    filteredCards.length > 0 && filteredCards.every((c) => selectedIds.has(c.id));
+
+  function toggleSelectMode() {
+    setSelectMode((v) => !v);
+    setSelectedIds(new Set());
+  }
+
+  function toggleCard(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleSelectAll() {
+    if (allFilteredSelected) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filteredCards.map((c) => c.id)));
+    }
+  }
+
+  async function handleDelete(ids: string[]) {
+    if (ids.length === 0) return;
+    setDeleting(true);
+    try {
+      await fetch("/api/learning-cards", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids }),
+      });
+      setCards((prev) => prev.filter((c) => !ids.includes(c.id)));
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        ids.forEach((id) => next.delete(id));
+        return next;
+      });
+    } catch (error) {
+      console.error("Failed to delete:", error);
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -104,12 +157,21 @@ export default function KnowhowPage() {
             <p className="text-sm text-text-secondary">{cards.length}件の学習カード</p>
           </div>
         </div>
-        <Link href="/posts">
-          <Button variant="secondary">
-            保存一覧へ
-            <ArrowRight className="ml-1.5 h-4 w-4" />
+        <div className="flex items-center gap-2">
+          <Button
+            variant={selectMode ? "primary" : "secondary"}
+            onClick={toggleSelectMode}
+          >
+            <CheckSquare className="h-4 w-4 mr-1.5" />
+            {selectMode ? "選択を終了" : "選択"}
           </Button>
-        </Link>
+          <Link href="/posts">
+            <Button variant="secondary">
+              保存一覧へ
+              <ArrowRight className="ml-1.5 h-4 w-4" />
+            </Button>
+          </Link>
+        </div>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-[1fr_240px]">
@@ -135,6 +197,28 @@ export default function KnowhowPage() {
           ))}
         </select>
       </div>
+
+      {selectMode && (
+        <div className="flex items-center justify-between rounded-xl border border-border bg-white px-4 py-3">
+          <Button variant="ghost" size="sm" onClick={toggleSelectAll}>
+            {allFilteredSelected ? (
+              <CheckSquare className="h-4 w-4 mr-1.5 text-accent" />
+            ) : (
+              <Square className="h-4 w-4 mr-1.5 text-text-muted" />
+            )}
+            全選択
+          </Button>
+          <Button
+            variant="danger"
+            size="sm"
+            disabled={selectedIds.size === 0 || deleting}
+            onClick={() => handleDelete(Array.from(selectedIds))}
+          >
+            <Trash2 className="h-4 w-4 mr-1.5" />
+            削除 ({selectedIds.size})
+          </Button>
+        </div>
+      )}
 
       {loading ? (
         <div className="grid gap-4 sm:grid-cols-2">
@@ -165,22 +249,54 @@ export default function KnowhowPage() {
         <div className="grid gap-4 lg:grid-cols-2">
           {filteredCards.map((card) => {
             const category = card.sourcePost.classification?.primaryCategory || "未分類";
+            const isSelected = selectedIds.has(card.id);
             return (
-              <Card key={card.id} hoverable className="flex flex-col gap-4">
+              <Card
+                key={card.id}
+                hoverable={selectMode}
+                className={`flex flex-col gap-4 ${selectMode && isSelected ? "ring-2 ring-accent" : ""}`}
+                onClick={selectMode ? () => toggleCard(card.id) : undefined}
+              >
                 <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
+                  <div className="min-w-0 flex-1">
+                    {selectMode && (
+                      <div className="mb-2 flex items-center gap-2">
+                        {isSelected ? (
+                          <CheckSquare className="h-4 w-4 flex-shrink-0 text-accent" />
+                        ) : (
+                          <Square className="h-4 w-4 flex-shrink-0 text-text-muted" />
+                        )}
+                      </div>
+                    )}
                     <div className="mb-2 flex flex-wrap items-center gap-2">
                       <LearningStatusBadge learningCard={card} />
                       <Badge>{category}</Badge>
                     </div>
                     <h2 className="line-clamp-2 text-base font-bold text-text">{card.title}</h2>
                   </div>
-                  {card.sourcePost.sourceUrl && (
-                    <a href={card.sourcePost.sourceUrl} target="_blank" rel="noreferrer">
-                      <Button variant="ghost" size="sm" title="元投稿を開く">
-                        <ExternalLink className="h-4 w-4" />
+                  {!selectMode && (
+                    <div className="flex items-center gap-1 flex-shrink-0">
+                      {card.sourcePost.sourceUrl && (
+                        <a
+                          href={card.sourcePost.sourceUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <Button variant="ghost" size="sm" title="元投稿を開く">
+                            <ExternalLink className="h-4 w-4" />
+                          </Button>
+                        </a>
+                      )}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        title="削除"
+                        onClick={(e) => { e.stopPropagation(); handleDelete([card.id]); }}
+                      >
+                        <Trash2 className="h-4 w-4 text-danger" />
                       </Button>
-                    </a>
+                    </div>
                   )}
                 </div>
 
@@ -211,12 +327,17 @@ export default function KnowhowPage() {
                         : card.sourcePost.authorName || "手動追加"}
                     </span>
                   </div>
-                  <Link href={`/posts/${card.sourcePost.id}/learning`}>
-                    <Button size="sm">
-                      カードを見る
-                      <ArrowRight className="ml-1.5 h-4 w-4" />
-                    </Button>
-                  </Link>
+                  {!selectMode && (
+                    <Link
+                      href={`/posts/${card.sourcePost.id}/learning`}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <Button size="sm">
+                        カードを見る
+                        <ArrowRight className="ml-1.5 h-4 w-4" />
+                      </Button>
+                    </Link>
+                  )}
                 </div>
               </Card>
             );

@@ -12,6 +12,20 @@ function mergeUserMemo(outputJson: string, userMemo: string | null | undefined):
   return outputJson;
 }
 
+export async function DELETE(
+  _request: Request,
+  { params }: { params: Promise<{ cardId: string }> }
+) {
+  const { cardId } = await params;
+  try {
+    await prisma.learningCard.delete({ where: { id: cardId } });
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    console.error("Failed to delete learning card:", error);
+    return NextResponse.json({ error: "学習カードの削除に失敗しました" }, { status: 500 });
+  }
+}
+
 export async function PUT(
   request: Request,
   { params }: { params: Promise<{ cardId: string }> }
