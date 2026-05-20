@@ -288,9 +288,10 @@ export function PostCard({
 
         {/* Translation */}
         {post.translatedText && !isUrlOnly && (
-          <p className="mb-4 rounded-xl bg-accent-subtle px-3 py-2 text-xs leading-relaxed text-text-secondary">
-            日本語訳: {post.translatedText}
-          </p>
+          <div className="mb-4 rounded-xl border border-border bg-border-light px-3 py-2">
+            <p className="mb-0.5 text-xs font-medium text-text-muted">日本語訳</p>
+            <p className="text-xs leading-relaxed text-text-secondary">{post.translatedText}</p>
+          </div>
         )}
 
         {/* URL article preview */}

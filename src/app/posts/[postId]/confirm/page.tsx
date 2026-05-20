@@ -13,11 +13,15 @@ import {
   ArrowRight,
   Brain,
   BookOpen,
+  ExternalLink,
   GitBranch,
   Lightbulb,
+  Newspaper,
   User,
   Zap,
 } from "lucide-react";
+
+const X_ARTICLE_RE = /(?:x|twitter)\.com\/i\/article\//i;
 
 function buildGains(post: {
   classification?: {
@@ -250,36 +254,75 @@ export default function ConfirmPage({ params }: { params: Promise<{ postId: stri
               })()
             : null;
           if (isUrlOnly && urlCard) {
+            const expandedUrl: string | undefined = urlCard.expandedUrl;
+            const isXArticle = expandedUrl ? X_ARTICLE_RE.test(expandedUrl) : false;
+            const pastedContent: string | null =
+              urlCard.pastedByUser && typeof urlCard.pastedContent === "string"
+                ? urlCard.pastedContent
+                : null;
+            const hasTitleOrDesc = !!(urlCard.title || urlCard.description);
+
             return (
               <>
                 <p className="mb-3 truncate text-xs text-text-muted">{post.text.trim()}</p>
-                <a
-                  href={urlCard.expandedUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="block overflow-hidden rounded-xl border border-border transition-colors hover:border-accent/40"
-                >
-                  {urlCard.imageUrl && (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={urlCard.imageUrl}
-                      alt=""
-                      className="h-40 w-full object-cover"
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).style.display = "none";
-                      }}
-                    />
-                  )}
-                  <div className="px-4 py-3">
-                    {urlCard.title && (
-                      <p className="mb-1 line-clamp-2 text-sm font-medium text-text">{urlCard.title}</p>
+                {isXArticle && expandedUrl ? (
+                  <a
+                    href={expandedUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex items-center gap-2 rounded-xl border border-border px-3 py-2 text-xs text-text-secondary transition-colors hover:border-accent/40"
+                  >
+                    <Newspaper className="h-3.5 w-3.5 flex-shrink-0 text-accent" />
+                    <span className="flex-1 truncate">X Article（Xアプリで開く）</span>
+                    <ExternalLink className="h-3.5 w-3.5 flex-shrink-0" />
+                  </a>
+                ) : hasTitleOrDesc && expandedUrl ? (
+                  <a
+                    href={expandedUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="block overflow-hidden rounded-xl border border-border transition-colors hover:border-accent/40"
+                  >
+                    {urlCard.imageUrl && (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={urlCard.imageUrl}
+                        alt=""
+                        className="h-40 w-full object-cover"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).style.display = "none";
+                        }}
+                      />
                     )}
-                    {urlCard.description && (
-                      <p className="line-clamp-3 text-xs text-text-secondary">{urlCard.description}</p>
-                    )}
-                    <p className="mt-1 truncate text-xs text-text-muted">{urlCard.expandedUrl}</p>
+                    <div className="px-4 py-3">
+                      {urlCard.title && (
+                        <p className="mb-1 line-clamp-2 text-sm font-medium text-text">{urlCard.title}</p>
+                      )}
+                      {urlCard.description && (
+                        <p className="line-clamp-3 text-xs text-text-secondary">{urlCard.description}</p>
+                      )}
+                      <p className="mt-1 truncate text-xs text-text-muted">{expandedUrl}</p>
+                    </div>
+                  </a>
+                ) : expandedUrl ? (
+                  <a
+                    href={expandedUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex items-center gap-2 rounded-xl border border-border px-3 py-2 text-xs text-text-secondary transition-colors hover:border-accent/40"
+                  >
+                    <ExternalLink className="h-3.5 w-3.5 flex-shrink-0" />
+                    <span className="flex-1 truncate">{expandedUrl}</span>
+                  </a>
+                ) : null}
+                {pastedContent && (
+                  <div className="mt-3 rounded-xl border border-border bg-border-light px-4 py-3">
+                    <p className="mb-2 text-xs font-medium text-text-muted">記事テキスト（貼り付け済み）</p>
+                    <p className="whitespace-pre-wrap text-sm leading-relaxed text-text">
+                      {pastedContent}
+                    </p>
                   </div>
-                </a>
+                )}
               </>
             );
           }
