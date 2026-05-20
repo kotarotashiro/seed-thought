@@ -23,7 +23,7 @@ import { clsx } from "clsx";
 const menuItems = [
   { href: "/", label: "ホーム", icon: Home },
   { href: "/posts", label: "保存一覧", icon: Archive },
-  { href: "/knowhow", label: "ノウハウ一覧", icon: BookOpen },
+  { href: "/knowhow", label: "学習カード一覧", icon: BookOpen },
   { href: "/search", label: "ノウハウ検索", icon: Search },
   { href: "/chat", label: "投稿チャット", icon: MessageCircle },
   { href: "/insights", label: "いいね傾向分析", icon: TrendingUp },

@@ -1,189 +1,227 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { BookOpen, ArrowRight, ExternalLink, ChevronDown, MessageCircle } from "lucide-react";
-import { Badge } from "@/components/ui/Badge";
+import {
+  ArrowRight,
+  BookOpen,
+  Calendar,
+  ExternalLink,
+  FileText,
+  Layers,
+  Search,
+} from "lucide-react";
+import { Badge, LearningStatusBadge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
-import { PostChatModal } from "@/components/posts/PostChatModal";
+import { Card } from "@/components/ui/Card";
 
-interface KnowhowPost {
+interface LearningCardItem {
   id: string;
-  text: string;
-  sourceUrl?: string | null;
-  authorName?: string | null;
-  authorUsername?: string | null;
-  savedAt: string;
-  classification?: {
-    primaryCategory: string;
-    summary: string;
-    tagsJson: string;
-    difficultyLevel: string;
-    learningPotentialScore: number;
-  } | null;
+  title: string;
+  summary: string;
+  coreInsight: string;
+  status: "draft" | "saved";
+  updatedAt: string;
+  userMemo?: string | null;
+  sourcePost: {
+    id: string;
+    text: string;
+    sourceUrl?: string | null;
+    authorName?: string | null;
+    authorUsername?: string | null;
+    classification?: {
+      primaryCategory: string;
+      postType: string;
+    } | null;
+  };
 }
 
-function DifficultyBadge({ level }: { level: string }) {
-  switch (level) {
-    case "beginner":
-      return <Badge variant="success">初級</Badge>;
-    case "intermediate":
-      return <Badge variant="warning">中級</Badge>;
-    case "advanced":
-      return <Badge>上級</Badge>;
-    default:
-      return null;
-  }
+function formatDate(value: string) {
+  return new Date(value).toLocaleDateString("ja-JP", {
+    year: "numeric",
+    month: "numeric",
+    day: "numeric",
+  });
 }
 
 export default function KnowhowPage() {
-  const [posts, setPosts] = useState<KnowhowPost[]>([]);
+  const [cards, setCards] = useState<LearningCardItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState("");
-  const [chatPost, setChatPost] = useState<KnowhowPost | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
     let cancelled = false;
-    async function load() {
+
+    async function loadLearningCards() {
       try {
-        const res = await fetch("/api/posts?postType=learning&sort=savedAt_desc");
+        const res = await fetch("/api/learning-cards");
         const data = await res.json();
-        if (!cancelled) setPosts(data.posts || []);
-      } catch (e) {
-        console.error(e);
+        if (!cancelled) setCards(data.learningCards || []);
+      } catch (error) {
+        console.error("Failed to fetch learning cards:", error);
       } finally {
         if (!cancelled) setLoading(false);
       }
     }
-    load();
-    return () => { cancelled = true; };
+
+    loadLearningCards();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  const categories = Array.from(
-    new Set(posts.map((p) => p.classification?.primaryCategory).filter(Boolean))
-  ) as string[];
+  const categories = useMemo(() => {
+    return Array.from(
+      new Set(cards.map((card) => card.sourcePost.classification?.primaryCategory).filter(Boolean))
+    ) as string[];
+  }, [cards]);
 
-  const filtered = selectedCategory
-    ? posts.filter((p) => p.classification?.primaryCategory === selectedCategory)
-    : posts;
-
-  const grouped = filtered.reduce<Record<string, KnowhowPost[]>>((acc, post) => {
-    const cat = post.classification?.primaryCategory ?? "未分類";
-    if (!acc[cat]) acc[cat] = [];
-    acc[cat].push(post);
-    return acc;
-  }, {});
+  const filteredCards = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    return cards.filter((card) => {
+      const matchesCategory =
+        !selectedCategory || card.sourcePost.classification?.primaryCategory === selectedCategory;
+      const matchesQuery =
+        !query ||
+        [card.title, card.summary, card.coreInsight, card.userMemo || "", card.sourcePost.text]
+          .join("\n")
+          .toLowerCase()
+          .includes(query);
+      return matchesCategory && matchesQuery;
+    });
+  }, [cards, searchQuery, selectedCategory]);
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-3">
-        <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center">
-          <BookOpen className="w-5 h-5 text-blue-600" />
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center">
+            <BookOpen className="w-5 h-5 text-blue-600" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold text-text">学習カード一覧</h1>
+            <p className="text-sm text-text-secondary">{cards.length}件の学習カード</p>
+          </div>
         </div>
-        <div>
-          <h1 className="text-2xl font-bold text-text">ノウハウ一覧</h1>
-          <p className="text-sm text-text-secondary">{posts.length}件の学習系投稿</p>
-        </div>
+        <Link href="/posts">
+          <Button variant="secondary">
+            保存一覧へ
+            <ArrowRight className="ml-1.5 h-4 w-4" />
+          </Button>
+        </Link>
       </div>
 
-      {/* Category dropdown */}
-      {categories.length > 0 && (
-        <div className="relative inline-block w-full sm:w-auto">
-          <select
-            value={selectedCategory}
-            onChange={(e) => setSelectedCategory(e.target.value)}
-            className="w-full sm:w-64 appearance-none bg-white border border-border rounded-xl px-4 py-2.5 text-sm text-text pr-9 focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent cursor-pointer"
-          >
-            <option value="">すべてのカテゴリ ({posts.length}件)</option>
-            {categories.map((cat) => {
-              const count = posts.filter((p) => p.classification?.primaryCategory === cat).length;
-              return (
-                <option key={cat} value={cat}>
-                  {cat} ({count}件)
-                </option>
-              );
-            })}
-          </select>
-          <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
-        </div>
-      )}
+      <div className="grid gap-3 sm:grid-cols-[1fr_240px]">
+        <label className="relative block">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted" />
+          <input
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+            placeholder="学習カードを検索..."
+            className="w-full rounded-xl border border-border bg-white py-2.5 pl-9 pr-4 text-sm text-text focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20"
+          />
+        </label>
+        <select
+          value={selectedCategory}
+          onChange={(event) => setSelectedCategory(event.target.value)}
+          className="w-full rounded-xl border border-border bg-white px-4 py-2.5 text-sm text-text focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20"
+        >
+          <option value="">すべてのカテゴリ</option>
+          {categories.map((category) => (
+            <option key={category} value={category}>
+              {category}
+            </option>
+          ))}
+        </select>
+      </div>
 
       {loading ? (
-        <div className="space-y-2">
-          {[1, 2, 3, 4, 5].map((i) => (
-            <div key={i} className="bg-white rounded-xl border border-border px-4 py-3 animate-pulse flex gap-3">
-              <div className="h-5 w-10 bg-border-light rounded" />
-              <div className="flex-1 h-4 bg-border-light rounded" />
-            </div>
+        <div className="grid gap-4 sm:grid-cols-2">
+          {[1, 2, 3, 4].map((item) => (
+            <Card key={item} className="animate-pulse">
+              <div className="mb-3 h-5 w-2/3 rounded bg-border-light" />
+              <div className="mb-2 h-3 w-full rounded bg-border-light" />
+              <div className="h-3 w-4/5 rounded bg-border-light" />
+            </Card>
           ))}
         </div>
-      ) : posts.length === 0 ? (
+      ) : cards.length === 0 ? (
         <div className="text-center py-16 bg-white rounded-2xl border border-border">
           <BookOpen className="w-12 h-12 text-text-muted mx-auto mb-3" />
-          <h3 className="text-lg font-semibold text-text mb-2">ノウハウ投稿がありません</h3>
+          <h3 className="text-lg font-semibold text-text mb-2">学習カードがありません</h3>
           <p className="text-sm text-text-secondary mb-4">
-            X連携や手動追加で学習系投稿を取り込みましょう。
+            保存一覧の「学ぶ」から、投稿を学習カードに変換できます。
           </p>
-          <Link href="/posts/new">
-            <Button>投稿を追加</Button>
+          <Link href="/posts">
+            <Button>保存一覧を見る</Button>
           </Link>
         </div>
-      ) : (
-        <div className="space-y-6">
-          {Object.entries(grouped).map(([category, categoryPosts]) => (
-            <div key={category}>
-              <div className="flex items-center gap-2 mb-2 px-1">
-                <h2 className="text-sm font-bold text-text">{category}</h2>
-                <span className="text-xs text-text-muted">{categoryPosts.length}件</span>
-              </div>
-              <div className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-white">
-                {categoryPosts.map((post) => {
-                  const summary = post.classification?.summary || post.text;
-                  return (
-                    <div
-                      key={post.id}
-                      className="flex items-center gap-3 px-4 py-3 hover:bg-border-light/40 transition-colors"
-                    >
-                      {post.classification && (
-                        <div className="flex-shrink-0">
-                          <DifficultyBadge level={post.classification.difficultyLevel} />
-                        </div>
-                      )}
-                      <p className="min-w-0 flex-1 truncate text-sm text-text">{summary}</p>
-                      <div className="flex flex-shrink-0 items-center gap-2">
-                        <button
-                          onClick={() => setChatPost(post)}
-                          title="チャット"
-                          className="rounded-lg p-1 text-text-muted hover:text-text hover:bg-border-light transition-colors"
-                        >
-                          <MessageCircle className="w-4 h-4" />
-                        </button>
-                        {post.sourceUrl && (
-                          <a href={post.sourceUrl} target="_blank" rel="noreferrer">
-                            <ExternalLink className="w-3.5 h-3.5 text-text-muted hover:text-text" />
-                          </a>
-                        )}
-                        <Link href={`/posts/${post.id}/confirm`}>
-                          <Button size="sm" variant="secondary">
-                            深掘る
-                            <ArrowRight className="w-3.5 h-3.5 ml-1" />
-                          </Button>
-                        </Link>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          ))}
+      ) : filteredCards.length === 0 ? (
+        <div className="text-center py-14 bg-white rounded-2xl border border-border">
+          <p className="text-sm text-text-secondary">該当する学習カードが見つかりませんでした</p>
         </div>
-      )}
+      ) : (
+        <div className="grid gap-4 lg:grid-cols-2">
+          {filteredCards.map((card) => {
+            const category = card.sourcePost.classification?.primaryCategory || "未分類";
+            return (
+              <Card key={card.id} hoverable className="flex flex-col gap-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="mb-2 flex flex-wrap items-center gap-2">
+                      <LearningStatusBadge learningCard={card} />
+                      <Badge>{category}</Badge>
+                    </div>
+                    <h2 className="line-clamp-2 text-base font-bold text-text">{card.title}</h2>
+                  </div>
+                  {card.sourcePost.sourceUrl && (
+                    <a href={card.sourcePost.sourceUrl} target="_blank" rel="noreferrer">
+                      <Button variant="ghost" size="sm" title="元投稿を開く">
+                        <ExternalLink className="h-4 w-4" />
+                      </Button>
+                    </a>
+                  )}
+                </div>
 
-      {chatPost && (
-        <PostChatModal
-          post={{ id: chatPost.id, text: chatPost.text, authorName: chatPost.authorName, classification: chatPost.classification ?? null }}
-          onClose={() => setChatPost(null)}
-        />
+                <p className="line-clamp-3 whitespace-pre-wrap text-sm leading-relaxed text-text-secondary">
+                  {card.summary}
+                </p>
+
+                <div className="rounded-xl bg-border-light px-4 py-3">
+                  <div className="mb-1 flex items-center gap-2">
+                    <Layers className="h-4 w-4 text-accent" />
+                    <p className="text-sm font-medium text-text">中心洞察</p>
+                  </div>
+                  <p className="line-clamp-2 text-sm leading-relaxed text-text-secondary">
+                    {card.coreInsight}
+                  </p>
+                </div>
+
+                <div className="mt-auto flex flex-col gap-3 border-t border-border pt-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex flex-wrap items-center gap-3 text-xs text-text-muted">
+                    <span className="inline-flex items-center gap-1">
+                      <Calendar className="h-3.5 w-3.5" />
+                      {formatDate(card.updatedAt)}
+                    </span>
+                    <span className="inline-flex items-center gap-1">
+                      <FileText className="h-3.5 w-3.5" />
+                      {card.sourcePost.authorUsername
+                        ? `@${card.sourcePost.authorUsername}`
+                        : card.sourcePost.authorName || "手動追加"}
+                    </span>
+                  </div>
+                  <Link href={`/posts/${card.sourcePost.id}/learning`}>
+                    <Button size="sm">
+                      カードを見る
+                      <ArrowRight className="ml-1.5 h-4 w-4" />
+                    </Button>
+                  </Link>
+                </div>
+              </Card>
+            );
+          })}
+        </div>
       )}
     </div>
   );

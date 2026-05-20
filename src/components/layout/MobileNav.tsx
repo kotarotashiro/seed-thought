@@ -8,7 +8,7 @@ import { clsx } from "clsx";
 const mobileItems = [
   { href: "/", label: "ホーム", icon: Home },
   { href: "/posts", label: "保存", icon: Archive },
-  { href: "/knowhow", label: "ノウハウ", icon: BookOpen },
+  { href: "/knowhow", label: "カード", icon: BookOpen },
   { href: "/search", label: "検索", icon: Search },
   { href: "/chat", label: "チャット", icon: MessageCircle },
   { href: "/settings", label: "設定", icon: Settings },

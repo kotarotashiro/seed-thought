@@ -57,6 +57,7 @@ export default function ConfirmPage({ params }: { params: Promise<{ postId: stri
   const [loading, setLoading] = useState(true);
   const [fetchingThread, setFetchingThread] = useState(false);
   const [deletingThread, setDeletingThread] = useState(false);
+  const [creatingDeepDive, setCreatingDeepDive] = useState(false);
   const [selectedThreadIds, setSelectedThreadIds] = useState<string[]>([]);
   const [threadMessage, setThreadMessage] = useState<string | null>(null);
   const [threadError, setThreadError] = useState<string | null>(null);
@@ -152,6 +153,29 @@ export default function ConfirmPage({ params }: { params: Promise<{ postId: stri
       setThreadError("ツリー投稿の削除に失敗しました");
     } finally {
       setDeletingThread(false);
+    }
+  };
+
+  const handleStartDeepDive = async () => {
+    setCreatingDeepDive(true);
+
+    try {
+      const res = await fetch("/api/deep-dive/sessions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ postId, mode: "thought_lens" }),
+      });
+      const data = await res.json();
+
+      if (!res.ok || data.error) {
+        throw new Error(data.error || "深掘りセッションの作成に失敗しました");
+      }
+
+      router.push(`/deep-dive/${data.id}/thought`);
+    } catch (error) {
+      console.error("Failed to create thought session:", error);
+      alert(error instanceof Error ? error.message : "深掘りセッションの作成に失敗しました");
+      setCreatingDeepDive(false);
     }
   };
 
@@ -359,12 +383,15 @@ export default function ConfirmPage({ params }: { params: Promise<{ postId: stri
             学ぶ
           </Button>
         </Link>
-        <Link href={`/posts/${postId}/mode`} className="flex-1">
-          <Button className="w-full">
-            深掘りを始める
-            <ArrowRight className="w-4 h-4 ml-2" />
-          </Button>
-        </Link>
+        <Button
+          onClick={handleStartDeepDive}
+          loading={creatingDeepDive}
+          loadingLabel="開始中..."
+          className="flex-1"
+        >
+          深掘りを始める
+          <ArrowRight className="w-4 h-4 ml-2" />
+        </Button>
       </div>
     </div>
   );
