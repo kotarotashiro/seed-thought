@@ -62,6 +62,10 @@ interface PostCardProps {
 
 const URL_ONLY_RE = /^https?:\/\/\S+$/;
 
+function isUrlLikeText(s: string | null | undefined): boolean {
+  return !!s && URL_ONLY_RE.test(s.trim());
+}
+
 export function PostCard({
   post,
   showRecommendReason = false,
@@ -77,8 +81,10 @@ export function PostCard({
     if (!post.urlCardJson) return null;
     try {
       const c = JSON.parse(post.urlCardJson) as { expandedUrl?: string; title?: string; description?: string; imageUrl?: string };
-      if (!c.title && !c.description) return null;
-      return { finalUrl: c.expandedUrl ?? post.text.trim(), title: c.title ?? null, description: c.description ?? null, image: c.imageUrl ?? null };
+      const cleanTitle = isUrlLikeText(c.title) ? null : (c.title ?? null);
+      const cleanDescription = isUrlLikeText(c.description) ? null : (c.description ?? null);
+      if (!cleanTitle && !cleanDescription) return null;
+      return { finalUrl: c.expandedUrl ?? post.text.trim(), title: cleanTitle, description: cleanDescription, image: c.imageUrl ?? null };
     } catch { return null; }
   });
   const [articleLoading, setArticleLoading] = useState(false);
@@ -103,8 +109,11 @@ export function PostCard({
     fetch(`/api/fetch-article?url=${encodeURIComponent(fetchUrl)}`)
       .then(r => r.json())
       .then((data: Partial<ArticlePreview> & { error?: string }) => {
-        if (!data.error && (data.title || data.description)) {
-          setArticle({ finalUrl: data.finalUrl ?? fetchUrl, title: data.title ?? null, description: data.description ?? null, image: data.image ?? null });
+        if (data.error) return;
+        const cleanTitle = isUrlLikeText(data.title) ? null : (data.title ?? null);
+        const cleanDescription = isUrlLikeText(data.description) ? null : (data.description ?? null);
+        if (cleanTitle || cleanDescription) {
+          setArticle({ finalUrl: data.finalUrl ?? fetchUrl, title: cleanTitle, description: cleanDescription, image: data.image ?? null });
         }
       })
       .catch(() => { /* silently fail */ })
