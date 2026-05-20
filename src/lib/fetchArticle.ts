@@ -12,11 +12,26 @@ function getGrokModel(): string {
   return process.env.GROK_MODEL || process.env.XAI_MODEL || "grok-3";
 }
 
+const X_ARTICLE_RE = /(?:x|twitter)\.com\/i\/article\//i;
+
+function isUrlLike(s: string): boolean {
+  return /^https?:\/\/\S+$/.test(s.trim());
+}
+
 async function fetchWithGrok(url: string): Promise<ArticlePreview> {
   const apiKey = getGrokApiKey()!;
   const model = getGrokModel();
+
+  const isXArticle = X_ARTICLE_RE.test(url);
+  const sources = isXArticle
+    ? [{ type: "x" }, { type: "web" }]
+    : [{ type: "web" }];
+  const prompt = isXArticle
+    ? `以下のX Article URLの記事を読んで、内容を日本語でまとめてください。\n\n必ず次のJSON形式のみで返してください（説明文不要）:\n{"title":"記事タイトル","description":"150〜250文字の内容まとめ"}\n\nURL: ${url}`
+    : `以下のURLの記事を読んで内容を日本語でまとめてください。\n\n必ず次のJSON形式のみで返してください（説明文不要）:\n{"title":"記事タイトル","description":"150〜250文字の内容まとめ"}\n\nURL: ${url}`;
+
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 20000);
+  const timer = setTimeout(() => controller.abort(), 25000);
 
   try {
     const res = await fetch("https://api.x.ai/v1/chat/completions", {
@@ -27,13 +42,8 @@ async function fetchWithGrok(url: string): Promise<ArticlePreview> {
       },
       body: JSON.stringify({
         model,
-        messages: [
-          {
-            role: "user",
-            content: `以下のURLの記事を読んで内容を日本語でまとめてください。\n\n必ず次のJSON形式のみで返してください（説明文不要）:\n{"title":"記事タイトル","description":"150〜250文字の内容まとめ"}\n\nURL: ${url}`,
-          },
-        ],
-        search_parameters: { mode: "on", sources: [{ type: "web" }] },
+        messages: [{ role: "user", content: prompt }],
+        search_parameters: { mode: "on", sources },
       }),
       signal: controller.signal,
     });
@@ -43,10 +53,17 @@ async function fetchWithGrok(url: string): Promise<ArticlePreview> {
     const content = data.choices?.[0]?.message?.content || "";
     const jsonMatch = content.match(/\{[\s\S]*?\}/);
     if (jsonMatch) {
-      const parsed = JSON.parse(jsonMatch[0]) as { title?: string; description?: string };
-      return { title: parsed.title || null, description: parsed.description || null, imageUrl: null };
+      try {
+        const parsed = JSON.parse(jsonMatch[0]) as { title?: string; description?: string };
+        const title = parsed.title && !isUrlLike(parsed.title) ? parsed.title : null;
+        const description = parsed.description && !isUrlLike(parsed.description) ? parsed.description : null;
+        if (title || description) {
+          return { title, description, imageUrl: null };
+        }
+      } catch { /* fall through */ }
     }
-    return { title: null, description: content.trim().slice(0, 300) || null, imageUrl: null };
+    const fallback = content.trim().slice(0, 300);
+    return { title: null, description: fallback && !isUrlLike(fallback) ? fallback : null, imageUrl: null };
   } catch {
     clearTimeout(timer);
     throw new Error("Grok fetch failed");

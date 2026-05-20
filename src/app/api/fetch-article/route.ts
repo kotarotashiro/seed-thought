@@ -15,12 +15,28 @@ interface ArticleResult {
   image: string | null;
 }
 
+const X_ARTICLE_RE = /(?:x|twitter)\.com\/i\/article\//i;
+
+function isUrlLike(s: string): boolean {
+  return /^https?:\/\/\S+$/.test(s.trim());
+}
+
 async function fetchWithGrok(url: string): Promise<ArticleResult> {
   const apiKey = getGrokApiKey()!;
   const model = getGrokModel();
 
+  // X Articles need the X source; regular URLs use web search
+  const isXArticle = X_ARTICLE_RE.test(url);
+  const sources = isXArticle
+    ? [{ type: "x" }, { type: "web" }]
+    : [{ type: "web" }];
+
+  const prompt = isXArticle
+    ? `以下のX Article URLの記事を読んで、内容を日本語でまとめてください。\n\n必ず次のJSON形式のみで返してください（説明文不要）:\n{"title":"記事タイトル","description":"150〜250文字の内容まとめ"}\n\nURL: ${url}`
+    : `以下のURLの記事を読んで内容を日本語でまとめてください。\n\n必ず次のJSON形式のみで返してください（説明文不要）:\n{"title":"記事タイトル","description":"150〜250文字の内容まとめ"}\n\nURL: ${url}`;
+
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 20000);
+  const timer = setTimeout(() => controller.abort(), 25000);
 
   try {
     const res = await fetch("https://api.x.ai/v1/chat/completions", {
@@ -31,16 +47,8 @@ async function fetchWithGrok(url: string): Promise<ArticleResult> {
       },
       body: JSON.stringify({
         model,
-        messages: [
-          {
-            role: "user",
-            content: `以下のURLの記事を読んで内容を日本語でまとめてください。\n\n必ず次のJSON形式のみで返してください（説明文不要）:\n{"title":"記事タイトル","description":"150〜250文字の内容まとめ"}\n\nURL: ${url}`,
-          },
-        ],
-        search_parameters: {
-          mode: "on",
-          sources: [{ type: "web" }],
-        },
+        messages: [{ role: "user", content: prompt }],
+        search_parameters: { mode: "on", sources },
       }),
       signal: controller.signal,
     });
@@ -57,27 +65,26 @@ async function fetchWithGrok(url: string): Promise<ArticleResult> {
     };
     const content = data.choices?.[0]?.message?.content || "";
 
-    // Extract JSON from the response (may have surrounding text)
     const jsonMatch = content.match(/\{[\s\S]*?\}/);
     if (jsonMatch) {
       try {
         const parsed = JSON.parse(jsonMatch[0]) as { title?: string; description?: string };
-        return {
-          finalUrl: url,
-          title: parsed.title || null,
-          description: parsed.description || null,
-          image: null,
-        };
+        const title = parsed.title && !isUrlLike(parsed.title) ? parsed.title : null;
+        const description = parsed.description && !isUrlLike(parsed.description) ? parsed.description : null;
+        if (title || description) {
+          return { finalUrl: url, title, description, image: null };
+        }
       } catch {
-        // JSON parse failed, use raw content
+        // fall through
       }
     }
 
-    // Fallback: use the content as description
+    // Fallback: use raw content only if it's not just a URL
+    const fallback = content.trim().slice(0, 300);
     return {
       finalUrl: url,
       title: null,
-      description: content.trim().slice(0, 300) || null,
+      description: fallback && !isUrlLike(fallback) ? fallback : null,
       image: null,
     };
   } catch (err) {

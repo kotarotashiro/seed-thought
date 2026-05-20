@@ -103,7 +103,7 @@ export function PostCard({
     fetch(`/api/fetch-article?url=${encodeURIComponent(fetchUrl)}`)
       .then(r => r.json())
       .then((data: Partial<ArticlePreview> & { error?: string }) => {
-        if (!data.error) {
+        if (!data.error && (data.title || data.description)) {
           setArticle({ finalUrl: data.finalUrl ?? fetchUrl, title: data.title ?? null, description: data.description ?? null, image: data.image ?? null });
         }
       })
