@@ -70,8 +70,12 @@ function isUrlLikeText(s: string | null | undefined): boolean {
 function getExpandedUrl(urlCardJson?: string | null): string | null {
   if (!urlCardJson) return null;
   try {
-    const c = JSON.parse(urlCardJson) as { expandedUrl?: string };
-    return c.expandedUrl ?? null;
+    const c = JSON.parse(urlCardJson) as { expandedUrl?: string; title?: string; description?: string };
+    if (c.expandedUrl) return c.expandedUrl;
+    // Some X entities store the resolved URL in title/description
+    if (c.title && URL_ONLY_RE.test(c.title.trim())) return c.title.trim();
+    if (c.description && URL_ONLY_RE.test(c.description.trim())) return c.description.trim();
+    return null;
   } catch { return null; }
 }
 
@@ -106,6 +110,9 @@ export function PostCard({
 
   useEffect(() => {
     if (!isUrlOnly || article !== null || autoFetchedRef.current) return;
+    // Skip auto-fetch for X Articles — Grok cannot read X Article body content;
+    // the UI shows a graceful "Xで開く" link instead.
+    if (isXArticle) return;
     autoFetchedRef.current = true;
 
     let fetchUrl = articleUrl!;
