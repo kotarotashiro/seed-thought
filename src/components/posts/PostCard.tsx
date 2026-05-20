@@ -10,7 +10,11 @@ import { PostMediaGrid, parsePostMedia } from "@/components/posts/PostMediaGrid"
 import { PostChatModal } from "@/components/posts/PostChatModal";
 import {
   ArrowRight,
+  BookOpen,
   CheckCircle2,
+  CheckSquare,
+  Square,
+  Trash2,
   User,
   ExternalLink,
   MessageCircle,
@@ -44,16 +48,29 @@ interface PostCardProps {
     classification?: {
       postType: string;
       primaryCategory: string;
-      summary: string;
-      recommendReason: string;
+      summary?: string;
+      recommendReason?: string;
     } | null;
   };
   showRecommendReason?: boolean;
+  showLearningButton?: boolean;
+  onDelete?: (id: string) => void;
+  selectMode?: boolean;
+  selected?: boolean;
+  onToggleSelect?: (id: string) => void;
 }
 
 const URL_ONLY_RE = /^https?:\/\/\S+$/;
 
-export function PostCard({ post, showRecommendReason = false }: PostCardProps) {
+export function PostCard({
+  post,
+  showRecommendReason = false,
+  showLearningButton = false,
+  onDelete,
+  selectMode = false,
+  selected = false,
+  onToggleSelect,
+}: PostCardProps) {
   const router = useRouter();
   const [chatOpen, setChatOpen] = useState(false);
   const [article, setArticle] = useState<ArticlePreview | null>(() => {
@@ -90,6 +107,10 @@ export function PostCard({ post, showRecommendReason = false }: PostCardProps) {
   };
 
   const handleCardClick = () => {
+    if (selectMode && onToggleSelect) {
+      onToggleSelect(post.id);
+      return;
+    }
     router.push(`/posts/${post.id}/confirm`);
   };
 
@@ -99,9 +120,22 @@ export function PostCard({ post, showRecommendReason = false }: PostCardProps) {
     <>
       <Card
         hoverable
-        className="group flex flex-col cursor-pointer"
+        className={`group flex flex-col cursor-pointer ${selectMode && selected ? "ring-2 ring-accent" : ""}`}
         onClick={handleCardClick}
       >
+        {selectMode && (
+          <div className="-mt-1 mb-3 flex items-center gap-2">
+            {selected ? (
+              <CheckSquare className="h-5 w-5 text-accent" />
+            ) : (
+              <Square className="h-5 w-5 text-text-muted" />
+            )}
+            <span className="text-xs text-text-secondary">
+              {selected ? "選択中" : "クリックして選択"}
+            </span>
+          </div>
+        )}
+
         {/* Author Info */}
         <div className="flex items-center gap-3 mb-3">
           <div className="w-10 h-10 rounded-full bg-accent-light flex items-center justify-center flex-shrink-0 overflow-hidden">
@@ -215,12 +249,19 @@ export function PostCard({ post, showRecommendReason = false }: PostCardProps) {
 
         {/* Actions */}
         <div className="mt-auto flex items-center gap-1.5 pt-2" onClick={stop}>
-          <Link href={`/posts/${post.id}/confirm`} className="flex-1" onClick={stop}>
+          <Link href={`/posts/${post.id}/confirm`} className="min-w-0 flex-1" onClick={stop}>
             <Button variant="primary" size="sm" className="w-full group-hover:shadow-md">
               深掘る
               <ArrowRight className="w-4 h-4 ml-1.5" />
             </Button>
           </Link>
+          {showLearningButton && (
+            <Link href={`/posts/${post.id}/learning`} onClick={stop}>
+              <Button variant="ghost" size="sm" title="学ぶ">
+                <BookOpen className="w-4 h-4" />
+              </Button>
+            </Link>
+          )}
           <Button
             variant="ghost"
             size="sm"
@@ -240,6 +281,16 @@ export function PostCard({ post, showRecommendReason = false }: PostCardProps) {
                 <ExternalLink className="w-4 h-4" />
               </Button>
             </a>
+          )}
+          {onDelete && (
+            <Button
+              variant="ghost"
+              size="sm"
+              title="削除"
+              onClick={(e) => { stop(e); onDelete(post.id); }}
+            >
+              <Trash2 className="w-4 h-4 text-danger" />
+            </Button>
           )}
         </div>
       </Card>

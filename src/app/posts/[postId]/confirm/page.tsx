@@ -238,7 +238,55 @@ export default function ConfirmPage({ params }: { params: Promise<{ postId: stri
             </p>
           </div>
         </div>
-        <p className="text-sm text-text leading-relaxed">{post.text}</p>
+        {(() => {
+          const isUrlOnly = /^https?:\/\/\S+$/.test((post.text || "").trim());
+          const urlCard = post.urlCardJson
+            ? (() => {
+                try {
+                  return JSON.parse(post.urlCardJson);
+                } catch {
+                  return null;
+                }
+              })()
+            : null;
+          if (isUrlOnly && urlCard) {
+            return (
+              <>
+                <p className="mb-3 truncate text-xs text-text-muted">{post.text.trim()}</p>
+                <a
+                  href={urlCard.expandedUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="block overflow-hidden rounded-xl border border-border transition-colors hover:border-accent/40"
+                >
+                  {urlCard.imageUrl && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={urlCard.imageUrl}
+                      alt=""
+                      className="h-40 w-full object-cover"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).style.display = "none";
+                      }}
+                    />
+                  )}
+                  <div className="px-4 py-3">
+                    {urlCard.title && (
+                      <p className="mb-1 line-clamp-2 text-sm font-medium text-text">{urlCard.title}</p>
+                    )}
+                    {urlCard.description && (
+                      <p className="line-clamp-3 text-xs text-text-secondary">{urlCard.description}</p>
+                    )}
+                    <p className="mt-1 truncate text-xs text-text-muted">{urlCard.expandedUrl}</p>
+                  </div>
+                </a>
+              </>
+            );
+          }
+          return (
+            <p className="whitespace-pre-wrap text-sm leading-relaxed text-text">{post.text}</p>
+          );
+        })()}
         {post.translatedText && (
           <div className="mt-3 rounded-xl border border-accent/10 bg-accent-subtle px-4 py-3">
             <p className="mb-1 text-xs font-medium text-accent">日本語訳</p>

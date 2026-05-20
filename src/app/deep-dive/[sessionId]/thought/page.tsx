@@ -118,6 +118,15 @@ export default function ThoughtLensPage({ params }: { params: Promise<{ sessionI
 
   return (
     <div className="mx-auto max-w-2xl space-y-5 sm:space-y-6">
+      {/* Back */}
+      <button
+        onClick={() => router.back()}
+        className="flex items-center gap-1.5 text-sm text-text-secondary transition-colors hover:text-text"
+      >
+        <ArrowLeft className="h-4 w-4" />
+        戻る
+      </button>
+
       {/* Header */}
       <div className="flex items-center gap-3">
         <div className="w-10 h-10 rounded-xl bg-purple-50 flex items-center justify-center">

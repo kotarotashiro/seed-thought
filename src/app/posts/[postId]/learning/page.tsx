@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, use } from "react";
+import { useEffect, useMemo, useRef, useState, use } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -92,6 +92,7 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
   const [memo, setMemo] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const autoGenerateTriedRef = useRef(false);
 
   const output = useMemo(() => parseLearningOutput(card), [card]);
 
@@ -156,6 +157,17 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
       setGenerating(false);
     }
   };
+
+  useEffect(() => {
+    if (loading) return;
+    if (!post) return;
+    if (card) return;
+    if (generating) return;
+    if (autoGenerateTriedRef.current) return;
+    autoGenerateTriedRef.current = true;
+    handleGenerate();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, post, card, generating]);
 
   const handleSave = async () => {
     if (!card) return;
@@ -274,12 +286,18 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
         <Card>
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h2 className="mb-1 text-base font-bold text-text">まだ学習カードがありません</h2>
-              <p className="text-sm text-text-secondary">この投稿からノウハウ・手順・マニュアルを生成します。</p>
+              <h2 className="mb-1 text-base font-bold text-text">
+                {generating ? "学習カードを生成しています…" : error ? "学習カードを生成できませんでした" : "学習カードを準備中…"}
+              </h2>
+              <p className="text-sm text-text-secondary">
+                {error
+                  ? "もう一度試してください。"
+                  : "この投稿からノウハウ・手順・マニュアルを自動生成します。"}
+              </p>
             </div>
             <Button onClick={handleGenerate} loading={generating} loadingLabel="生成中..." className="w-full sm:w-auto">
               <Sparkles className="mr-1.5 h-4 w-4" />
-              学ぶ
+              {error ? "再生成" : "学ぶ"}
             </Button>
           </div>
         </Card>

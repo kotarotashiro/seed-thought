@@ -3,23 +3,9 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { PostFilters } from "@/components/posts/PostFilters";
-import { PostMediaGrid, parsePostMedia } from "@/components/posts/PostMediaGrid";
-import { PostChatModal } from "@/components/posts/PostChatModal";
-import { PostTypeBadge, SavedTypeBadge, Badge, LearningStatusBadge } from "@/components/ui/Badge";
+import { PostCard } from "@/components/posts/PostCard";
 import { Button } from "@/components/ui/Button";
-import { Card } from "@/components/ui/Card";
-import {
-  Archive,
-  Trash2,
-  ArrowRight,
-  ExternalLink,
-  User,
-  CheckCircle2,
-  CheckSquare,
-  Square,
-  MessageCircle,
-  BookOpen,
-} from "lucide-react";
+import { Archive, Trash2, CheckSquare } from "lucide-react";
 
 interface Author {
   username: string;
@@ -48,15 +34,6 @@ interface PostListItem {
   learningCard?: { id: string; status: string } | null;
 }
 
-function formatDate(value?: string | null) {
-  if (!value) return null;
-  return new Date(value).toLocaleDateString("ja-JP", {
-    year: "numeric",
-    month: "numeric",
-    day: "numeric",
-  });
-}
-
 export default function PostsPage() {
   const [posts, setPosts] = useState<PostListItem[]>([]);
   const [genres, setGenres] = useState<string[]>([]);
@@ -74,7 +51,6 @@ export default function PostsPage() {
   const [selectMode, setSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkDeleting, setBulkDeleting] = useState(false);
-  const [chatPost, setChatPost] = useState<PostListItem | null>(null);
 
   const loadPosts = async (showLoading = true) => {
     if (showLoading) setLoading(true);
@@ -269,148 +245,18 @@ export default function PostsPage() {
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 xl:gap-5">
           {posts.map((post) => (
-            <Card
+            <PostCard
               key={post.id}
-              hoverable
-              className={`flex min-h-[280px] flex-col ${selectMode && selectedIds.has(post.id) ? "ring-2 ring-accent" : ""}`}
-              onClick={selectMode ? () => toggleSelectPost(post.id) : undefined}
-            >
-              {selectMode && (
-                <div className="flex items-center gap-2 mb-3 -mt-1">
-                  {selectedIds.has(post.id) ? (
-                    <CheckSquare className="w-5 h-5 text-accent" />
-                  ) : (
-                    <Square className="w-5 h-5 text-text-muted" />
-                  )}
-                  <span className="text-xs text-text-secondary">
-                    {selectedIds.has(post.id) ? "選択中" : "クリックして選択"}
-                  </span>
-                </div>
-              )}
-
-              <div className="mb-4 flex items-start gap-3">
-                <div className="h-10 w-10 flex-shrink-0 overflow-hidden rounded-full bg-accent-light flex items-center justify-center">
-                  {post.authorAvatarUrl ? (
-                    <img src={post.authorAvatarUrl} alt="" className="h-full w-full object-cover" />
-                  ) : (
-                    <User className="h-5 w-5 text-accent" />
-                  )}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-semibold text-text">
-                    {post.authorName || "手動追加"}
-                  </p>
-                  <p className="text-xs text-text-muted">
-                    {post.authorUsername ? `@${post.authorUsername}` : "手動入力"}
-                  </p>
-                </div>
-              </div>
-
-              {(() => {
-                const urlCard = post.urlCardJson ? (() => { try { return JSON.parse(post.urlCardJson); } catch { return null; } })() : null;
-                const isUrlOnly = /^https?:\/\/\S+$/.test(post.text.trim());
-                if (urlCard && isUrlOnly) {
-                  return (
-                    <a
-                      href={urlCard.expandedUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="mb-3 block rounded-xl border border-border overflow-hidden hover:border-accent/40 transition-colors"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      {urlCard.imageUrl && (
-                        <img src={urlCard.imageUrl} alt="" className="w-full h-32 object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
-                      )}
-                      <div className="px-3 py-2">
-                        {urlCard.title && <p className="text-sm font-medium text-text line-clamp-2 mb-1">{urlCard.title}</p>}
-                        {urlCard.description && <p className="text-xs text-text-secondary line-clamp-2">{urlCard.description}</p>}
-                        <p className="text-xs text-text-muted mt-1 truncate">{urlCard.expandedUrl}</p>
-                      </div>
-                    </a>
-                  );
-                }
-                return <p className="text-sm text-text leading-relaxed line-clamp-4 mb-4">{post.text}</p>;
-              })()}
-              {post.translatedText && (
-                <p className="mb-4 rounded-xl bg-accent-subtle px-3 py-2 text-xs leading-relaxed text-text-secondary">
-                  日本語訳: {post.translatedText}
-                </p>
-              )}
-              <PostMediaGrid media={parsePostMedia(post.mediaJson)} sourceUrl={post.sourceUrl} />
-
-              <div className="mt-auto space-y-3 pt-3">
-                <div className="flex flex-wrap items-center gap-1.5">
-                  {post.classification && (
-                    <>
-                      <PostTypeBadge type={post.classification.postType} />
-                      <Badge>{post.classification.primaryCategory}</Badge>
-                    </>
-                  )}
-                  <SavedTypeBadge type={post.savedType} />
-                  <span className="text-xs text-text-muted">
-                    {post.postedAt
-                      ? `投稿 ${formatDate(post.postedAt)}`
-                      : `保存 ${formatDate(post.savedAt)}`}
-                  </span>
-                  {(post.deepDiveSessions?.length ?? 0) > 0 ? (
-                    <Badge variant="success" className="gap-1">
-                      <CheckCircle2 className="h-3 w-3" />
-                      深掘り済み
-                    </Badge>
-                  ) : (
-                    <Badge variant="warning">未消化</Badge>
-                  )}
-                  <LearningStatusBadge learningCard={post.learningCard} />
-                  {(post.threadPosts?.length ?? 0) > 0 && (
-                    <Badge variant="success">
-                      ツリー {(post.threadPosts?.length ?? 0) + 1}投稿
-                    </Badge>
-                  )}
-                </div>
-
-                <div className="flex items-center gap-1.5">
-                  <Link href={`/posts/${post.id}/confirm`} className="min-w-0 flex-1">
-                    <Button size="sm" className="w-full">
-                      深掘る
-                      <ArrowRight className="w-4 h-4 ml-1" />
-                    </Button>
-                  </Link>
-                  <Link href={`/posts/${post.id}/learning`}>
-                    <Button variant="ghost" size="sm" title="学ぶ">
-                      <BookOpen className="w-4 h-4" />
-                    </Button>
-                  </Link>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    title="この投稿についてチャット"
-                    onClick={() => setChatPost(post)}
-                  >
-                    <MessageCircle className="w-4 h-4" />
-                  </Button>
-                  {post.sourceUrl && (
-                    <a href={post.sourceUrl} target="_blank" rel="noreferrer">
-                      <Button variant="ghost" size="sm" title="Xの投稿を開く">
-                        <ExternalLink className="w-4 h-4" />
-                      </Button>
-                    </a>
-                  )}
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    title="削除"
-                    onClick={() => handleDelete(post.id)}
-                  >
-                    <Trash2 className="w-4 h-4 text-danger" />
-                  </Button>
-                </div>
-              </div>
-            </Card>
+              post={post}
+              showLearningButton
+              onDelete={handleDelete}
+              selectMode={selectMode}
+              selected={selectedIds.has(post.id)}
+              onToggleSelect={toggleSelectPost}
+            />
           ))}
         </div>
       )}
-
-      {chatPost && <PostChatModal post={chatPost} onClose={() => setChatPost(null)} />}
     </div>
   );
 }
