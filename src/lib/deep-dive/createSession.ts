@@ -3,7 +3,7 @@ import { getAiProvider } from "@/lib/ai/provider";
 import type { PostClassificationResult } from "@/lib/ai/types";
 import { createFallbackDeepDiveSession } from "@/lib/ai/fallback";
 import { buildPostTextWithThread } from "@/lib/posts/threadText";
-import { fetchArticlePreview } from "@/lib/fetchArticle";
+import { resolveArticleForAi } from "@/lib/posts/articleContent";
 
 export async function createDeepDiveSession(
   postId: string,
@@ -46,32 +46,11 @@ export async function createDeepDiveSession(
         recommendedMode: "unknown",
       };
 
-  // For URL-only posts, enrich with article content for better AI analysis
-  let articleTitle: string | undefined;
-  let articleDescription: string | undefined;
-
-  const isUrlOnly = /^https?:\/\/\S+$/.test((post.text || "").trim());
-  let urlCardTitle: string | undefined;
-  let urlCardDescription: string | undefined;
-
-  if (post.urlCardJson) {
-    try {
-      const c = JSON.parse(post.urlCardJson) as { title?: string; description?: string };
-      urlCardTitle = c.title || undefined;
-      urlCardDescription = c.description || undefined;
-    } catch { /* ignore */ }
-  }
-
-  if (urlCardTitle) {
-    articleTitle = urlCardTitle;
-    articleDescription = urlCardDescription;
-  } else if (isUrlOnly) {
-    try {
-      const preview = await fetchArticlePreview(post.text.trim());
-      articleTitle = preview.title || undefined;
-      articleDescription = preview.description || undefined;
-    } catch { /* silently skip */ }
-  }
+  // Resolve article content: user-pasted > cached metadata > live fetch
+  const { title: articleTitle, description: articleDescription } = await resolveArticleForAi(
+    post.urlCardJson,
+    post.text,
+  );
 
   // Generate all steps via AI at session creation (batch generation)
   const provider = getAiProvider();

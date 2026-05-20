@@ -4,7 +4,7 @@ import { getAiProvider } from "@/lib/ai/provider";
 import type { SourcePostForLearning } from "@/lib/ai/types";
 import { getUserFacingError } from "@/lib/api/errors";
 import { buildPostTextWithThread } from "@/lib/posts/threadText";
-import { fetchArticlePreview } from "@/lib/fetchArticle";
+import { resolveArticleForAi } from "@/lib/posts/articleContent";
 
 type RawMediaItem = {
   type?: unknown;
@@ -74,40 +74,16 @@ async function getPostForLearning(postId: string) {
   });
 }
 
-function parseUrlCard(urlCardJson?: string | null): { title?: string; description?: string } {
-  if (!urlCardJson) return {};
-  try {
-    const c = JSON.parse(urlCardJson) as { title?: string; description?: string };
-    return { title: c.title || undefined, description: c.description || undefined };
-  } catch {
-    return {};
-  }
-}
-
 async function buildSourcePost(
   post: NonNullable<Awaited<ReturnType<typeof getPostForLearning>>>
 ): Promise<SourcePostForLearning> {
   const threadMedia = post.threadPosts.flatMap((threadPost) => parseMedia(threadPost.mediaJson));
 
-  // For URL-only posts, try to get article content for richer AI analysis
-  const isUrlOnly = /^https?:\/\/\S+$/.test((post.text || "").trim());
-  let articleTitle: string | undefined;
-  let articleDescription: string | undefined;
-
-  const urlCard = parseUrlCard(post.urlCardJson);
-  if (urlCard.title) {
-    articleTitle = urlCard.title;
-    articleDescription = urlCard.description;
-  } else if (isUrlOnly) {
-    const url = post.text.trim();
-    try {
-      const preview = await fetchArticlePreview(url);
-      articleTitle = preview.title || undefined;
-      articleDescription = preview.description || undefined;
-    } catch {
-      // silently skip — AI will work with what it has
-    }
-  }
+  // Resolve article content: user-pasted > cached metadata > live fetch
+  const { title: articleTitle, description: articleDescription } = await resolveArticleForAi(
+    post.urlCardJson,
+    post.text,
+  );
 
   return {
     id: post.id,

@@ -9,6 +9,7 @@ import { PostMediaGrid, parsePostMedia } from "@/components/posts/PostMediaGrid"
 import { OutputTypeCard } from "@/components/outputs/OutputTypeCard";
 import { OutputPreview } from "@/components/outputs/OutputPreview";
 import type { LearningOutput } from "@/lib/ai/types";
+import { parseArticleContent } from "@/lib/posts/articleContent";
 import {
   AlertCircle,
   ArrowLeft,
@@ -21,8 +22,10 @@ import {
   Layers,
   Lightbulb,
   ListChecks,
+  Newspaper,
   Pencil,
   Sparkles,
+  Trash2,
   User,
 } from "lucide-react";
 
@@ -59,6 +62,7 @@ interface PostView {
   text: string;
   translatedText?: string | null;
   mediaJson?: string | null;
+  urlCardJson?: string | null;
   sourceUrl?: string | null;
   authorName?: string | null;
   authorUsername?: string | null;
@@ -104,6 +108,11 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
   const [generatedOutput, setGeneratedOutput] = useState<{ title: string; content: string; contentJson?: Record<string, unknown> | null; warning?: string | null } | null>(null);
   const [generatingOutput, setGeneratingOutput] = useState(false);
   const [outputError, setOutputError] = useState<string | null>(null);
+
+  // Delete state
+  const [deleting, setDeleting] = useState(false);
+
+  const article = useMemo(() => (post ? parseArticleContent(post.urlCardJson) : null), [post]);
 
   const output = useMemo(() => parseLearningOutput(card), [card]);
 
@@ -224,6 +233,25 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
     }
   };
 
+  const handleDelete = async () => {
+    if (!card) return;
+    if (!confirm("この学習カードを削除しますか？削除後はまた「学ぶ」から再生成できます。")) return;
+    setDeleting(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const res = await fetch(`/api/learning-cards/${card.id}`, { method: "DELETE" });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error((errData as { error?: string }).error || "学習カードの削除に失敗しました");
+      }
+      router.push("/knowhow");
+    } catch (deleteError) {
+      setError(deleteError instanceof Error ? deleteError.message : "学習カードの削除に失敗しました");
+      setDeleting(false);
+    }
+  };
+
   const handleGenerateOutput = async () => {
     if (!card || !selectedOutput) return;
     setGeneratingOutput(true);
@@ -284,7 +312,22 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
             保存済み投稿を、実践マニュアルと応用メモに変換します。
           </p>
         </div>
-        <LearningStatusBadge learningCard={card} />
+        <div className="flex items-center gap-2">
+          <LearningStatusBadge learningCard={card} />
+          {card && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleDelete}
+              disabled={deleting}
+              loading={deleting}
+              loadingLabel="削除中..."
+              title="学習カードを削除"
+            >
+              <Trash2 className="h-4 w-4 text-danger" />
+            </Button>
+          )}
+        </div>
       </div>
 
       <Card>
@@ -309,6 +352,44 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
           <div className="mt-3 rounded-xl border border-accent/10 bg-accent-subtle px-4 py-3">
             <p className="mb-1 text-xs font-medium text-accent">日本語訳</p>
             <p className="whitespace-pre-wrap text-sm leading-relaxed text-text">{post.translatedText}</p>
+          </div>
+        )}
+        {/* Article content (pasted by user or auto-fetched). Shown so the user
+            can verify the AI is using the same article text they expect. */}
+        {article && (article.pastedContent || article.title || article.description || article.isXArticle) && (
+          <div className="mt-3 space-y-2">
+            {article.isXArticle && article.expandedUrl && (
+              <a
+                href={article.expandedUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="flex items-center gap-2 rounded-xl border border-border px-3 py-2 text-xs text-text-secondary transition-colors hover:border-accent/40"
+              >
+                <Newspaper className="h-3.5 w-3.5 flex-shrink-0 text-accent" />
+                <span className="flex-1 truncate">X Article（Xアプリで開く）</span>
+                <ExternalLink className="h-3.5 w-3.5 flex-shrink-0" />
+              </a>
+            )}
+            {(article.pastedContent || article.title || article.description) && (
+              <div className="rounded-xl border border-border bg-border-light px-4 py-3">
+                <p className="mb-2 flex items-center gap-1.5 text-xs font-medium text-text-muted">
+                  <Newspaper className="h-3.5 w-3.5 text-accent" />
+                  {article.pastedContent ? "記事テキスト（貼り付け済み）" : "記事プレビュー"}
+                </p>
+                {article.title && (
+                  <p className="mb-1 text-sm font-medium text-text">{article.title}</p>
+                )}
+                {article.pastedContent ? (
+                  <p className="whitespace-pre-wrap text-sm leading-relaxed text-text">
+                    {article.pastedContent}
+                  </p>
+                ) : article.description ? (
+                  <p className="text-sm leading-relaxed text-text-secondary">
+                    {article.description}
+                  </p>
+                ) : null}
+              </div>
+            )}
           </div>
         )}
         <PostMediaGrid media={parsePostMedia(post.mediaJson)} />
