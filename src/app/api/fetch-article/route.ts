@@ -25,15 +25,21 @@ async function fetchWithGrok(url: string): Promise<ArticleResult> {
   const apiKey = getGrokApiKey()!;
   const model = getGrokModel();
 
-  // X Articles need the X source; regular URLs use web search
   const isXArticle = X_ARTICLE_RE.test(url);
+
+  // X Articles: search X by article ID (Grok x_search can read X Article content)
+  // Regular URLs: ask Grok to browse/summarize via web search
   const sources = isXArticle
-    ? [{ type: "x" }, { type: "web" }]
+    ? [{ type: "x" }]
     : [{ type: "web" }];
 
-  const prompt = isXArticle
-    ? `以下のX Article URLの記事を読んで、内容を日本語でまとめてください。\n\n必ず次のJSON形式のみで返してください（説明文不要）:\n{"title":"記事タイトル","description":"150〜250文字の内容まとめ"}\n\nURL: ${url}`
-    : `以下のURLの記事を読んで内容を日本語でまとめてください。\n\n必ず次のJSON形式のみで返してください（説明文不要）:\n{"title":"記事タイトル","description":"150〜250文字の内容まとめ"}\n\nURL: ${url}`;
+  let prompt: string;
+  if (isXArticle) {
+    const articleId = url.match(/\/article\/(\d+)/)?.[1] ?? url;
+    prompt = `X上のArticle ID「${articleId}」の長文記事を検索して、内容を日本語でまとめてください。\n\n必ず次のJSON形式のみで返してください（説明文不要）:\n{"title":"記事タイトル","description":"150〜250文字の内容まとめ"}`;
+  } else {
+    prompt = `以下のURLの記事を読んで内容を日本語でまとめてください。\n\n必ず次のJSON形式のみで返してください（説明文不要）:\n{"title":"記事タイトル","description":"150〜250文字の内容まとめ"}\n\nURL: ${url}`;
+  }
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 25000);
