@@ -133,12 +133,13 @@ function mapTweetsWithAuthors(response: XApiResponse): XTweetWithAuthor[] {
       }));
     const urlEntities = tweet.entities?.urls ?? [];
     const cardEntity = urlEntities.find((e) => e.title || e.description);
-    const urlCard = cardEntity
+    const anyUrlEntity = cardEntity ?? urlEntities.find((e) => e.unwound_url || e.expanded_url);
+    const urlCard = anyUrlEntity
       ? {
-          expandedUrl: cardEntity.unwound_url ?? cardEntity.expanded_url ?? cardEntity.url,
-          title: cardEntity.title ?? null,
-          description: cardEntity.description ?? null,
-          imageUrl: cardEntity.images?.[0]?.url ?? null,
+          expandedUrl: anyUrlEntity.unwound_url ?? anyUrlEntity.expanded_url ?? anyUrlEntity.url,
+          title: anyUrlEntity.title ?? null,
+          description: anyUrlEntity.description ?? null,
+          imageUrl: anyUrlEntity.images?.[0]?.url ?? null,
         }
       : null;
 

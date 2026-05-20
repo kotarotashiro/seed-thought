@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Card } from "@/components/ui/Card";
@@ -76,20 +76,46 @@ export function PostCard({
   const [article, setArticle] = useState<ArticlePreview | null>(() => {
     if (!post.urlCardJson) return null;
     try {
-      const c = JSON.parse(post.urlCardJson);
-      return { finalUrl: c.expandedUrl, title: c.title, description: c.description, image: c.imageUrl };
+      const c = JSON.parse(post.urlCardJson) as { expandedUrl?: string; title?: string; description?: string; imageUrl?: string };
+      if (!c.title && !c.description) return null;
+      return { finalUrl: c.expandedUrl ?? post.text.trim(), title: c.title ?? null, description: c.description ?? null, image: c.imageUrl ?? null };
     } catch { return null; }
   });
   const [articleLoading, setArticleLoading] = useState(false);
+  const autoFetchedRef = useRef(false);
+
+  const isUrlOnly = URL_ONLY_RE.test(post.text.trim());
+  const articleUrl = isUrlOnly ? post.text.trim() : null;
+
+  useEffect(() => {
+    if (!isUrlOnly || article !== null || autoFetchedRef.current) return;
+    autoFetchedRef.current = true;
+
+    let fetchUrl = articleUrl!;
+    if (post.urlCardJson) {
+      try {
+        const c = JSON.parse(post.urlCardJson) as { expandedUrl?: string };
+        if (c.expandedUrl) fetchUrl = c.expandedUrl;
+      } catch { /* ignore */ }
+    }
+
+    setArticleLoading(true);
+    fetch(`/api/fetch-article?url=${encodeURIComponent(fetchUrl)}`)
+      .then(r => r.json())
+      .then((data: Partial<ArticlePreview> & { error?: string }) => {
+        if (!data.error) {
+          setArticle({ finalUrl: data.finalUrl ?? fetchUrl, title: data.title ?? null, description: data.description ?? null, image: data.image ?? null });
+        }
+      })
+      .catch(() => { /* silently fail */ })
+      .finally(() => setArticleLoading(false));
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const savedDate = new Date(post.savedAt).toLocaleDateString("ja-JP", {
     year: "numeric",
     month: "short",
     day: "numeric",
   });
-
-  const isUrlOnly = URL_ONLY_RE.test(post.text.trim());
-  const articleUrl = isUrlOnly ? post.text.trim() : null;
 
   const fetchArticle = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -197,19 +223,19 @@ export function PostCard({
                   )}
                 </div>
               </a>
+            ) : articleLoading ? (
+              <div className="flex items-center gap-2 text-xs text-text-muted py-2 px-3 rounded-xl border border-border">
+                <Loader2 className="w-3.5 h-3.5 animate-spin flex-shrink-0" />
+                <span>記事を読み込み中...</span>
+              </div>
             ) : (
               <Button
                 variant="secondary"
                 size="sm"
                 className="w-full"
                 onClick={fetchArticle}
-                disabled={articleLoading}
               >
-                {articleLoading ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" />
-                ) : (
-                  <Newspaper className="w-3.5 h-3.5 mr-1.5" />
-                )}
+                <Newspaper className="w-3.5 h-3.5 mr-1.5" />
                 記事を読み込む
               </Button>
             )}
