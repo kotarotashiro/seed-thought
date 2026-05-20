@@ -18,6 +18,7 @@ export default function LearningLessonPage({ params }: { params: Promise<{ sessi
   const [userNotes, setUserNotes] = useState<Record<number, string>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
 
   useEffect(() => {
     async function fetchSession() {
@@ -96,7 +97,8 @@ export default function LearningLessonPage({ params }: { params: Promise<{ sessi
 
   const handleSaveAndClose = async () => {
     await saveCurrentStep(false, currentStep);
-    router.push("/deep-dives");
+    setSaved(true);
+    setTimeout(() => router.push("/deep-dives"), 900);
   };
 
   if (loading || !session) {
@@ -191,6 +193,12 @@ export default function LearningLessonPage({ params }: { params: Promise<{ sessi
                 : "理解メモを書く（任意）"
             }
           />
+        </div>
+      )}
+
+      {saved && (
+        <div className="rounded-xl border border-success/20 bg-success-light px-4 py-2 text-sm text-success text-center">
+          進捗を保存しました
         </div>
       )}
 

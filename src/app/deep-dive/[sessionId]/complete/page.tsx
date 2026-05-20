@@ -246,10 +246,10 @@ export default function CompletePage({ params }: { params: Promise<{ sessionId: 
 
       {/* Actions */}
       <div className="flex flex-col gap-3 sm:flex-row">
-        <Button variant="secondary" onClick={() => router.push("/deep-dives")} className="flex-1">
+        <Button variant="secondary" onClick={() => router.replace("/deep-dives")} className="flex-1">
           深掘り履歴へ
         </Button>
-        <Button variant="secondary" onClick={() => router.push("/")} className="flex-1">
+        <Button variant="secondary" onClick={() => router.replace("/")} className="flex-1">
           ホームへ戻る
         </Button>
       </div>

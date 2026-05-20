@@ -135,7 +135,10 @@ export function buildLearningPrompt(input: SourcePostForLearning): string {
   "status": "draft"
 }
 
-投稿データ:
+${input.articleTitle || input.articleDescription ? `## 記事情報（投稿リンク先の内容）
+${input.articleTitle ? `タイトル: ${input.articleTitle}` : ""}
+${input.articleDescription ? `内容: ${input.articleDescription}` : ""}
+` : ""}投稿データ:
 ${JSON.stringify(input, null, 2)}
 
 JSONのみ返してください。説明文は不要です。`;
@@ -174,6 +177,10 @@ export async function buildDeepDivePrompt(input: GenerateDeepDiveSessionInput): 
 
 ## 元投稿
 ${input.postText}
+${input.articleTitle || input.articleDescription ? `
+## 記事情報（投稿リンク先の内容）
+${input.articleTitle ? `タイトル: ${input.articleTitle}` : ""}
+${input.articleDescription ? `内容: ${input.articleDescription}` : ""}` : ""}
 
 ## 投稿分類
 タイプ: ${input.classification.postType}

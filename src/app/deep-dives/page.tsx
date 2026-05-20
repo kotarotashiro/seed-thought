@@ -14,11 +14,19 @@ export default function DeepDivesPage() {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [deleting, setDeleting] = useState(false);
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  function isOrphanSession(session: any) {
+    if (session.status !== "in_progress") return false;
+    if (session.currentStep !== 0) return false;
+    const steps: { userNote: string | null }[] = session.steps || [];
+    return steps.every((s) => !s.userNote);
+  }
+
   const reloadSessions = async () => {
     try {
       const res = await fetch("/api/deep-dive/sessions");
       const data = await res.json();
-      setSessions(data || []);
+      setSessions((data || []).filter((s: unknown) => !isOrphanSession(s)));
     } catch (error) {
       console.error("Failed to fetch sessions:", error);
     } finally {
@@ -33,7 +41,7 @@ export default function DeepDivesPage() {
       try {
         const res = await fetch("/api/deep-dive/sessions");
         const data = await res.json();
-        if (!cancelled) setSessions(data || []);
+        if (!cancelled) setSessions((data || []).filter((s: unknown) => !isOrphanSession(s)));
       } catch (error) {
         console.error("Failed to fetch sessions:", error);
       } finally {
@@ -45,6 +53,7 @@ export default function DeepDivesPage() {
     return () => {
       cancelled = true;
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const toggleSession = (id: string) => {

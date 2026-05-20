@@ -29,6 +29,9 @@ export interface SourcePostForLearning {
   type?: string;
   existingSummary?: string;
   userMemo?: string;
+  /** Article content when the post is a link to an external article */
+  articleTitle?: string;
+  articleDescription?: string;
 }
 
 export interface LearningOutput {
@@ -84,6 +87,8 @@ export interface GenerateDeepDiveSessionInput {
   mode: "thought_lens" | "learning_lesson";
   postText: string;
   classification: PostClassificationResult;
+  articleTitle?: string;
+  articleDescription?: string;
 }
 
 export interface DeepDiveStepContent {
