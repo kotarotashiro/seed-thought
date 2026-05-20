@@ -1,0 +1,109 @@
+import { NextResponse } from "next/server";
+import { prisma } from "@/lib/db/prisma";
+import { getAiProvider } from "@/lib/ai/provider";
+import { getUserFacingError } from "@/lib/api/errors";
+import { createFallbackOutput } from "@/lib/ai/fallback";
+import type { PostClassificationResult } from "@/lib/ai/types";
+import { buildPostTextWithThread } from "@/lib/posts/threadText";
+
+const VALID_OUTPUT_TYPES = ["x", "instagram", "note", "markdown_log"] as const;
+type OutputType = (typeof VALID_OUTPUT_TYPES)[number];
+
+// POST /api/learning-cards/[cardId]/outputs
+// Generate SNS/note output from a learning card's content.
+export async function POST(
+  request: Request,
+  { params }: { params: Promise<{ cardId: string }> }
+) {
+  const { cardId } = await params;
+  try {
+    const body = (await request.json()) as { outputType?: string };
+    const { outputType } = body;
+
+    if (!outputType || !VALID_OUTPUT_TYPES.includes(outputType as OutputType)) {
+      return NextResponse.json({ error: "outputType が不正です" }, { status: 400 });
+    }
+
+    const card = await prisma.learningCard.findUnique({
+      where: { id: cardId },
+      include: {
+        sourcePost: {
+          include: {
+            classification: true,
+            threadPosts: { orderBy: { threadOrder: "asc" } },
+          },
+        },
+      },
+    });
+
+    if (!card) {
+      return NextResponse.json({ error: "学習カードが見つかりません" }, { status: 404 });
+    }
+
+    const post = card.sourcePost;
+    const classification: PostClassificationResult = post.classification
+      ? {
+          postType: post.classification.postType as PostClassificationResult["postType"],
+          primaryCategory: post.classification.primaryCategory,
+          tags: JSON.parse(post.classification.tagsJson || "[]"),
+          summary: post.classification.summary,
+          recommendReason: post.classification.recommendReason,
+          difficultyLevel: post.classification.difficultyLevel as PostClassificationResult["difficultyLevel"],
+          thinkingPotentialScore: post.classification.thinkingPotentialScore,
+          learningPotentialScore: post.classification.learningPotentialScore,
+          outputPotentialScore: post.classification.outputPotentialScore,
+          recommendedMode: post.classification.recommendedMode as PostClassificationResult["recommendedMode"],
+        }
+      : {
+          postType: "unknown" as PostClassificationResult["postType"],
+          primaryCategory: "未分類",
+          tags: [],
+          summary: post.text.substring(0, 100),
+          recommendReason: "",
+          difficultyLevel: "unknown" as PostClassificationResult["difficultyLevel"],
+          thinkingPotentialScore: 50,
+          learningPotentialScore: 50,
+          outputPotentialScore: 50,
+          recommendedMode: "unknown" as PostClassificationResult["recommendedMode"],
+        };
+
+    const postText = buildPostTextWithThread(post);
+    const provider = getAiProvider();
+    let warning: string | null = null;
+
+    const result = await provider
+      .generateOutput({
+        outputType: outputType as OutputType,
+        postText,
+        classification,
+        steps: [
+          {
+            title: "学習内容",
+            question: "",
+            aiContent: card.outputJson,
+            userNote: card.userMemo ?? null,
+          },
+        ],
+        userFinalNote: card.userMemo ?? null,
+        finalSummary: card.summary,
+      })
+      .catch((err: unknown) => {
+        warning = getUserFacingError(err, "AI生成に失敗したため、下書きを作成しました");
+        return createFallbackOutput({
+          outputType: outputType as OutputType,
+          postText,
+          classification,
+          userFinalNote: card.userMemo ?? null,
+          finalSummary: card.summary,
+        });
+      });
+
+    return NextResponse.json({ ...result, warning });
+  } catch (error) {
+    console.error("Failed to generate output from learning card:", error);
+    return NextResponse.json(
+      { error: getUserFacingError(error, "アウトプットの生成に失敗しました") },
+      { status: 500 }
+    );
+  }
+}

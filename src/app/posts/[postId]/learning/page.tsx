@@ -6,8 +6,11 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Badge, LearningStatusBadge } from "@/components/ui/Badge";
 import { PostMediaGrid, parsePostMedia } from "@/components/posts/PostMediaGrid";
+import { OutputTypeCard } from "@/components/outputs/OutputTypeCard";
+import { OutputPreview } from "@/components/outputs/OutputPreview";
 import type { LearningOutput } from "@/lib/ai/types";
 import {
+  AlertCircle,
   ArrowLeft,
   BookOpen,
   CheckCircle2,
@@ -22,6 +25,8 @@ import {
   Sparkles,
   User,
 } from "lucide-react";
+
+const OUTPUT_TYPES = ["x", "instagram", "note", "markdown_log"] as const;
 
 const tabs = [
   "要約",
@@ -93,6 +98,12 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const autoGenerateTriedRef = useRef(false);
+
+  // SNS output state
+  const [selectedOutput, setSelectedOutput] = useState<string | null>(null);
+  const [generatedOutput, setGeneratedOutput] = useState<{ title: string; content: string; contentJson?: Record<string, unknown> | null; warning?: string | null } | null>(null);
+  const [generatingOutput, setGeneratingOutput] = useState(false);
+  const [outputError, setOutputError] = useState<string | null>(null);
 
   const output = useMemo(() => parseLearningOutput(card), [card]);
 
@@ -200,6 +211,38 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
       setMessage("画像生成プロンプトをコピーしました");
     } catch {
       setMessage("画像生成プロンプトを表示しました");
+    }
+  };
+
+  const handleCopyMemo = async () => {
+    if (!memo) return;
+    try {
+      await navigator.clipboard.writeText(memo);
+      setMessage("メモをコピーしました");
+    } catch {
+      // ignore
+    }
+  };
+
+  const handleGenerateOutput = async () => {
+    if (!card || !selectedOutput) return;
+    setGeneratingOutput(true);
+    setOutputError(null);
+    setGeneratedOutput(null);
+    try {
+      const res = await fetch(`/api/learning-cards/${card.id}/outputs`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ outputType: selectedOutput }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "アウトプットの生成に失敗しました");
+      setGeneratedOutput(data);
+      if (data.warning) setOutputError(data.warning);
+    } catch (genErr) {
+      setOutputError(genErr instanceof Error ? genErr.message : "アウトプットの生成に失敗しました");
+    } finally {
+      setGeneratingOutput(false);
     }
   };
 
@@ -491,15 +534,69 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
                   className="min-h-[180px] w-full resize-y rounded-xl border border-border px-4 py-3 text-sm leading-relaxed text-text focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20"
                   placeholder="あとで見返すためのメモを書いてください"
                 />
-                <div className="mt-3">
+                <div className="mt-3 flex gap-2">
                   <Button onClick={handleSave} loading={saving} loadingLabel="保存中...">
                     <CheckCircle2 className="mr-1.5 h-4 w-4" />
                     学習カードに保存
+                  </Button>
+                  <Button variant="secondary" onClick={handleCopyMemo} disabled={!memo}>
+                    <Copy className="mr-1.5 h-4 w-4" />
+                    コピー
                   </Button>
                 </div>
               </div>
             )}
           </Card>
+
+          {/* SNS Output section */}
+          <Card>
+            <div className="mb-4 flex items-center gap-2">
+              <Sparkles className="h-5 w-5 text-accent" />
+              <h3 className="text-base font-bold text-text">SNS発信コンテンツ</h3>
+            </div>
+            <p className="mb-4 text-sm text-text-secondary">
+              学習内容を発信用コンテンツに変換します。
+            </p>
+            <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+              {OUTPUT_TYPES.map((type) => (
+                <OutputTypeCard
+                  key={type}
+                  type={type}
+                  selected={selectedOutput === type}
+                  onClick={() => {
+                    setSelectedOutput(type);
+                    setGeneratedOutput(null);
+                    setOutputError(null);
+                  }}
+                />
+              ))}
+            </div>
+            <Button
+              onClick={handleGenerateOutput}
+              disabled={!selectedOutput || generatingOutput}
+              loading={generatingOutput}
+              loadingLabel="生成中..."
+              className="w-full"
+            >
+              <Sparkles className="mr-1.5 h-4 w-4" />
+              アウトプットを生成
+            </Button>
+            {outputError && (
+              <div className="mt-3 flex items-start gap-2 rounded-xl border border-danger/20 bg-danger-light p-3">
+                <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0 text-danger" />
+                <p className="text-sm text-danger">{outputError}</p>
+              </div>
+            )}
+          </Card>
+
+          {generatedOutput && (
+            <OutputPreview
+              title={generatedOutput.title}
+              content={generatedOutput.content}
+              contentJson={generatedOutput.contentJson ?? null}
+              outputType={selectedOutput || ""}
+            />
+          )}
         </>
       )}
     </div>

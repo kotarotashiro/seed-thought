@@ -109,6 +109,7 @@ export function PostCard({
   const [pasteOpen, setPasteOpen] = useState(false);
   const [pasteValue, setPasteValue] = useState("");
   const [pasteSaving, setPasteSaving] = useState(false);
+  const [pasteError, setPasteError] = useState<string | null>(null);
   const [pastedContent, setPastedContent] = useState<string | null>(() => {
     if (!post.urlCardJson) return null;
     try {
@@ -208,17 +209,22 @@ export function PostCard({
       pastedByUser: true,
     };
 
+    setPasteError(null);
     try {
-      await fetch(`/api/posts/${post.id}`, {
+      const res = await fetch(`/api/posts/${post.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ urlCardJson: JSON.stringify(newCard) }),
       });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error((errData as { error?: string }).error || "保存に失敗しました");
+      }
       setPastedContent(text);
       setPasteOpen(false);
       setPasteValue("");
-    } catch {
-      // silently fail
+    } catch (err) {
+      setPasteError(err instanceof Error ? err.message : "保存に失敗しました");
     } finally {
       setPasteSaving(false);
     }
@@ -340,11 +346,14 @@ export function PostCard({
                       rows={5}
                       autoFocus
                     />
+                    {pasteError && (
+                      <p className="text-xs text-danger">{pasteError}</p>
+                    )}
                     <div className="flex gap-2 justify-end">
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={(e) => { stop(e); setPasteOpen(false); setPasteValue(""); }}
+                        onClick={(e) => { stop(e); setPasteOpen(false); setPasteValue(""); setPasteError(null); }}
                       >
                         キャンセル
                       </Button>
