@@ -19,6 +19,8 @@ import {
   ExternalLink,
   MessageCircle,
   Newspaper,
+  Clipboard,
+  Pencil,
   Loader2,
 } from "lucide-react";
 
@@ -103,6 +105,18 @@ export function PostCard({
   const [articleLoading, setArticleLoading] = useState(false);
   const autoFetchedRef = useRef(false);
 
+  // X Article paste state
+  const [pasteOpen, setPasteOpen] = useState(false);
+  const [pasteValue, setPasteValue] = useState("");
+  const [pasteSaving, setPasteSaving] = useState(false);
+  const [pastedContent, setPastedContent] = useState<string | null>(() => {
+    if (!post.urlCardJson) return null;
+    try {
+      const c = JSON.parse(post.urlCardJson) as { pastedContent?: string; pastedByUser?: boolean };
+      return (c.pastedByUser && c.pastedContent) ? c.pastedContent : null;
+    } catch { return null; }
+  });
+
   const isUrlOnly = URL_ONLY_RE.test(post.text.trim());
   const articleUrl = isUrlOnly ? post.text.trim() : null;
   const initialExpandedUrl = getExpandedUrl(post.urlCardJson);
@@ -176,6 +190,40 @@ export function PostCard({
     }
   };
 
+  const handlePasteSave = async (e: React.MouseEvent) => {
+    stop(e);
+    const text = pasteValue.trim();
+    if (!text || pasteSaving) return;
+    setPasteSaving(true);
+
+    let existingCard: Record<string, unknown> = {};
+    try {
+      if (post.urlCardJson) existingCard = JSON.parse(post.urlCardJson) as Record<string, unknown>;
+    } catch { /* ignore */ }
+
+    const newCard = {
+      ...existingCard,
+      expandedUrl: resolvedUrl ?? (existingCard.expandedUrl as string | undefined),
+      pastedContent: text,
+      pastedByUser: true,
+    };
+
+    try {
+      await fetch(`/api/posts/${post.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ urlCardJson: JSON.stringify(newCard) }),
+      });
+      setPastedContent(text);
+      setPasteOpen(false);
+      setPasteValue("");
+    } catch {
+      // silently fail
+    } finally {
+      setPasteSaving(false);
+    }
+  };
+
   const handleCardClick = () => {
     if (selectMode && onToggleSelect) {
       onToggleSelect(post.id);
@@ -242,7 +290,77 @@ export function PostCard({
         {/* URL article preview */}
         {isUrlOnly && (
           <div className="mb-3" onClick={stop}>
-            {article ? (
+            {isXArticle && resolvedUrl ? (
+              <div className="space-y-2">
+                {/* Always show the "open in X" link */}
+                <a
+                  href={resolvedUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex items-center gap-2 text-xs text-text-secondary py-2 px-3 rounded-xl border border-border hover:border-accent/40 transition-colors"
+                  onClick={stop}
+                >
+                  <Newspaper className="w-3.5 h-3.5 flex-shrink-0 text-accent" />
+                  <span className="flex-1 truncate">X Article（Xアプリで開く）</span>
+                  <ExternalLink className="w-3.5 h-3.5 flex-shrink-0" />
+                </a>
+                {/* Pasted content preview */}
+                {pastedContent && !pasteOpen && (
+                  <div className="relative rounded-xl border border-border bg-border-light px-3 py-2">
+                    <p className="text-xs leading-relaxed text-text-secondary line-clamp-4 whitespace-pre-wrap pr-7">
+                      {pastedContent}
+                    </p>
+                    <button
+                      className="absolute top-2 right-2 p-0.5 text-text-muted hover:text-accent transition-colors"
+                      onClick={(e) => { stop(e); setPasteValue(pastedContent); setPasteOpen(true); }}
+                      title="編集"
+                    >
+                      <Pencil className="w-3 h-3" />
+                    </button>
+                  </div>
+                )}
+                {/* Paste toggle button (shown only when no content and panel closed) */}
+                {!pasteOpen && !pastedContent && (
+                  <button
+                    className="w-full flex items-center justify-center gap-1.5 text-xs text-text-muted hover:text-accent transition-colors py-1.5 rounded-xl border border-dashed border-border hover:border-accent/40"
+                    onClick={(e) => { stop(e); setPasteOpen(true); }}
+                  >
+                    <Clipboard className="w-3 h-3" />
+                    記事テキストを貼り付ける
+                  </button>
+                )}
+                {/* Paste panel */}
+                {pasteOpen && (
+                  <div className="space-y-2" onClick={stop}>
+                    <textarea
+                      value={pasteValue}
+                      onChange={(e) => setPasteValue(e.target.value)}
+                      placeholder="X記事のテキストをここに貼り付けてください..."
+                      className="w-full rounded-xl border border-border bg-white text-xs p-3 text-text resize-none focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent"
+                      rows={5}
+                      autoFocus
+                    />
+                    <div className="flex gap-2 justify-end">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={(e) => { stop(e); setPasteOpen(false); setPasteValue(""); }}
+                      >
+                        キャンセル
+                      </Button>
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        onClick={handlePasteSave}
+                        disabled={!pasteValue.trim() || pasteSaving}
+                      >
+                        {pasteSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "保存"}
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : article ? (
               <a
                 href={article.finalUrl}
                 target="_blank"
@@ -272,18 +390,6 @@ export function PostCard({
                 <Loader2 className="w-3.5 h-3.5 animate-spin flex-shrink-0" />
                 <span>記事を読み込み中...</span>
               </div>
-            ) : isXArticle && resolvedUrl ? (
-              <a
-                href={resolvedUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="flex items-center gap-2 text-xs text-text-secondary py-2 px-3 rounded-xl border border-border hover:border-accent/40 transition-colors"
-                onClick={stop}
-              >
-                <Newspaper className="w-3.5 h-3.5 flex-shrink-0 text-accent" />
-                <span className="flex-1 truncate">X Article（Xアプリで開く）</span>
-                <ExternalLink className="w-3.5 h-3.5 flex-shrink-0" />
-              </a>
             ) : (
               <Button
                 variant="secondary"

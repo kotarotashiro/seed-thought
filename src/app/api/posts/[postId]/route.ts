@@ -153,6 +153,29 @@ export async function PUT(
   }
 }
 
+// PATCH /api/posts/[postId]
+// Partial update — currently supports: urlCardJson
+export async function PATCH(
+  request: Request,
+  { params }: { params: Promise<{ postId: string }> }
+) {
+  const { postId } = await params;
+  try {
+    const body = await request.json() as { urlCardJson?: string };
+    if (body.urlCardJson === undefined) {
+      return NextResponse.json({ error: "更新するフィールドがありません" }, { status: 400 });
+    }
+    await prisma.post.update({
+      where: { id: postId },
+      data: { urlCardJson: body.urlCardJson },
+    });
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("Failed to patch post:", error);
+    return NextResponse.json({ error: "投稿の更新に失敗しました" }, { status: 500 });
+  }
+}
+
 // DELETE /api/posts/[postId]
 export async function DELETE(
   request: Request,
