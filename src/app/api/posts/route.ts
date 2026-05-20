@@ -59,6 +59,7 @@ export async function GET(request: Request) {
         classification: true,
         threadPosts: { select: { id: true } },
         deepDiveSessions: { select: { id: true, status: true } },
+        learningCard: { select: { id: true, status: true } },
       },
       orderBy: [
         getPostOrderBy(sort),

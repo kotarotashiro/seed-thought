@@ -7,10 +7,12 @@ import type {
   GeneratedDeepDiveSessionResult,
   GenerateOutputInput,
   GeneratedOutputResult,
+  LearningOutput,
   PostContext,
   PostSummaryForSearch,
   PostSummaryForTrend,
   SemanticSearchResult,
+  SourcePostForLearning,
   TranslateTextInput,
   TrendInsight,
 } from "./types";
@@ -51,6 +53,64 @@ export const mockProvider: AiProvider = {
 
   async translateText(input: TranslateTextInput): Promise<string> {
     return input.text;
+  },
+
+  async generateLearningCard(input: SourcePostForLearning): Promise<LearningOutput> {
+    await delay(800);
+
+    const baseText = input.translatedText || input.text;
+    const topic = input.genre || input.type || "保存投稿のノウハウ";
+    const title = `${topic}を実務で使うための学習カード`;
+
+    return {
+      sourcePostId: input.id,
+      title,
+      summary: `この投稿は、${topic}に関する気づきを扱っています。\nポイントは、内容をそのまま読むのではなく、再利用できる型として捉えることです。\n実務では手順化して小さく試すことで価値に変えられます。`,
+      originalIntent: "投稿者は、自分の経験から得た実践知を短い形で共有し、読者が次の行動に移せるようにしています。",
+      whatIsInteresting: "短い投稿の中に、背景となる判断基準、実践手順、応用できる型が含まれている点が面白いところです。",
+      coreInsight: `${baseText.substring(0, 80)}${baseText.length > 80 ? "..." : ""} という内容を、自分の仕事に移植できる構造として捉えることが中心です。`,
+      structure: [
+        { label: "課題の発見", description: "投稿内で扱われている困りごとや改善余地を見つける。" },
+        { label: "型への変換", description: "個別の経験を、他の場面でも使える手順や判断基準に変える。" },
+        { label: "実務への適用", description: "自分のテーマや顧客対応、発信、教材づくりに置き換える。" },
+      ],
+      steps: [
+        {
+          title: "投稿の狙いを一文にする",
+          description: "投稿者が一番伝えたいことを、自分の言葉で短く言い換えます。",
+          actions: ["本文と翻訳を読み比べる", "重要そうな動詞を抜き出す", "一文の学びにする"],
+        },
+        {
+          title: "再利用できる手順に分ける",
+          description: "ノウハウとして実行できるように、順番と条件を整理します。",
+          actions: ["前提条件を書く", "実行手順を3から5個に分ける", "失敗しやすい点をメモする"],
+        },
+        {
+          title: "自分の業務に置き換える",
+          description: "自分の発信、提案、教材、作業フローにどう使うかを決めます。",
+          actions: ["使う場面を1つ選ぶ", "明日試す小さな行動にする", "結果を見る指標を決める"],
+        },
+      ],
+      manual: `# ${title}\n\n## 目的\n保存した投稿から、実務に使えるノウハウを取り出す。\n\n## 進め方\n1. 投稿の中心メッセージを一文にする。\n2. そのメッセージを、判断基準・手順・注意点に分ける。\n3. 自分の仕事で使う場面を1つ決める。\n4. 小さく試し、結果をメモする。\n\n## 使いどころ\n発信内容の設計、セミナー資料、業務マニュアル、顧客への説明資料に転用できます。`,
+      applicationIdeas: [
+        { title: "発信用コンテンツ", description: "投稿の構造をもとに、自分のテーマの解説投稿へ変換する。" },
+        { title: "業務マニュアル", description: "実践手順をチェックリスト化し、繰り返し使える作業メモにする。" },
+        { title: "教材づくり", description: "図解構成を使って、セミナーやワークショップの説明資料にする。" },
+      ],
+      tips: ["投稿の文面を転載せず、自分の言葉に置き換える", "最初は1つの業務場面だけで試す", "うまくいった条件も一緒に保存する"],
+      useCases: ["学習メモ", "SNS投稿", "セミナー資料", "業務手順書", "ノウハウ記事"],
+      diagramStructure: {
+        title: `${topic}を使える知識に変える流れ`,
+        sections: [
+          { heading: "投稿の核", body: "一番大事な主張を短く整理する", visualIdea: "中央にキーメッセージを置く" },
+          { heading: "構造化", body: "背景、手順、注意点に分ける", visualIdea: "3分割のフロー図" },
+          { heading: "応用", body: "自分の業務や発信に置き換える", visualIdea: "矢印で実務活用へつなぐ" },
+        ],
+      },
+      imageExplanationPrompt: `日本語の学習用図解。タイトルは「${topic}を使える知識に変える流れ」。中央に投稿の核、左から右に「抽出」「構造化」「実務へ応用」の3ステップを配置。落ち着いた白背景、アクセントカラーは緑、セミナー資料に使える読みやすいデザイン。`,
+      userLearningMemo: "この投稿は、保存して終わりにせず、自分の実務で試せる小さな手順に変えると価値が出る。",
+      status: "draft",
+    };
   },
 
   async generateDeepDiveSession(input: GenerateDeepDiveSessionInput): Promise<GeneratedDeepDiveSessionResult> {

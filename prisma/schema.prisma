@@ -32,8 +32,27 @@ model Post {
   classification  PostClassification?
   deepDiveSessions DeepDiveSession[]
   threadPosts      ThreadPost[]
+  learningCard     LearningCard?
 
   @@unique([sourcePostId, savedType])
+}
+
+model LearningCard {
+  id           String   @id @default(cuid())
+  sourcePostId String   @unique
+  title        String
+  summary      String
+  coreInsight  String
+  manual       String
+  diagramPrompt String
+  imagePrompt  String
+  outputJson   String
+  userMemo     String?
+  status       String   @default("draft") // "draft" | "saved"
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  sourcePost Post @relation(fields: [sourcePostId], references: [id], onDelete: Cascade)
 }
 
 model ThreadPost {

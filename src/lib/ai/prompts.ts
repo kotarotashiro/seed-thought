@@ -1,5 +1,15 @@
 import { getProfile } from "@/lib/profile/fixedProfile";
-import type { ChatMessage, ClassifyPostInput, GenerateDeepDiveSessionInput, GenerateOutputInput, PostContext, PostSummaryForSearch, PostSummaryForTrend, TranslateTextInput } from "./types";
+import type {
+  ChatMessage,
+  ClassifyPostInput,
+  GenerateDeepDiveSessionInput,
+  GenerateOutputInput,
+  PostContext,
+  PostSummaryForSearch,
+  PostSummaryForTrend,
+  SourcePostForLearning,
+  TranslateTextInput,
+} from "./types";
 import { beginnerTeachingRules, strictLearningKnowledge } from "./knowledge";
 
 export async function buildClassifyPrompt(input: ClassifyPostInput): Promise<string> {
@@ -62,6 +72,73 @@ ${input.text}
 {
   "translatedText": "日本語訳"
 }`;
+}
+
+export function buildLearningPrompt(input: SourcePostForLearning): string {
+  return `あなたは、X APIで収集された投稿データを、ユーザーが再利用できる「学習資産」に変換するAIです。
+
+以下の投稿データを読み取り、単なる要約ではなく、ユーザーがあとから実践・応用・発信に使える形に変換してください。
+
+重要なのは、投稿を保存することではなく、投稿の中にある
+「構造」
+「手順」
+「発想」
+「応用可能な型」
+を抽出することです。
+
+以下を必ず出力してください。
+
+1. タイトル
+2. 3行要約
+3. この投稿が伝えようとしている本質
+4. 何が面白いのか
+5. 抽出できる構造
+6. 実践手順
+7. マニュアル化した本文
+8. ユーザーの業務への応用アイデア
+9. うまく使うコツ
+10. 向いている用途
+11. 図解・解説画像にするための構成
+12. 解説画像生成用プロンプト
+13. ユーザーがあとで見返すための学習メモ
+
+出力は必ずJSONで返してください。
+
+## 出力形式
+{
+  "sourcePostId": "${input.id}",
+  "title": "学習カードのタイトル",
+  "summary": "3行要約。改行を含めてもよい",
+  "originalIntent": "この投稿が伝えようとしている本質",
+  "whatIsInteresting": "何が面白いのか",
+  "coreInsight": "中心となる洞察",
+  "structure": [
+    { "label": "構造名", "description": "説明" }
+  ],
+  "steps": [
+    { "title": "手順名", "description": "説明", "actions": ["具体アクション"] }
+  ],
+  "manual": "実践マニュアル本文",
+  "applicationIdeas": [
+    { "title": "応用アイデア名", "description": "説明" }
+  ],
+  "tips": ["うまく使うコツ"],
+  "useCases": ["向いている用途"],
+  "diagramStructure": {
+    "title": "図解タイトル",
+    "sections": [
+      { "heading": "見出し", "body": "本文", "visualIdea": "視覚表現案" }
+    ]
+  },
+  "imageExplanationPrompt": "解説画像生成用プロンプト",
+  "userLearningMemo": "ユーザーがあとで見返すための学習メモ",
+  "status": "draft"
+}
+
+投稿データ:
+${JSON.stringify(input, null, 2)}
+
+JSONのみ返してください。説明文は不要です。`;
 }
 
 export async function buildDeepDivePrompt(input: GenerateDeepDiveSessionInput): Promise<string> {
@@ -286,8 +363,8 @@ JSONのみ返してください。`;
 
 export async function buildChatPrompt(
   message: string,
-  history: import("./types").ChatMessage[],
-  posts: import("./types").PostContext[]
+  history: ChatMessage[],
+  posts: PostContext[]
 ): Promise<string> {
   const profile = await getProfile();
   const postsContext = posts

@@ -8,19 +8,31 @@ import type {
   GeneratedDeepDiveSessionResult,
   GenerateOutputInput,
   GeneratedOutputResult,
+  LearningOutput,
   PostClassificationResult,
   PostContext,
   PostSummaryForSearch,
   PostSummaryForTrend,
   SemanticSearchResult,
+  SourcePostForLearning,
   TranslateTextInput,
   TrendInsight,
 } from "./types";
-import { buildChatPrompt, buildClassifyPrompt, buildDeepDivePrompt, buildOutputPrompt, buildSemanticSearchPrompt, buildTranslatePrompt, buildTrendAnalysisPrompt } from "./prompts";
+import {
+  buildChatPrompt,
+  buildClassifyPrompt,
+  buildDeepDivePrompt,
+  buildLearningPrompt,
+  buildOutputPrompt,
+  buildSemanticSearchPrompt,
+  buildTranslatePrompt,
+  buildTrendAnalysisPrompt,
+} from "./prompts";
 import { parseAiJson } from "./json";
 import {
   isGeneratedDeepDiveSessionResult,
   isGeneratedOutputResult,
+  isLearningOutput,
   isPostClassificationResult,
   isSemanticSearchResult,
   isTrendInsight,
@@ -184,6 +196,15 @@ export function getAiProvider(): AiProvider {
       const prompt = buildTranslatePrompt(input);
       const result = await callConfiguredAi(prompt);
       return parseAiJson(result, isTranslatedTextResult, "日本語翻訳").translatedText;
+    },
+
+    async generateLearningCard(input: SourcePostForLearning): Promise<LearningOutput> {
+      const settings = await getAiRuntimeSettings();
+      if (settings.provider === "mock") return mockProvider.generateLearningCard(input);
+
+      const prompt = buildLearningPrompt(input);
+      const result = await callConfiguredAi(prompt);
+      return parseAiJson(result, isLearningOutput, "学習カード");
     },
 
     async generateDeepDiveSession(

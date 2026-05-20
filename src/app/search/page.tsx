@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { Search, ArrowRight, ExternalLink, Sparkles, Clock, X } from "lucide-react";
 import { Badge, PostTypeBadge } from "@/components/ui/Badge";
@@ -29,6 +29,7 @@ const HISTORY_KEY = "knowhow-search-history";
 const MAX_HISTORY = 8;
 
 function loadHistory(): string[] {
+  if (typeof window === "undefined") return [];
   try {
     return JSON.parse(localStorage.getItem(HISTORY_KEY) || "[]");
   } catch {
@@ -48,11 +49,7 @@ export default function SearchPage() {
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
   const [error, setError] = useState("");
-  const [history, setHistory] = useState<string[]>([]);
-
-  useEffect(() => {
-    setHistory(loadHistory());
-  }, []);
+  const [history, setHistory] = useState<string[]>(loadHistory);
 
   const handleSearch = async (q?: string) => {
     const searchQuery = (q ?? query).trim();

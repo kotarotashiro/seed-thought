@@ -1,6 +1,7 @@
 import type {
   GeneratedDeepDiveSessionResult,
   GeneratedOutputResult,
+  LearningOutput,
   PostClassificationResult,
   SemanticSearchResult,
   TrendInsight,
@@ -89,6 +90,46 @@ export function isTrendInsight(value: unknown): value is TrendInsight {
   );
 }
 
+export function isLearningOutput(value: unknown): value is LearningOutput {
+  if (!isRecord(value) || !isRecord(value.diagramStructure)) return false;
+
+  return (
+    typeof value.sourcePostId === "string" &&
+    typeof value.title === "string" &&
+    typeof value.summary === "string" &&
+    typeof value.originalIntent === "string" &&
+    typeof value.whatIsInteresting === "string" &&
+    typeof value.coreInsight === "string" &&
+    isLabelDescriptionArray(value.structure) &&
+    Array.isArray(value.steps) &&
+    value.steps.every((step) => {
+      if (!isRecord(step)) return false;
+      return (
+        typeof step.title === "string" &&
+        typeof step.description === "string" &&
+        isStringArray(step.actions)
+      );
+    }) &&
+    typeof value.manual === "string" &&
+    isLabelDescriptionArray(value.applicationIdeas, "title") &&
+    isStringArray(value.tips) &&
+    isStringArray(value.useCases) &&
+    typeof value.diagramStructure.title === "string" &&
+    Array.isArray(value.diagramStructure.sections) &&
+    value.diagramStructure.sections.every((section) => {
+      if (!isRecord(section)) return false;
+      return (
+        typeof section.heading === "string" &&
+        typeof section.body === "string" &&
+        (section.visualIdea === undefined || typeof section.visualIdea === "string")
+      );
+    }) &&
+    typeof value.imageExplanationPrompt === "string" &&
+    typeof value.userLearningMemo === "string" &&
+    (value.status === "draft" || value.status === "saved")
+  );
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -103,4 +144,14 @@ function isScore(value: unknown): value is number {
 
 function isOneOf(value: unknown, choices: string[]): value is string {
   return typeof value === "string" && choices.includes(value);
+}
+
+function isLabelDescriptionArray(value: unknown, labelKey: "label" | "title" = "label"): boolean {
+  return (
+    Array.isArray(value) &&
+    value.every((item) => {
+      if (!isRecord(item)) return false;
+      return typeof item[labelKey] === "string" && typeof item.description === "string";
+    })
+  );
 }

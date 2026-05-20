@@ -1,0 +1,60 @@
+import { NextResponse } from "next/server";
+import { prisma } from "@/lib/db/prisma";
+
+function mergeUserMemo(outputJson: string, userMemo: string | null | undefined): string {
+  try {
+    const output = JSON.parse(outputJson);
+    if (typeof output === "object" && output !== null && typeof userMemo === "string") {
+      return JSON.stringify({ ...output, userLearningMemo: userMemo });
+    }
+  } catch {
+  }
+  return outputJson;
+}
+
+export async function PUT(
+  request: Request,
+  { params }: { params: Promise<{ cardId: string }> }
+) {
+  const { cardId } = await params;
+
+  try {
+    const body = await request.json();
+    const status = body.status;
+    const userMemo = body.userMemo;
+
+    if (status !== undefined && status !== "draft" && status !== "saved") {
+      return NextResponse.json(
+        { error: "status は draft または saved を指定してください" },
+        { status: 400 }
+      );
+    }
+
+    if (userMemo !== undefined && typeof userMemo !== "string") {
+      return NextResponse.json(
+        { error: "userMemo は文字列で指定してください" },
+        { status: 400 }
+      );
+    }
+
+    const current = await prisma.learningCard.findUnique({ where: { id: cardId } });
+    if (!current) {
+      return NextResponse.json({ error: "学習カードが見つかりません" }, { status: 404 });
+    }
+
+    const learningCard = await prisma.learningCard.update({
+      where: { id: cardId },
+      data: {
+        ...(status !== undefined ? { status } : {}),
+        ...(userMemo !== undefined
+          ? { userMemo, outputJson: mergeUserMemo(current.outputJson, userMemo) }
+          : {}),
+      },
+    });
+
+    return NextResponse.json(learningCard);
+  } catch (error) {
+    console.error("Failed to update learning card:", error);
+    return NextResponse.json({ error: "学習カードの更新に失敗しました" }, { status: 500 });
+  }
+}

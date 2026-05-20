@@ -23,6 +23,7 @@ export async function GET(
           include: { steps: true },
           orderBy: { createdAt: "desc" },
         },
+        learningCard: true,
       },
     });
 
@@ -43,6 +44,7 @@ export async function GET(
               include: { steps: true },
               orderBy: { createdAt: "desc" },
             },
+            learningCard: true,
           },
         });
       } catch (error) {
@@ -102,6 +104,7 @@ export async function GET(
             include: { steps: true },
             orderBy: { createdAt: "desc" },
           },
+          learningCard: true,
         },
       });
     }

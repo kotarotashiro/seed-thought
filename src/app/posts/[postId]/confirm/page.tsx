@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
-import { PostTypeBadge, Badge } from "@/components/ui/Badge";
+import { PostTypeBadge, Badge, LearningStatusBadge } from "@/components/ui/Badge";
 import { PostMediaGrid, parsePostMedia } from "@/components/posts/PostMediaGrid";
 import {
   AlertCircle,
@@ -26,6 +26,7 @@ function buildGains(post: {
     summary: string;
     recommendReason: string;
   } | null;
+  learningCard?: { id: string; status: string } | null;
 }) {
   const category = post.classification?.primaryCategory || "このテーマ";
   const summary = post.classification?.summary || "投稿の中心テーマ";
@@ -227,6 +228,7 @@ export default function ConfirmPage({ params }: { params: Promise<{ postId: stri
           <div className="flex gap-2 mt-3">
             <PostTypeBadge type={post.classification.postType} />
             <Badge>{post.classification.primaryCategory}</Badge>
+            <LearningStatusBadge learningCard={post.learningCard} />
           </div>
         )}
         {canFetchThread && (
@@ -349,6 +351,12 @@ export default function ConfirmPage({ params }: { params: Promise<{ postId: stri
         <Link href="/" className="flex-1">
           <Button variant="secondary" className="w-full">
             別の候補を見る
+          </Button>
+        </Link>
+        <Link href={`/posts/${postId}/learning`} className="flex-1">
+          <Button variant="secondary" className="w-full">
+            <BookOpen className="w-4 h-4 mr-2" />
+            学ぶ
           </Button>
         </Link>
         <Link href={`/posts/${postId}/mode`} className="flex-1">

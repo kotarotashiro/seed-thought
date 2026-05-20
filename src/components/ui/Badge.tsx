@@ -78,3 +78,19 @@ export function SavedTypeBadge({ type }: { type: string }) {
       return <Badge>{type}</Badge>;
   }
 }
+
+export function LearningStatusBadge({
+  learningCard,
+}: {
+  learningCard?: { id: string; status: string } | null;
+}) {
+  if (!learningCard) {
+    return <Badge variant="warning">未学習</Badge>;
+  }
+
+  if (learningCard.status === "saved") {
+    return <Badge variant="success">マニュアル化済み</Badge>;
+  }
+
+  return <Badge variant="learning">学習済み</Badge>;
+}

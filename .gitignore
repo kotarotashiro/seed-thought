@@ -42,6 +42,7 @@ backups/
 # local runtime logs
 dev-server.log
 *.local.log
+.claude/
 
 # vercel
 .vercel

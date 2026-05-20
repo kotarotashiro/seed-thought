@@ -10,6 +10,63 @@ export interface TranslateTextInput {
   text: string;
 }
 
+export interface SourcePostForLearning {
+  id: string;
+  authorName: string;
+  authorHandle: string;
+  text: string;
+  translatedText?: string;
+  postUrl: string;
+  postedAt?: string;
+  media: {
+    type: "image" | "video" | "gif";
+    url: string;
+    thumbnailUrl?: string;
+    altText?: string;
+  }[];
+  tags?: string[];
+  genre?: string;
+  type?: string;
+  existingSummary?: string;
+  userMemo?: string;
+}
+
+export interface LearningOutput {
+  sourcePostId: string;
+  title: string;
+  summary: string;
+  originalIntent: string;
+  whatIsInteresting: string;
+  coreInsight: string;
+  structure: {
+    label: string;
+    description: string;
+  }[];
+  steps: {
+    title: string;
+    description: string;
+    actions: string[];
+  }[];
+  manual: string;
+  applicationIdeas: {
+    title: string;
+    description: string;
+  }[];
+  tips: string[];
+  useCases: string[];
+  diagramStructure: {
+    title: string;
+    sections: {
+      heading: string;
+      body: string;
+      visualIdea?: string;
+    }[];
+  };
+  imageExplanationPrompt: string;
+  userLearningMemo: string;
+  status: "draft" | "saved";
+}
+
 export interface PostClassificationResult {
   postType: "thought" | "learning" | "output_material" | "unknown";
   primaryCategory: string;
@@ -120,6 +177,7 @@ export interface PostContext {
 export interface AiProvider {
   classifyPost(input: ClassifyPostInput): Promise<PostClassificationResult>;
   translateText(input: TranslateTextInput): Promise<string>;
+  generateLearningCard(input: SourcePostForLearning): Promise<LearningOutput>;
   generateDeepDiveSession(input: GenerateDeepDiveSessionInput): Promise<GeneratedDeepDiveSessionResult>;
   generateOutput(input: GenerateOutputInput): Promise<GeneratedOutputResult>;
   searchSemantically(query: string, posts: PostSummaryForSearch[]): Promise<SemanticSearchResult>;

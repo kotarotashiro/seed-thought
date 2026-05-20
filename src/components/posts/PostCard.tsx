@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Card } from "@/components/ui/Card";
-import { PostTypeBadge, SavedTypeBadge, Badge } from "@/components/ui/Badge";
+import { PostTypeBadge, SavedTypeBadge, Badge, LearningStatusBadge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { PostMediaGrid, parsePostMedia } from "@/components/posts/PostMediaGrid";
 import { PostChatModal } from "@/components/posts/PostChatModal";
@@ -40,6 +40,7 @@ interface PostCardProps {
     savedType?: string;
     threadPosts?: { id: string }[];
     deepDiveSessions?: { id: string; status: string }[];
+    learningCard?: { id: string; status: string } | null;
     classification?: {
       postType: string;
       primaryCategory: string;
@@ -198,6 +199,7 @@ export function PostCard({ post, showRecommendReason = false }: PostCardProps) {
                 深掘り済み
               </Badge>
             )}
+            <LearningStatusBadge learningCard={post.learningCard} />
           </div>
         )}
 

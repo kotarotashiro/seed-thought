@@ -5,7 +5,7 @@ import Link from "next/link";
 import { PostFilters } from "@/components/posts/PostFilters";
 import { PostMediaGrid, parsePostMedia } from "@/components/posts/PostMediaGrid";
 import { PostChatModal } from "@/components/posts/PostChatModal";
-import { PostTypeBadge, SavedTypeBadge, Badge } from "@/components/ui/Badge";
+import { PostTypeBadge, SavedTypeBadge, Badge, LearningStatusBadge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import {
@@ -18,6 +18,7 @@ import {
   CheckSquare,
   Square,
   MessageCircle,
+  BookOpen,
 } from "lucide-react";
 
 interface Author {
@@ -44,6 +45,7 @@ interface PostListItem {
   } | null;
   threadPosts?: { id: string }[];
   deepDiveSessions?: { id: string; status: string }[];
+  learningCard?: { id: string; status: string } | null;
 }
 
 function formatDate(value?: string | null) {
@@ -61,7 +63,6 @@ export default function PostsPage() {
   const [authors, setAuthors] = useState<Author[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Filters
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedGenre, setSelectedGenre] = useState("");
   const [selectedPostType, setSelectedPostType] = useState("");
@@ -70,12 +71,9 @@ export default function PostsPage() {
   const [selectedSort, setSelectedSort] = useState("savedAt_desc");
   const [selectedAuthor, setSelectedAuthor] = useState("");
 
-  // Selection state
   const [selectMode, setSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkDeleting, setBulkDeleting] = useState(false);
-
-  // Chat modal state
   const [chatPost, setChatPost] = useState<PostListItem | null>(null);
 
   const loadPosts = async (showLoading = true) => {
@@ -184,7 +182,6 @@ export default function PostsPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex min-w-0 items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-accent-light flex items-center justify-center">
@@ -230,7 +227,6 @@ export default function PostsPage() {
         </div>
       </div>
 
-      {/* Filters */}
       <PostFilters
         genres={genres}
         authors={authors}
@@ -250,7 +246,6 @@ export default function PostsPage() {
         onSearchChange={setSearchQuery}
       />
 
-      {/* Posts */}
       {loading ? (
         <div className="space-y-3">
           {[1, 2, 3, 4, 5].map((i) => (
@@ -293,7 +288,6 @@ export default function PostsPage() {
                 </div>
               )}
 
-              {/* Author row */}
               <div className="mb-4 flex items-start gap-3">
                 <div className="h-10 w-10 flex-shrink-0 overflow-hidden rounded-full bg-accent-light flex items-center justify-center">
                   {post.authorAvatarUrl ? (
@@ -312,7 +306,6 @@ export default function PostsPage() {
                 </div>
               </div>
 
-              {/* Content */}
               {(() => {
                 const urlCard = post.urlCardJson ? (() => { try { return JSON.parse(post.urlCardJson); } catch { return null; } })() : null;
                 const isUrlOnly = /^https?:\/\/\S+$/.test(post.text.trim());
@@ -345,7 +338,6 @@ export default function PostsPage() {
               )}
               <PostMediaGrid media={parsePostMedia(post.mediaJson)} sourceUrl={post.sourceUrl} />
 
-              {/* Footer */}
               <div className="mt-auto space-y-3 pt-3">
                 <div className="flex flex-wrap items-center gap-1.5">
                   {post.classification && (
@@ -368,6 +360,7 @@ export default function PostsPage() {
                   ) : (
                     <Badge variant="warning">未消化</Badge>
                   )}
+                  <LearningStatusBadge learningCard={post.learningCard} />
                   {(post.threadPosts?.length ?? 0) > 0 && (
                     <Badge variant="success">
                       ツリー {(post.threadPosts?.length ?? 0) + 1}投稿
@@ -380,6 +373,11 @@ export default function PostsPage() {
                     <Button size="sm" className="w-full">
                       深掘る
                       <ArrowRight className="w-4 h-4 ml-1" />
+                    </Button>
+                  </Link>
+                  <Link href={`/posts/${post.id}/learning`}>
+                    <Button variant="ghost" size="sm" title="学ぶ">
+                      <BookOpen className="w-4 h-4" />
                     </Button>
                   </Link>
                   <Button
@@ -412,7 +410,6 @@ export default function PostsPage() {
         </div>
       )}
 
-      {/* Chat modal */}
       {chatPost && <PostChatModal post={chatPost} onClose={() => setChatPost(null)} />}
     </div>
   );

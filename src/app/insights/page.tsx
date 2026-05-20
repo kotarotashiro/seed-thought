@@ -98,7 +98,12 @@ export default function InsightsPage() {
     }
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      void load();
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, []);
 
   return (
     <div className="space-y-6">

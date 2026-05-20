@@ -44,12 +44,12 @@ export function ModeSelectCard({ mode, selected, onClick, recommended }: ModeSel
         </div>
         <div>
           <h3 className="text-base font-bold text-text mb-1">
-            {isThought ? "考える：思考レンズ" : "学ぶ：厳密学習"}
+            {isThought ? "考える：思考レンズ" : "学ぶ：知識資産化"}
           </h3>
           <p className="text-sm text-text-secondary leading-relaxed">
             {isThought
               ? "本質・構造・価値観・反論を考える。抽象的な投稿、視点系の投稿におすすめ。"
-              : "AIが先生役になり、投稿を教材として基礎・仕組み・具体例・実務での使い方を教えます。"}
+              : "投稿をノウハウ・手順・応用アイデア・マニュアル・図解構成に変換します。"}
           </p>
         </div>
       </div>

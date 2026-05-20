@@ -45,6 +45,21 @@ export default function ModeSelectPage({ params }: { params: Promise<{ postId: s
     setCreating(true);
 
     try {
+      if (selectedMode === "learning_lesson") {
+        const res = await fetch(`/api/posts/${postId}/learning`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+        });
+
+        if (!res.ok) {
+          const data = await res.json().catch(() => null);
+          throw new Error(data?.error || "Learning card creation failed");
+        }
+
+        router.push(`/posts/${postId}/learning`);
+        return;
+      }
+
       const res = await fetch("/api/deep-dive/sessions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -57,8 +72,7 @@ export default function ModeSelectPage({ params }: { params: Promise<{ postId: s
       }
 
       const session = await res.json();
-      const path = selectedMode === "thought_lens" ? "thought" : "learning";
-      router.push(`/deep-dive/${session.id}/${path}`);
+      router.push(`/deep-dive/${session.id}/thought`);
     } catch (error) {
       console.error("Failed to create session:", error);
       alert(error instanceof Error ? error.message : "セッションの作成に失敗しました");
@@ -124,7 +138,7 @@ export default function ModeSelectPage({ params }: { params: Promise<{ postId: s
             <Sparkles className="w-5 h-5 text-accent flex-shrink-0" />
             <div>
               <p className="text-sm font-medium text-accent mb-1">
-                AIのおすすめ：{recommendedMode === "thought_lens" ? "思考レンズ" : "学習レッスン"}
+                AIのおすすめ：{recommendedMode === "thought_lens" ? "思考レンズ" : "知識資産化"}
               </p>
               <p className="text-sm text-text-secondary">
                 {post.classification.recommendReason}

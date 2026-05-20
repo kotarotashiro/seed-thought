@@ -8,14 +8,25 @@ import type {
   GeneratedDeepDiveSessionResult,
   GenerateOutputInput,
   GeneratedOutputResult,
+  LearningOutput,
   PostContext,
   PostSummaryForSearch,
   PostSummaryForTrend,
   SemanticSearchResult,
+  SourcePostForLearning,
   TranslateTextInput,
   TrendInsight,
 } from "./types";
-import { buildChatPrompt, buildClassifyPrompt, buildDeepDivePrompt, buildOutputPrompt, buildSemanticSearchPrompt, buildTranslatePrompt, buildTrendAnalysisPrompt } from "./prompts";
+import {
+  buildChatPrompt,
+  buildClassifyPrompt,
+  buildDeepDivePrompt,
+  buildLearningPrompt,
+  buildOutputPrompt,
+  buildSemanticSearchPrompt,
+  buildTranslatePrompt,
+  buildTrendAnalysisPrompt,
+} from "./prompts";
 
 function getClient(): OpenAI {
   const apiKey = process.env.OPENAI_API_KEY;
@@ -59,6 +70,12 @@ export const openaiProvider: AiProvider = {
     const prompt = buildTranslatePrompt(input);
     const result = await callOpenAI(prompt);
     return (JSON.parse(result) as { translatedText: string }).translatedText;
+  },
+
+  async generateLearningCard(input: SourcePostForLearning): Promise<LearningOutput> {
+    const prompt = buildLearningPrompt(input);
+    const result = await callOpenAI(prompt);
+    return JSON.parse(result) as LearningOutput;
   },
 
   async generateDeepDiveSession(input: GenerateDeepDiveSessionInput): Promise<GeneratedDeepDiveSessionResult> {
