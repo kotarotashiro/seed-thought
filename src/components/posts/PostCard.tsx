@@ -105,8 +105,9 @@ export function PostCard({
 
   const isUrlOnly = URL_ONLY_RE.test(post.text.trim());
   const articleUrl = isUrlOnly ? post.text.trim() : null;
-  const expandedUrl = getExpandedUrl(post.urlCardJson);
-  const isXArticle = expandedUrl ? X_ARTICLE_RE.test(expandedUrl) : false;
+  const initialExpandedUrl = getExpandedUrl(post.urlCardJson);
+  const [resolvedUrl, setResolvedUrl] = useState<string | null>(initialExpandedUrl);
+  const isXArticle = resolvedUrl ? X_ARTICLE_RE.test(resolvedUrl) : false;
 
   useEffect(() => {
     if (!isUrlOnly || article !== null || autoFetchedRef.current) return;
@@ -126,8 +127,9 @@ export function PostCard({
     setArticleLoading(true);
     fetch(`/api/fetch-article?url=${encodeURIComponent(fetchUrl)}`)
       .then(r => r.json())
-      .then((data: Partial<ArticlePreview> & { error?: string }) => {
-        if (data.error) return;
+      .then((data: Partial<ArticlePreview> & { error?: string; isXArticle?: boolean }) => {
+        if (data.finalUrl) setResolvedUrl(data.finalUrl);
+        if (data.error || data.isXArticle) return;
         const cleanTitle = isUrlLikeText(data.title) ? null : (data.title ?? null);
         const cleanDescription = isUrlLikeText(data.description) ? null : (data.description ?? null);
         if (cleanTitle || cleanDescription) {
@@ -159,8 +161,9 @@ export function PostCard({
 
     try {
       const res = await fetch(`/api/fetch-article?url=${encodeURIComponent(fetchUrl)}`);
-      const data = (await res.json()) as Partial<ArticlePreview> & { error?: string };
-      if (data.error) return;
+      const data = (await res.json()) as Partial<ArticlePreview> & { error?: string; isXArticle?: boolean };
+      if (data.finalUrl) setResolvedUrl(data.finalUrl);
+      if (data.error || data.isXArticle) return;
       const cleanTitle = isUrlLikeText(data.title) ? null : (data.title ?? null);
       const cleanDescription = isUrlLikeText(data.description) ? null : (data.description ?? null);
       if (cleanTitle || cleanDescription) {
@@ -269,9 +272,9 @@ export function PostCard({
                 <Loader2 className="w-3.5 h-3.5 animate-spin flex-shrink-0" />
                 <span>記事を読み込み中...</span>
               </div>
-            ) : isXArticle ? (
+            ) : isXArticle && resolvedUrl ? (
               <a
-                href={expandedUrl!}
+                href={resolvedUrl}
                 target="_blank"
                 rel="noreferrer"
                 className="flex items-center gap-2 text-xs text-text-secondary py-2 px-3 rounded-xl border border-border hover:border-accent/40 transition-colors"

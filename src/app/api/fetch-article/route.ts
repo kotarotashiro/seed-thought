@@ -182,6 +182,27 @@ async function fetchWithHtml(url: string): Promise<ArticleResult> {
   }
 }
 
+async function resolveRedirect(rawUrl: string): Promise<string> {
+  // Only resolve short-URL hosts to avoid wasteful HEAD calls
+  if (!/^https?:\/\/(t\.co|bit\.ly|tinyurl\.com|buff\.ly|ow\.ly)\//i.test(rawUrl)) {
+    return rawUrl;
+  }
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 5000);
+    const res = await fetch(rawUrl, {
+      method: "HEAD",
+      redirect: "follow",
+      headers: { "User-Agent": "Mozilla/5.0 (compatible; SeedThought/1.0)" },
+      signal: controller.signal,
+    });
+    clearTimeout(timer);
+    return res.url || rawUrl;
+  } catch {
+    return rawUrl;
+  }
+}
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const rawUrl = searchParams.get("url");
@@ -190,27 +211,43 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Invalid URL" }, { status: 400 });
   }
 
+  // Resolve t.co / short URLs to their final destination so the client
+  // can identify X Articles and Grok gets the real article URL.
+  const resolvedUrl = await resolveRedirect(rawUrl);
+
+  // For X Articles, Grok cannot fetch body content via live search.
+  // Skip Grok and return early with the resolved URL so client shows
+  // an "open in X" affordance instead of looping on failed fetches.
+  if (X_ARTICLE_RE.test(resolvedUrl)) {
+    return NextResponse.json({
+      finalUrl: resolvedUrl,
+      title: null,
+      description: null,
+      image: null,
+      isXArticle: true,
+    });
+  }
+
   const grokKey = getGrokApiKey();
 
   try {
     if (grokKey) {
-      const result = await fetchWithGrok(rawUrl);
-      return NextResponse.json(result);
+      const result = await fetchWithGrok(resolvedUrl);
+      return NextResponse.json({ ...result, finalUrl: resolvedUrl });
     } else {
-      const result = await fetchWithHtml(rawUrl);
+      const result = await fetchWithHtml(resolvedUrl);
       return NextResponse.json(result);
     }
   } catch (err) {
-    // If Grok failed, try HTML fallback before giving up
     if (grokKey) {
       try {
-        const result = await fetchWithHtml(rawUrl);
+        const result = await fetchWithHtml(resolvedUrl);
         return NextResponse.json(result);
       } catch {
-        // Both failed
+        // both failed
       }
     }
     const msg = err instanceof Error ? err.message : "fetch failed";
-    return NextResponse.json({ error: msg }, { status: 502 });
+    return NextResponse.json({ error: msg, finalUrl: resolvedUrl }, { status: 502 });
   }
 }
