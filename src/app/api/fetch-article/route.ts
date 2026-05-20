@@ -71,6 +71,8 @@ async function fetchWithGrok(url: string): Promise<ArticleResult> {
     };
     const content = data.choices?.[0]?.message?.content || "";
 
+    console.log(`[fetch-article] Grok response for ${url}:`, content.slice(0, 500));
+
     const jsonMatch = content.match(/\{[\s\S]*?\}/);
     if (jsonMatch) {
       try {
@@ -85,12 +87,18 @@ async function fetchWithGrok(url: string): Promise<ArticleResult> {
       }
     }
 
-    // Fallback: use raw content only if it's not just a URL
+    // Fallback: use raw content only if it has meaningful text (not just URL or JSON)
     const fallback = content.trim().slice(0, 300);
+    const looksUseless =
+      !fallback ||
+      isUrlLike(fallback) ||
+      fallback.startsWith("{") ||
+      fallback.startsWith("[") ||
+      /^https?:\/\//.test(fallback); // starts with URL
     return {
       finalUrl: url,
       title: null,
-      description: fallback && !isUrlLike(fallback) ? fallback : null,
+      description: looksUseless ? null : fallback,
       image: null,
     };
   } catch (err) {

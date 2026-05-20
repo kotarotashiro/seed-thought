@@ -61,9 +61,18 @@ interface PostCardProps {
 }
 
 const URL_ONLY_RE = /^https?:\/\/\S+$/;
+const X_ARTICLE_RE = /(?:x|twitter)\.com\/i\/article\//i;
 
 function isUrlLikeText(s: string | null | undefined): boolean {
   return !!s && URL_ONLY_RE.test(s.trim());
+}
+
+function getExpandedUrl(urlCardJson?: string | null): string | null {
+  if (!urlCardJson) return null;
+  try {
+    const c = JSON.parse(urlCardJson) as { expandedUrl?: string };
+    return c.expandedUrl ?? null;
+  } catch { return null; }
 }
 
 export function PostCard({
@@ -92,6 +101,8 @@ export function PostCard({
 
   const isUrlOnly = URL_ONLY_RE.test(post.text.trim());
   const articleUrl = isUrlOnly ? post.text.trim() : null;
+  const expandedUrl = getExpandedUrl(post.urlCardJson);
+  const isXArticle = expandedUrl ? X_ARTICLE_RE.test(expandedUrl) : false;
 
   useEffect(() => {
     if (!isUrlOnly || article !== null || autoFetchedRef.current) return;
@@ -130,12 +141,26 @@ export function PostCard({
     e.stopPropagation();
     if (!articleUrl || articleLoading) return;
     setArticleLoading(true);
+
+    let fetchUrl = articleUrl;
+    if (post.urlCardJson) {
+      try {
+        const c = JSON.parse(post.urlCardJson) as { expandedUrl?: string };
+        if (c.expandedUrl) fetchUrl = c.expandedUrl;
+      } catch { /* ignore */ }
+    }
+
     try {
-      const res = await fetch(`/api/fetch-article?url=${encodeURIComponent(articleUrl)}`);
-      const data = await res.json();
-      setArticle(data);
+      const res = await fetch(`/api/fetch-article?url=${encodeURIComponent(fetchUrl)}`);
+      const data = (await res.json()) as Partial<ArticlePreview> & { error?: string };
+      if (data.error) return;
+      const cleanTitle = isUrlLikeText(data.title) ? null : (data.title ?? null);
+      const cleanDescription = isUrlLikeText(data.description) ? null : (data.description ?? null);
+      if (cleanTitle || cleanDescription) {
+        setArticle({ finalUrl: data.finalUrl ?? fetchUrl, title: cleanTitle, description: cleanDescription, image: data.image ?? null });
+      }
     } catch {
-      setArticle({ finalUrl: articleUrl, title: null, description: "記事を読み込めませんでした", image: null });
+      // silently fail; user can retry
     } finally {
       setArticleLoading(false);
     }
@@ -237,6 +262,18 @@ export function PostCard({
                 <Loader2 className="w-3.5 h-3.5 animate-spin flex-shrink-0" />
                 <span>記事を読み込み中...</span>
               </div>
+            ) : isXArticle ? (
+              <a
+                href={expandedUrl!}
+                target="_blank"
+                rel="noreferrer"
+                className="flex items-center gap-2 text-xs text-text-secondary py-2 px-3 rounded-xl border border-border hover:border-accent/40 transition-colors"
+                onClick={stop}
+              >
+                <Newspaper className="w-3.5 h-3.5 flex-shrink-0 text-accent" />
+                <span className="flex-1 truncate">X Article（Xアプリで開く）</span>
+                <ExternalLink className="w-3.5 h-3.5 flex-shrink-0" />
+              </a>
             ) : (
               <Button
                 variant="secondary"
