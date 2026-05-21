@@ -305,7 +305,7 @@ export default function KnowhowPage() {
                   )}
                 </div>
 
-                <p className="line-clamp-3 whitespace-pre-wrap text-sm leading-relaxed text-text-secondary">
+                <p className="whitespace-pre-wrap text-sm leading-relaxed text-text-secondary">
                   {card.summary}
                 </p>
 
@@ -314,7 +314,7 @@ export default function KnowhowPage() {
                     <Layers className="h-4 w-4 text-accent" />
                     <p className="text-sm font-medium text-text">中心洞察</p>
                   </div>
-                  <p className="line-clamp-2 text-sm leading-relaxed text-text-secondary">
+                  <p className="text-sm leading-relaxed text-text-secondary">
                     {card.coreInsight}
                   </p>
                 </div>

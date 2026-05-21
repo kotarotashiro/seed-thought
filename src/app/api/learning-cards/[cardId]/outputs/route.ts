@@ -6,7 +6,7 @@ import { createFallbackOutput } from "@/lib/ai/fallback";
 import type { PostClassificationResult } from "@/lib/ai/types";
 import { buildPostTextWithThread } from "@/lib/posts/threadText";
 
-const VALID_OUTPUT_TYPES = ["x", "instagram", "note", "markdown_log"] as const;
+const VALID_OUTPUT_TYPES = ["x", "instagram", "note", "markdown_log", "seminar"] as const;
 type OutputType = (typeof VALID_OUTPUT_TYPES)[number];
 
 // POST /api/learning-cards/[cardId]/outputs

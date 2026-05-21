@@ -244,6 +244,7 @@ export async function buildOutputPrompt(input: GenerateOutputInput): Promise<str
     instagram: "Instagramカルーセル（スライド構成）",
     note: "note記事（1000-2000文字）",
     markdown_log: "Markdown学習ログ",
+    seminar: "セミナー（スライド構成＋台本）",
   };
 
   return `あなたはSNS・コンテンツライターです。
@@ -292,6 +293,14 @@ Instagramカルーセルの場合、contentJsonに以下を含めてください
 ${input.outputType === "x" ? "X投稿は280文字以内に収めてください。ハッシュタグは2-3個にしてください。" : ""}
 
 ${input.outputType === "markdown_log" ? "Markdownの学習ログとして、見出し・箇条書き・コードブロック等を活用してください。" : ""}
+
+${input.outputType === "seminar" ? `セミナー用に、以下をcontentJsonに含めてください:
+{
+  "slides": [
+    { "slideNumber": 1, "title": "スライドタイトル", "bullets": ["箇条書き1", "箇条書き2"], "speakerNote": "話す内容の台本" }
+  ]
+}
+スライドは8〜12枚程度、各スライドに1〜3分の台本を添えてください。` : ""}
 
 JSONのみ返してください。`;
 }

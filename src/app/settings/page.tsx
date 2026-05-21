@@ -465,30 +465,6 @@ export default function SettingsPage() {
                 ))}
               </div>
             </div>
-            <div>
-              <p className="mb-2 text-sm font-medium text-text">出力先</p>
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                {outputChannelOptions.map((channel) => (
-                  <label
-                    key={channel}
-                    className="flex items-center gap-2 rounded-xl border border-border bg-white px-3 py-2 text-sm text-text"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={profile.outputChannels.includes(channel)}
-                      onChange={() =>
-                        setProfile((current) => ({
-                          ...current,
-                          outputChannels: toggleListValue(current.outputChannels, channel),
-                        }))
-                      }
-                      className="h-4 w-4 accent-accent"
-                    />
-                    {channel}
-                  </label>
-                ))}
-              </div>
-            </div>
             <Select
               label="トーン"
               value={profile.tone}

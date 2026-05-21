@@ -341,7 +341,7 @@ export default function ConfirmPage({ params }: { params: Promise<{ postId: stri
             </p>
           </div>
         )}
-        <PostMediaGrid media={postMedia} className="max-h-[240px]" />
+        <PostMediaGrid media={postMedia} />
         {post.classification && (
           <div className="flex gap-2 mt-3">
             <PostTypeBadge type={post.classification.postType} />
@@ -432,28 +432,23 @@ export default function ConfirmPage({ params }: { params: Promise<{ postId: stri
 
       {/* AI Summary */}
       {post.classification && (
-        <div className="rounded-2xl border border-border bg-white pl-4 pr-5 py-4 border-l-4 border-l-accent">
+        <Card>
           <div className="flex items-start gap-3">
-            <Lightbulb className="w-5 h-5 text-accent flex-shrink-0 mt-0.5" />
+            <Lightbulb className="w-5 h-5 text-text-muted flex-shrink-0 mt-0.5" />
             <div>
-              <p className="text-sm font-medium text-accent mb-1">AIのざっくり要約</p>
-              <p className="text-sm text-text leading-relaxed">
+              <p className="text-sm font-semibold text-text mb-1">AIのざっくり要約</p>
+              <p className="text-sm text-text-secondary leading-relaxed">
                 {post.classification.summary}
               </p>
             </div>
           </div>
-        </div>
+        </Card>
       )}
 
       {/* Actions */}
       <div className="flex flex-col gap-3 sm:flex-row">
-        <Link href="/" className="flex-1">
-          <Button variant="secondary" className="w-full">
-            別の候補を見る
-          </Button>
-        </Link>
         <Link href={`/posts/${postId}/learning`} className="flex-1">
-          <Button variant="secondary" className="w-full">
+          <Button className="w-full">
             <BookOpen className="w-4 h-4 mr-2" />
             学ぶ
           </Button>
@@ -468,6 +463,15 @@ export default function ConfirmPage({ params }: { params: Promise<{ postId: stri
           <ArrowRight className="w-4 h-4 ml-2" />
         </Button>
       </div>
+
+      {/* Bottom back button */}
+      <button
+        onClick={safeBack}
+        className="flex items-center gap-1.5 text-sm text-text-secondary hover:text-text transition-colors"
+      >
+        <ArrowLeft className="w-4 h-4" />
+        戻る
+      </button>
     </div>
   );
 }

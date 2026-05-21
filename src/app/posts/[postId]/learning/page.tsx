@@ -43,7 +43,7 @@ const PROGRESS_STEPS = [
 
 const ARTICLE_PREVIEW_CHARS = 240;
 
-const OUTPUT_TYPES = ["x", "instagram", "note", "markdown_log"] as const;
+const OUTPUT_TYPES = ["x", "instagram", "note", "markdown_log", "seminar"] as const;
 
 const tabs = [
   "要約",
@@ -131,6 +131,7 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
   const [progressStep, setProgressStep] = useState(0);
 
   const [articleExpanded, setArticleExpanded] = useState(false);
+  const [postExpanded, setPostExpanded] = useState(false);
 
   const article = useMemo(() => (post ? parseArticleContent(post.urlCardJson) : null), [post]);
 
@@ -343,26 +344,15 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
             保存済み投稿を、実践マニュアルと応用メモに変換します。
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <LearningStatusBadge learningCard={card} />
-          {card && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleDelete}
-              disabled={deleting}
-              loading={deleting}
-              loadingLabel="削除中..."
-              title="学習カードを削除"
-            >
-              <Trash2 className="h-4 w-4 text-danger" />
-            </Button>
-          )}
-        </div>
+        <LearningStatusBadge learningCard={card} />
       </div>
 
       <Card>
-        <div className="mb-4 flex items-center gap-3">
+        <button
+          type="button"
+          onClick={() => setPostExpanded((v) => !v)}
+          className="flex w-full items-center gap-3 text-left"
+        >
           <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center overflow-hidden rounded-full bg-accent-light">
             {post.authorAvatarUrl ? (
               <img src={post.authorAvatarUrl} alt="" className="h-full w-full object-cover" />
@@ -370,98 +360,124 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
               <User className="h-5 w-5 text-accent" />
             )}
           </div>
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-medium text-text">{post.authorName || "手動追加"}</p>
             <p className="text-xs text-text-muted">
               {post.authorUsername ? `@${post.authorUsername}` : "手動入力"}
               {post.postedAt ? ` ・ ${new Date(post.postedAt).toLocaleDateString("ja-JP")}` : ""}
             </p>
           </div>
-        </div>
-        <p className="whitespace-pre-wrap text-sm leading-relaxed text-text">{post.text}</p>
-        {post.translatedText && (
-          <div className="mt-3 rounded-xl border border-border bg-border-light px-4 py-3">
-            <p className="mb-1 flex items-center gap-1 text-xs font-semibold text-text-secondary">
-              <Languages className="h-3.5 w-3.5" />
-              日本語訳
-            </p>
-            <p className="whitespace-pre-wrap text-sm leading-relaxed text-text-secondary">{post.translatedText}</p>
-          </div>
-        )}
-        {/* Article content (pasted by user or auto-fetched). Shown so the user
-            can verify the AI is using the same article text they expect. */}
-        {article && (article.pastedContent || article.title || article.description || article.isXArticle) && (
-          <div className="mt-3 space-y-2">
-            {article.isXArticle && article.expandedUrl && (
-              <a
-                href={article.expandedUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="flex items-center gap-2 rounded-xl border border-border px-3 py-2 text-xs text-text-secondary transition-colors hover:border-accent/40"
-              >
-                <Newspaper className="h-3.5 w-3.5 flex-shrink-0 text-accent" />
-                <span className="flex-1 truncate">X Article（Xアプリで開く）</span>
-                <ExternalLink className="h-3.5 w-3.5 flex-shrink-0" />
-              </a>
+          <span className="flex items-center gap-1 text-xs text-accent">
+            {postExpanded ? (
+              <>折りたたむ <ChevronUp className="h-3.5 w-3.5" /></>
+            ) : (
+              <>投稿を見る <ChevronDown className="h-3.5 w-3.5" /></>
             )}
-            {(article.pastedContent || article.title || article.description) && (
-              <div className="rounded-xl border border-border bg-border-light px-4 py-3">
-                <div className="mb-2 flex items-center justify-between gap-2">
-                  <p className="flex items-center gap-1.5 text-xs font-semibold text-text-secondary">
-                    <Newspaper className="h-3.5 w-3.5 text-accent" />
-                    {article.pastedContent ? "記事テキスト（貼り付け済み）" : "記事プレビュー"}
-                  </p>
-                  {article.pastedContent && article.pastedContent.length > ARTICLE_PREVIEW_CHARS && (
-                    <button
-                      type="button"
-                      onClick={() => setArticleExpanded((v) => !v)}
-                      className="flex items-center gap-1 text-xs text-accent hover:text-accent-hover"
-                    >
-                      {articleExpanded ? (
-                        <>
-                          折りたたむ
-                          <ChevronUp className="h-3 w-3" />
-                        </>
-                      ) : (
-                        <>
-                          全文を見る
-                          <ChevronDown className="h-3 w-3" />
-                        </>
-                      )}
-                    </button>
-                  )}
-                </div>
-                {article.title && (
-                  <p className="mb-1 text-sm font-medium text-text">{article.title}</p>
-                )}
-                {article.pastedContent ? (
-                  <p className="whitespace-pre-wrap text-sm leading-relaxed text-text">
-                    {articleExpanded || article.pastedContent.length <= ARTICLE_PREVIEW_CHARS
-                      ? article.pastedContent
-                      : article.pastedContent.slice(0, ARTICLE_PREVIEW_CHARS) + "…"}
-                  </p>
-                ) : article.description ? (
-                  <p className="text-sm leading-relaxed text-text-secondary">
-                    {article.description}
-                  </p>
-                ) : null}
+          </span>
+        </button>
+
+        {postExpanded && (
+          <div className="mt-4">
+            <p className="whitespace-pre-wrap text-sm leading-relaxed text-text">{post.text}</p>
+            {post.translatedText && (
+              <div className="mt-3 rounded-xl border border-border bg-border-light px-4 py-3">
+                <p className="mb-1 flex items-center gap-1 text-xs font-semibold text-text-secondary">
+                  <Languages className="h-3.5 w-3.5" />
+                  日本語訳
+                </p>
+                <p className="whitespace-pre-wrap text-sm leading-relaxed text-text-secondary">{post.translatedText}</p>
               </div>
             )}
+            {article && (article.pastedContent || article.title || article.description || article.isXArticle) && (
+              <div className="mt-3 space-y-2">
+                {article.isXArticle && article.expandedUrl && (
+                  <a
+                    href={article.expandedUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex items-center gap-2 rounded-xl border border-border px-3 py-2 text-xs text-text-secondary transition-colors hover:border-accent/40"
+                  >
+                    <Newspaper className="h-3.5 w-3.5 flex-shrink-0 text-accent" />
+                    <span className="flex-1 truncate">X Article（Xアプリで開く）</span>
+                    <ExternalLink className="h-3.5 w-3.5 flex-shrink-0" />
+                  </a>
+                )}
+                {(article.pastedContent || article.title || article.description) && (
+                  <div className="rounded-xl border border-border bg-border-light px-4 py-3">
+                    <div className="mb-2 flex items-center justify-between gap-2">
+                      <p className="flex items-center gap-1.5 text-xs font-semibold text-text-secondary">
+                        <Newspaper className="h-3.5 w-3.5 text-accent" />
+                        {article.pastedContent ? "記事テキスト（貼り付け済み）" : "記事プレビュー"}
+                      </p>
+                      {article.pastedContent && article.pastedContent.length > ARTICLE_PREVIEW_CHARS && (
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); setArticleExpanded((v) => !v); }}
+                          className="flex items-center gap-1 text-xs text-accent hover:text-accent-hover"
+                        >
+                          {articleExpanded ? (
+                            <>
+                              折りたたむ
+                              <ChevronUp className="h-3 w-3" />
+                            </>
+                          ) : (
+                            <>
+                              全文を見る
+                              <ChevronDown className="h-3 w-3" />
+                            </>
+                          )}
+                        </button>
+                      )}
+                    </div>
+                    {article.title && (
+                      <p className="mb-1 text-sm font-medium text-text">{article.title}</p>
+                    )}
+                    {article.pastedContent ? (
+                      <p className="whitespace-pre-wrap text-sm leading-relaxed text-text">
+                        {articleExpanded || article.pastedContent.length <= ARTICLE_PREVIEW_CHARS
+                          ? article.pastedContent
+                          : article.pastedContent.slice(0, ARTICLE_PREVIEW_CHARS) + "…"}
+                      </p>
+                    ) : article.description ? (
+                      <p className="text-sm leading-relaxed text-text-secondary">
+                        {article.description}
+                      </p>
+                    ) : null}
+                  </div>
+                )}
+              </div>
+            )}
+            <PostMediaGrid media={parsePostMedia(post.mediaJson)} />
+            {post.sourceUrl && (
+              <a
+                href={post.sourceUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="mt-4 inline-flex items-center gap-1.5 text-sm font-medium text-accent hover:text-accent-hover"
+              >
+                投稿URLを開く
+                <ExternalLink className="h-4 w-4" />
+              </a>
+            )}
           </div>
         )}
-        <PostMediaGrid media={parsePostMedia(post.mediaJson)} />
-        {post.sourceUrl && (
-          <a
-            href={post.sourceUrl}
-            target="_blank"
-            rel="noreferrer"
-            className="mt-4 inline-flex items-center gap-1.5 text-sm font-medium text-accent hover:text-accent-hover"
-          >
-            投稿URLを開く
-            <ExternalLink className="h-4 w-4" />
-          </a>
-        )}
       </Card>
+
+      {card && (
+        <div className="flex justify-end">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleDelete}
+            disabled={deleting}
+            loading={deleting}
+            loadingLabel="削除中..."
+          >
+            <Trash2 className="h-4 w-4 mr-1.5 text-danger" />
+            <span className="text-danger">学習カードを削除</span>
+          </Button>
+        </div>
+      )}
 
       {!card || !output ? (
         <Card>
@@ -728,7 +744,7 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
             <p className="mb-4 text-sm text-text-secondary">
               学習内容を発信用コンテンツに変換します。
             </p>
-            <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-5">
               {OUTPUT_TYPES.map((type) => (
                 <OutputTypeCard
                   key={type}

@@ -6,7 +6,7 @@ import { RecommendationModeSelect } from "@/components/posts/RecommendationModeS
 import { Sprout } from "lucide-react";
 
 export default function HomePage() {
-  const [mode, setMode] = useState("latest");
+  const [mode, setMode] = useState("random");
   const [genre, setGenre] = useState("");
   const [savedType, setSavedType] = useState("");
   const [genres, setGenres] = useState<string[]>([]);
@@ -130,7 +130,6 @@ export default function HomePage() {
             <PostCard
               key={post.id}
               post={post}
-              showRecommendReason
             />
           ))}
         </div>
