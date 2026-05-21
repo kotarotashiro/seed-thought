@@ -53,8 +53,6 @@ const themeOptions = [
   "業務効率化",
 ];
 
-const outputChannelOptions = ["X", "Instagram", "note", "ブログ", "セミナー資料", "チラシ"];
-
 const toneOptions = [
   "やさしく、実用的で、少し本音感のある文章",
   "短く、わかりやすく、行動につながる文章",
