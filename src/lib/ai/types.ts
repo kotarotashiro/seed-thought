@@ -4,6 +4,8 @@ export interface ClassifyPostInput {
   text: string;
   authorName?: string | null;
   authorUsername?: string | null;
+  /** Optional article body (e.g. user-pasted X Article text or fetched URL content) */
+  articleContent?: string;
 }
 
 export interface TranslateTextInput {

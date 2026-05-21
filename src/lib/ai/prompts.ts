@@ -28,6 +28,9 @@ export async function buildClassifyPrompt(input: ClassifyPostInput): Promise<str
 ## 投稿本文
 ${input.text}
 
+${input.articleContent ? `## 投稿が指すリンク先記事の本文（要約・分類はこちらを優先）
+${input.articleContent}
+` : ""}
 ${input.authorName ? `投稿者: ${input.authorName}` : ""}
 ${input.authorUsername ? `アカウント: @${input.authorUsername}` : ""}
 

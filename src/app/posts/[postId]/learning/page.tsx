@@ -15,6 +15,8 @@ import {
   ArrowLeft,
   BookOpen,
   CheckCircle2,
+  ChevronDown,
+  ChevronUp,
   Copy,
   ExternalLink,
   FileText,
@@ -28,6 +30,8 @@ import {
   Trash2,
   User,
 } from "lucide-react";
+
+const ARTICLE_PREVIEW_CHARS = 240;
 
 const OUTPUT_TYPES = ["x", "instagram", "note", "markdown_log"] as const;
 
@@ -111,6 +115,8 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
 
   // Delete state
   const [deleting, setDeleting] = useState(false);
+
+  const [articleExpanded, setArticleExpanded] = useState(false);
 
   const article = useMemo(() => (post ? parseArticleContent(post.urlCardJson) : null), [post]);
 
@@ -349,9 +355,9 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
         </div>
         <p className="whitespace-pre-wrap text-sm leading-relaxed text-text">{post.text}</p>
         {post.translatedText && (
-          <div className="mt-3 rounded-xl border border-accent/10 bg-accent-subtle px-4 py-3">
-            <p className="mb-1 text-xs font-medium text-accent">日本語訳</p>
-            <p className="whitespace-pre-wrap text-sm leading-relaxed text-text">{post.translatedText}</p>
+          <div className="mt-3 rounded-xl border border-border bg-border-light px-4 py-3">
+            <p className="mb-1 text-xs font-medium text-text-muted">日本語訳</p>
+            <p className="whitespace-pre-wrap text-sm leading-relaxed text-text-secondary">{post.translatedText}</p>
           </div>
         )}
         {/* Article content (pasted by user or auto-fetched). Shown so the user
@@ -372,16 +378,39 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
             )}
             {(article.pastedContent || article.title || article.description) && (
               <div className="rounded-xl border border-border bg-border-light px-4 py-3">
-                <p className="mb-2 flex items-center gap-1.5 text-xs font-medium text-text-muted">
-                  <Newspaper className="h-3.5 w-3.5 text-accent" />
-                  {article.pastedContent ? "記事テキスト（貼り付け済み）" : "記事プレビュー"}
-                </p>
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <p className="flex items-center gap-1.5 text-xs font-medium text-text-muted">
+                    <Newspaper className="h-3.5 w-3.5 text-accent" />
+                    {article.pastedContent ? "記事テキスト（貼り付け済み）" : "記事プレビュー"}
+                  </p>
+                  {article.pastedContent && article.pastedContent.length > ARTICLE_PREVIEW_CHARS && (
+                    <button
+                      type="button"
+                      onClick={() => setArticleExpanded((v) => !v)}
+                      className="flex items-center gap-1 text-xs text-accent hover:text-accent-hover"
+                    >
+                      {articleExpanded ? (
+                        <>
+                          折りたたむ
+                          <ChevronUp className="h-3 w-3" />
+                        </>
+                      ) : (
+                        <>
+                          全文を見る
+                          <ChevronDown className="h-3 w-3" />
+                        </>
+                      )}
+                    </button>
+                  )}
+                </div>
                 {article.title && (
                   <p className="mb-1 text-sm font-medium text-text">{article.title}</p>
                 )}
                 {article.pastedContent ? (
                   <p className="whitespace-pre-wrap text-sm leading-relaxed text-text">
-                    {article.pastedContent}
+                    {articleExpanded || article.pastedContent.length <= ARTICLE_PREVIEW_CHARS
+                      ? article.pastedContent
+                      : article.pastedContent.slice(0, ARTICLE_PREVIEW_CHARS) + "…"}
                   </p>
                 ) : article.description ? (
                   <p className="text-sm leading-relaxed text-text-secondary">

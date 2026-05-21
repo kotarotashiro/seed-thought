@@ -11,47 +11,18 @@ import {
   AlertCircle,
   ArrowLeft,
   ArrowRight,
-  Brain,
   BookOpen,
+  ChevronDown,
+  ChevronUp,
   ExternalLink,
   GitBranch,
   Lightbulb,
   Newspaper,
   User,
-  Zap,
 } from "lucide-react";
 
 const X_ARTICLE_RE = /(?:x|twitter)\.com\/i\/article\//i;
-
-function buildGains(post: {
-  classification?: {
-    postType: string;
-    primaryCategory: string;
-    summary: string;
-    recommendReason: string;
-  } | null;
-  learningCard?: { id: string; status: string } | null;
-}) {
-  const category = post.classification?.primaryCategory || "このテーマ";
-  const summary = post.classification?.summary || "投稿の中心テーマ";
-  const reason = post.classification?.recommendReason || "自分の仕事や発信に置き換える視点";
-
-  if (post.classification?.postType === "learning") {
-    return [
-      { icon: BookOpen, label: "学ぶテーマ", description: summary },
-      { icon: Lightbulb, label: "背景知識", description: `${category}の前提や用語を整理できます` },
-      { icon: Zap, label: "実務の型", description: reason },
-      { icon: ArrowRight, label: "次の一手", description: "自分の作業で試す手順に落とし込めます" },
-    ];
-  }
-
-  return [
-    { icon: Brain, label: "主張の核", description: summary },
-    { icon: Lightbulb, label: "前提の整理", description: `${category}で成り立つ条件を考えられます` },
-    { icon: Zap, label: "反論と条件", description: "どこまで使える考え方か見極められます" },
-    { icon: ArrowRight, label: "発信への転用", description: reason },
-  ];
-}
+const ARTICLE_PREVIEW_CHARS = 240;
 
 export default function ConfirmPage({ params }: { params: Promise<{ postId: string }> }) {
   const { postId } = use(params);
@@ -65,6 +36,7 @@ export default function ConfirmPage({ params }: { params: Promise<{ postId: stri
   const [selectedThreadIds, setSelectedThreadIds] = useState<string[]>([]);
   const [threadMessage, setThreadMessage] = useState<string | null>(null);
   const [threadError, setThreadError] = useState<string | null>(null);
+  const [articleExpanded, setArticleExpanded] = useState(false);
 
   const loadPost = async () => {
     try {
@@ -201,7 +173,6 @@ export default function ConfirmPage({ params }: { params: Promise<{ postId: stri
     );
   }
 
-  const gains = buildGains(post);
   const threadPosts = post.threadPosts || [];
   const canFetchThread = post.source === "x" && post.sourcePostId;
   const postMedia = parsePostMedia(post.mediaJson);
@@ -221,7 +192,7 @@ export default function ConfirmPage({ params }: { params: Promise<{ postId: stri
       <div>
         <h1 className="mb-2 text-xl font-bold text-text sm:text-2xl">この投稿を深掘る？</h1>
         <p className="text-sm text-text-secondary">
-          始める前に、投稿の内容と今回得られそうなものを確認します。
+          始める前に、投稿の内容を確認します。
         </p>
       </div>
 
@@ -317,9 +288,32 @@ export default function ConfirmPage({ params }: { params: Promise<{ postId: stri
                 ) : null}
                 {pastedContent && (
                   <div className="mt-3 rounded-xl border border-border bg-border-light px-4 py-3">
-                    <p className="mb-2 text-xs font-medium text-text-muted">記事テキスト（貼り付け済み）</p>
+                    <div className="mb-2 flex items-center justify-between gap-2">
+                      <p className="text-xs font-medium text-text-muted">記事テキスト（貼り付け済み）</p>
+                      {pastedContent.length > ARTICLE_PREVIEW_CHARS && (
+                        <button
+                          type="button"
+                          onClick={() => setArticleExpanded((v) => !v)}
+                          className="flex items-center gap-1 text-xs text-accent hover:text-accent-hover"
+                        >
+                          {articleExpanded ? (
+                            <>
+                              折りたたむ
+                              <ChevronUp className="h-3 w-3" />
+                            </>
+                          ) : (
+                            <>
+                              全文を見る
+                              <ChevronDown className="h-3 w-3" />
+                            </>
+                          )}
+                        </button>
+                      )}
+                    </div>
                     <p className="whitespace-pre-wrap text-sm leading-relaxed text-text">
-                      {pastedContent}
+                      {articleExpanded || pastedContent.length <= ARTICLE_PREVIEW_CHARS
+                        ? pastedContent
+                        : pastedContent.slice(0, ARTICLE_PREVIEW_CHARS) + "…"}
                     </p>
                   </div>
                 )}
@@ -331,9 +325,9 @@ export default function ConfirmPage({ params }: { params: Promise<{ postId: stri
           );
         })()}
         {post.translatedText && (
-          <div className="mt-3 rounded-xl border border-accent/10 bg-accent-subtle px-4 py-3">
-            <p className="mb-1 text-xs font-medium text-accent">日本語訳</p>
-            <p className="whitespace-pre-wrap text-sm leading-relaxed text-text">
+          <div className="mt-3 rounded-xl border border-border bg-border-light px-4 py-3">
+            <p className="mb-1 text-xs font-medium text-text-muted">日本語訳</p>
+            <p className="whitespace-pre-wrap text-sm leading-relaxed text-text-secondary">
               {post.translatedText}
             </p>
           </div>
@@ -441,25 +435,6 @@ export default function ConfirmPage({ params }: { params: Promise<{ postId: stri
           </div>
         </Card>
       )}
-
-      {/* Gains */}
-      <Card>
-        <h3 className="text-base font-bold text-text mb-4">この投稿から得られそうなもの</h3>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          {gains.map((gain) => {
-            const Icon = gain.icon;
-            return (
-              <div key={gain.label} className="bg-border-light rounded-xl p-4">
-                <div className="flex items-center gap-2 mb-1.5">
-                  <Icon className="w-4 h-4 text-accent" />
-                  <span className="text-sm font-medium text-text">{gain.label}</span>
-                </div>
-                <p className="text-xs text-text-secondary">{gain.description}</p>
-              </div>
-            );
-          })}
-        </div>
-      </Card>
 
       {/* Actions */}
       <div className="flex flex-col gap-3 sm:flex-row">

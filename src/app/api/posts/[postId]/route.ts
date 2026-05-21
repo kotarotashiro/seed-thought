@@ -6,6 +6,7 @@ import {
   isWeakClassification,
 } from "@/lib/ai/fallback";
 import { needsJapaneseTranslation } from "@/lib/text/language";
+import { resolveArticleForAi } from "@/lib/posts/articleContent";
 
 // GET /api/posts/[postId]
 export async function GET(
@@ -56,11 +57,19 @@ export async function GET(
       const fallback = createFallbackClassification({ text: post.text });
       let classification = fallback;
 
+      // Pull article body (pasted or fetched) so AI classifies the actual
+      // article content rather than the bare URL.
+      const { description: articleContent } = await resolveArticleForAi(
+        post.urlCardJson,
+        post.text,
+      );
+
       try {
         classification = await getAiProvider().classifyPost({
           text: post.text,
           authorName: post.authorName,
           authorUsername: post.authorUsername,
+          articleContent,
         });
       } catch (error) {
         console.error("Post reclassification failed, using fallback:", error);
@@ -155,21 +164,42 @@ export async function PUT(
 
 // PATCH /api/posts/[postId]
 // Partial update — currently supports: urlCardJson
+// When urlCardJson is updated with newly-pasted article content, the post's
+// classification is cleared so the next GET reclassifies using the article
+// body (rather than the bare URL, which usually classifies as 不明).
 export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ postId: string }> }
 ) {
   const { postId } = await params;
   try {
-    const body = await request.json() as { urlCardJson?: string };
+    const body = (await request.json()) as { urlCardJson?: string };
     if (body.urlCardJson === undefined) {
       return NextResponse.json({ error: "更新するフィールドがありません" }, { status: 400 });
     }
+
+    // Detect whether the incoming urlCardJson includes user-pasted article
+    // content. If so, also wipe the existing classification so it will be
+    // regenerated next time the post is fetched, this time with the article
+    // body fed to the classify prompt.
+    let hasNewPastedContent = false;
+    try {
+      const incoming = JSON.parse(body.urlCardJson) as { pastedByUser?: boolean; pastedContent?: string };
+      if (incoming.pastedByUser && typeof incoming.pastedContent === "string" && incoming.pastedContent.trim().length > 0) {
+        hasNewPastedContent = true;
+      }
+    } catch { /* invalid JSON — fall through */ }
+
     await prisma.post.update({
       where: { id: postId },
       data: { urlCardJson: body.urlCardJson },
     });
-    return NextResponse.json({ success: true });
+
+    if (hasNewPastedContent) {
+      await prisma.postClassification.deleteMany({ where: { postId } });
+    }
+
+    return NextResponse.json({ success: true, reclassifyOnNextGet: hasNewPastedContent });
   } catch (error) {
     console.error("Failed to patch post:", error);
     return NextResponse.json({ error: "投稿の更新に失敗しました" }, { status: 500 });
