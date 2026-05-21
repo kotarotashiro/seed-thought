@@ -411,7 +411,7 @@ export function createFallbackDeepDiveSession(input: {
 }
 
 export function createFallbackOutput(input: {
-  outputType: "x" | "instagram" | "note" | "markdown_log";
+  outputType: "x" | "instagram" | "note" | "markdown_log" | "seminar";
   postText: string;
   classification: PostClassificationResult;
   finalSummary?: string | null;

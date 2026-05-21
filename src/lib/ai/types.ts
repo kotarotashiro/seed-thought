@@ -112,7 +112,7 @@ export interface GeneratedDeepDiveSessionResult {
 }
 
 export interface GenerateOutputInput {
-  outputType: "x" | "instagram" | "note" | "markdown_log";
+  outputType: "x" | "instagram" | "note" | "markdown_log" | "seminar";
   postText: string;
   classification: PostClassificationResult;
   steps: {
