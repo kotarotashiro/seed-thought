@@ -125,6 +125,11 @@ export default function KnowhowPage() {
 
   async function handleDelete(ids: string[]) {
     if (ids.length === 0) return;
+    const msg =
+      ids.length === 1
+        ? "この学習カードを削除しますか？"
+        : `選択した${ids.length}件の学習カードを削除しますか？`;
+    if (!confirm(msg)) return;
     setDeleting(true);
     try {
       await fetch("/api/learning-cards", {

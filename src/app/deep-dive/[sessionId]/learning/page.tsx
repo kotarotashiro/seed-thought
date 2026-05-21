@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect, use, useCallback } from "react";
+import { useState, useEffect, use, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { useSafeBack } from "@/hooks/useSafeBack";
 import { Button } from "@/components/ui/Button";
 import { PostMiniCard } from "@/components/posts/PostMiniCard";
 import { StepProgress } from "@/components/deep-dive/StepProgress";
@@ -12,6 +13,7 @@ import { ArrowLeft, ArrowRight, BookOpen, Save } from "lucide-react";
 export default function LearningLessonPage({ params }: { params: Promise<{ sessionId: string }> }) {
   const { sessionId } = use(params);
   const router = useRouter();
+  const safeBack = useSafeBack();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [session, setSession] = useState<any>(null);
   const [currentStep, setCurrentStep] = useState(0);
@@ -19,6 +21,8 @@ export default function LearningLessonPage({ params }: { params: Promise<{ sessi
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [autoSaveStatus, setAutoSaveStatus] = useState<"idle" | "saved" | "unsaved">("idle");
+  const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     async function fetchSession() {
@@ -69,6 +73,28 @@ export default function LearningLessonPage({ params }: { params: Promise<{ sessi
       setSaving(false);
     }
   }, [session, currentStep, userNotes, sessionId]);
+
+  const handleNoteChange = useCallback((value: string, stepIdx: number) => {
+    setUserNotes((prev) => ({ ...prev, [stepIdx]: value }));
+    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    setAutoSaveStatus("unsaved");
+    autoSaveTimerRef.current = setTimeout(async () => {
+      if (!session) return;
+      const step = session.steps[stepIdx];
+      if (!step) return;
+      try {
+        await fetch(`/api/deep-dive/steps/${step.id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ userNote: value || null, completed: false }),
+        });
+        setAutoSaveStatus("saved");
+        setTimeout(() => setAutoSaveStatus("idle"), 2000);
+      } catch {
+        setAutoSaveStatus("idle");
+      }
+    }, 1000);
+  }, [session]);
 
   const handleNext = async () => {
     const nextStep = currentStep + 1;
@@ -121,7 +147,7 @@ export default function LearningLessonPage({ params }: { params: Promise<{ sessi
     <div className="mx-auto max-w-2xl space-y-5 sm:space-y-6">
       {/* Back */}
       <button
-        onClick={() => router.back()}
+        onClick={safeBack}
         className="flex items-center gap-1.5 text-sm text-text-secondary transition-colors hover:text-text"
       >
         <ArrowLeft className="h-4 w-4" />
@@ -183,16 +209,24 @@ export default function LearningLessonPage({ params }: { params: Promise<{ sessi
             </div>
           )}
 
-          <UserNoteBox
-            value={userNotes[currentStep] || ""}
-            onChange={(v) => setUserNotes((prev) => ({ ...prev, [currentStep]: v }))}
-            highlighted={isLastStep}
-            placeholder={
-              isComprehensionCheck
-                ? "理解チェックの感想や追加メモ..."
-                : "理解メモを書く（任意）"
-            }
-          />
+          <div className="relative">
+            <UserNoteBox
+              value={userNotes[currentStep] || ""}
+              onChange={(v) => handleNoteChange(v, currentStep)}
+              highlighted={isLastStep}
+              placeholder={
+                isComprehensionCheck
+                  ? "理解チェックの感想や追加メモ..."
+                  : "理解メモを書く（任意）"
+              }
+            />
+            {autoSaveStatus === "saved" && (
+              <p className="mt-1 text-right text-xs text-success">保存しました ✓</p>
+            )}
+            {autoSaveStatus === "unsaved" && (
+              <p className="mt-1 text-right text-xs text-text-muted">未保存…</p>
+            )}
+          </div>
         </div>
       )}
 
@@ -221,7 +255,7 @@ export default function LearningLessonPage({ params }: { params: Promise<{ sessi
             loadingLabel="保存中..."
           >
             <Save className="w-4 h-4 mr-1" />
-            保存して閉じる
+            中断して保存
           </Button>
           <Button onClick={handleNext} disabled={saving} loading={saving} loadingLabel="保存中...">
             {isLastStep ? "完了する" : "次へ"}

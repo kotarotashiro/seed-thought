@@ -2,6 +2,7 @@
 
 import { useState, useEffect, use } from "react";
 import { useRouter } from "next/navigation";
+import { useSafeBack } from "@/hooks/useSafeBack";
 import Link from "next/link";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -16,6 +17,7 @@ import {
   ChevronUp,
   ExternalLink,
   GitBranch,
+  Languages,
   Lightbulb,
   Newspaper,
   User,
@@ -27,6 +29,7 @@ const ARTICLE_PREVIEW_CHARS = 240;
 export default function ConfirmPage({ params }: { params: Promise<{ postId: string }> }) {
   const { postId } = use(params);
   const router = useRouter();
+  const safeBack = useSafeBack();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [post, setPost] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -181,7 +184,7 @@ export default function ConfirmPage({ params }: { params: Promise<{ postId: stri
     <div className="mx-auto max-w-2xl space-y-5 sm:space-y-6">
       {/* Back Button */}
       <button
-        onClick={() => router.back()}
+        onClick={safeBack}
         className="flex items-center gap-1.5 text-sm text-text-secondary hover:text-text transition-colors"
       >
         <ArrowLeft className="w-4 h-4" />
@@ -289,7 +292,10 @@ export default function ConfirmPage({ params }: { params: Promise<{ postId: stri
                 {pastedContent && (
                   <div className="mt-3 rounded-xl border border-border bg-border-light px-4 py-3">
                     <div className="mb-2 flex items-center justify-between gap-2">
-                      <p className="text-xs font-medium text-text-muted">記事テキスト（貼り付け済み）</p>
+                      <p className="flex items-center gap-1 text-xs font-semibold text-text-secondary">
+                        <Newspaper className="h-3.5 w-3.5 text-accent" />
+                        記事テキスト（貼り付け済み）
+                      </p>
                       {pastedContent.length > ARTICLE_PREVIEW_CHARS && (
                         <button
                           type="button"
@@ -326,13 +332,16 @@ export default function ConfirmPage({ params }: { params: Promise<{ postId: stri
         })()}
         {post.translatedText && (
           <div className="mt-3 rounded-xl border border-border bg-border-light px-4 py-3">
-            <p className="mb-1 text-xs font-medium text-text-muted">日本語訳</p>
+            <p className="mb-1 flex items-center gap-1 text-xs font-semibold text-text-secondary">
+              <Languages className="h-3.5 w-3.5" />
+              日本語訳
+            </p>
             <p className="whitespace-pre-wrap text-sm leading-relaxed text-text-secondary">
               {post.translatedText}
             </p>
           </div>
         )}
-        <PostMediaGrid media={postMedia} />
+        <PostMediaGrid media={postMedia} className="max-h-[240px]" />
         {post.classification && (
           <div className="flex gap-2 mt-3">
             <PostTypeBadge type={post.classification.postType} />
@@ -423,7 +432,7 @@ export default function ConfirmPage({ params }: { params: Promise<{ postId: stri
 
       {/* AI Summary */}
       {post.classification && (
-        <Card className="bg-accent-subtle border-accent/10">
+        <div className="rounded-2xl border border-border bg-white pl-4 pr-5 py-4 border-l-4 border-l-accent">
           <div className="flex items-start gap-3">
             <Lightbulb className="w-5 h-5 text-accent flex-shrink-0 mt-0.5" />
             <div>
@@ -433,7 +442,7 @@ export default function ConfirmPage({ params }: { params: Promise<{ postId: stri
               </p>
             </div>
           </div>
-        </Card>
+        </div>
       )}
 
       {/* Actions */}

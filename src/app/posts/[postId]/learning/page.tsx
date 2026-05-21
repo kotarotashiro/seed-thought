@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, use } from "react";
 import { useRouter } from "next/navigation";
+import { useSafeBack } from "@/hooks/useSafeBack";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Badge, LearningStatusBadge } from "@/components/ui/Badge";
@@ -105,6 +106,7 @@ function SectionHeader({ icon: Icon, title }: { icon: typeof BookOpen; title: st
 export default function PostLearningPage({ params }: { params: Promise<{ postId: string }> }) {
   const { postId } = use(params);
   const router = useRouter();
+  const safeBack = useSafeBack();
   const [post, setPost] = useState<PostView | null>(null);
   const [card, setCard] = useState<LearningCardView | null>(null);
   const [activeTab, setActiveTab] = useState<TabKey>("要約");
@@ -324,7 +326,7 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
   return (
     <div className="mx-auto max-w-4xl space-y-5 sm:space-y-6">
       <button
-        onClick={() => router.back()}
+        onClick={safeBack}
         className="flex items-center gap-1.5 text-sm text-text-secondary transition-colors hover:text-text"
       >
         <ArrowLeft className="h-4 w-4" />
