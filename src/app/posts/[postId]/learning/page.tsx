@@ -18,6 +18,7 @@ import {
   CheckCircle2,
   ChevronDown,
   ChevronUp,
+  Clock,
   Copy,
   ExternalLink,
   FileText,
@@ -120,9 +121,14 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
 
   // SNS output state
   const [selectedOutput, setSelectedOutput] = useState<string | null>(null);
-  const [generatedOutput, setGeneratedOutput] = useState<{ title: string; content: string; contentJson?: Record<string, unknown> | null; warning?: string | null } | null>(null);
+  const [generatedOutput, setGeneratedOutput] = useState<{ id?: string; title: string; content: string; contentJson?: Record<string, unknown> | null; warning?: string | null } | null>(null);
   const [generatingOutput, setGeneratingOutput] = useState(false);
   const [outputError, setOutputError] = useState<string | null>(null);
+
+  // Output history
+  const [outputHistory, setOutputHistory] = useState<Array<{ id: string; outputType: string; title: string; content: string; contentJson: string | null; createdAt: string }>>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
 
   // Delete state
   const [deleting, setDeleting] = useState(false);
@@ -155,6 +161,9 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
       setPost(data.post || null);
       setCard(data.learningCard || null);
       setMemo(data.learningCard?.userMemo || "");
+      if (data.learningCard?.id) {
+        void loadOutputHistory(data.learningCard.id);
+      }
     } catch (loadError) {
       console.error("Failed to fetch learning card:", loadError);
       setError("学習カードの取得に失敗しました");
@@ -174,6 +183,9 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
         setPost(data.post || null);
         setCard(data.learningCard || null);
         setMemo(data.learningCard?.userMemo || "");
+        if (data.learningCard?.id) {
+          void loadOutputHistory(data.learningCard.id);
+        }
       } catch (loadError) {
         console.error("Failed to fetch learning card:", loadError);
         if (!cancelled) setError("学習カードの取得に失敗しました");
@@ -284,6 +296,19 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
     }
   };
 
+  const loadOutputHistory = async (cardId: string) => {
+    setHistoryLoading(true);
+    try {
+      const res = await fetch(`/api/learning-cards/${cardId}/outputs`);
+      const data = await res.json();
+      setOutputHistory(data.outputs || []);
+    } catch {
+      // ignore
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
   const handleGenerateOutput = async () => {
     if (!card || !selectedOutput) return;
     setGeneratingOutput(true);
@@ -299,6 +324,8 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
       if (!res.ok) throw new Error(data.error || "アウトプットの生成に失敗しました");
       setGeneratedOutput(data);
       if (data.warning) setOutputError(data.warning);
+      // Refresh history
+      await loadOutputHistory(card.id);
     } catch (genErr) {
       setOutputError(genErr instanceof Error ? genErr.message : "アウトプットの生成に失敗しました");
     } finally {
@@ -783,6 +810,48 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
               contentJson={generatedOutput.contentJson ?? null}
               outputType={selectedOutput || ""}
             />
+          )}
+
+          {/* Output history */}
+          {outputHistory.length > 0 && (
+            <Card>
+              <button
+                type="button"
+                onClick={() => setShowHistory((v) => !v)}
+                className="flex w-full items-center justify-between"
+              >
+                <div className="flex items-center gap-2">
+                  <Clock className="h-5 w-5 text-text-muted" />
+                  <h3 className="text-base font-bold text-text">生成履歴</h3>
+                  <span className="rounded-full bg-border-light px-2 py-0.5 text-xs text-text-secondary">{outputHistory.length}件</span>
+                </div>
+                {showHistory ? <ChevronUp className="h-4 w-4 text-text-muted" /> : <ChevronDown className="h-4 w-4 text-text-muted" />}
+              </button>
+
+              {showHistory && (
+                <div className="mt-4 space-y-3">
+                  {historyLoading ? (
+                    <div className="animate-pulse space-y-2">
+                      {[1, 2].map((i) => <div key={i} className="h-16 bg-border-light rounded-xl" />)}
+                    </div>
+                  ) : (
+                    outputHistory.map((item) => {
+                      const typeLabels: Record<string, string> = { x: "X投稿", instagram: "Instagram", note: "note", markdown_log: "Markdown", seminar: "セミナー" };
+                      const parsedJson = item.contentJson ? (() => { try { return JSON.parse(item.contentJson); } catch { return null; } })() : null;
+                      return (
+                        <OutputPreview
+                          key={item.id}
+                          title={`${typeLabels[item.outputType] ?? item.outputType} • ${new Date(item.createdAt).toLocaleDateString("ja-JP", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}`}
+                          content={item.content}
+                          contentJson={parsedJson}
+                          outputType={item.outputType}
+                        />
+                      );
+                    })
+                  )}
+                </div>
+              )}
+            </Card>
           )}
         </>
       )}

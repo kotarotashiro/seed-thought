@@ -53,6 +53,21 @@ model LearningCard {
   updatedAt    DateTime @updatedAt
 
   sourcePost Post @relation(fields: [sourcePostId], references: [id], onDelete: Cascade)
+  outputs    LearningCardOutput[]
+}
+
+model LearningCardOutput {
+  id             String   @id @default(cuid())
+  learningCardId String
+  outputType     String   // "x" | "instagram" | "note" | "markdown_log" | "seminar"
+  title          String
+  content        String
+  contentJson    String?  // JSON object
+  createdAt      DateTime @default(now())
+
+  learningCard LearningCard @relation(fields: [learningCardId], references: [id], onDelete: Cascade)
+
+  @@index([learningCardId])
 }
 
 model ThreadPost {

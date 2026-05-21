@@ -460,7 +460,6 @@ export default function ConfirmPage({ params }: { params: Promise<{ postId: stri
           className="flex-1"
         >
           深掘りを始める
-          <ArrowRight className="w-4 h-4 ml-2" />
         </Button>
       </div>
 

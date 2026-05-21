@@ -9,8 +9,30 @@ import { buildPostTextWithThread } from "@/lib/posts/threadText";
 const VALID_OUTPUT_TYPES = ["x", "instagram", "note", "markdown_log", "seminar"] as const;
 type OutputType = (typeof VALID_OUTPUT_TYPES)[number];
 
+// GET /api/learning-cards/[cardId]/outputs
+// List previously generated outputs for a learning card.
+export async function GET(
+  _request: Request,
+  { params }: { params: Promise<{ cardId: string }> }
+) {
+  const { cardId } = await params;
+  try {
+    const outputs = await prisma.learningCardOutput.findMany({
+      where: { learningCardId: cardId },
+      orderBy: { createdAt: "desc" },
+    });
+    return NextResponse.json({ outputs });
+  } catch (error) {
+    console.error("Failed to fetch learning card outputs:", error);
+    return NextResponse.json(
+      { error: getUserFacingError(error, "履歴の取得に失敗しました") },
+      { status: 500 }
+    );
+  }
+}
+
 // POST /api/learning-cards/[cardId]/outputs
-// Generate SNS/note output from a learning card's content.
+// Generate SNS/note output from a learning card's content and save to history.
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ cardId: string }> }
@@ -98,7 +120,18 @@ export async function POST(
         });
       });
 
-    return NextResponse.json({ ...result, warning });
+    // Save to history
+    const saved = await prisma.learningCardOutput.create({
+      data: {
+        learningCardId: cardId,
+        outputType,
+        title: result.title,
+        content: result.content,
+        contentJson: result.contentJson ? JSON.stringify(result.contentJson) : null,
+      },
+    });
+
+    return NextResponse.json({ ...result, id: saved.id, warning });
   } catch (error) {
     console.error("Failed to generate output from learning card:", error);
     return NextResponse.json(
