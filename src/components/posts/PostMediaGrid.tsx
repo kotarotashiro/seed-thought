@@ -28,16 +28,18 @@ export function parsePostMedia(mediaJson?: string | null): PostMediaItem[] {
 export function PostMediaGrid({
   media,
   sourceUrl,
+  className,
 }: {
   media: PostMediaItem[];
   sourceUrl?: string | null;
+  className?: string;
 }) {
   if (media.length === 0) return null;
 
   const isSingle = media.length === 1;
 
   return (
-    <div className={`mt-3 overflow-hidden rounded-xl ${isSingle ? "" : "grid grid-cols-2 gap-1"}`}>
+    <div className={`mt-3 overflow-hidden rounded-xl ${isSingle ? "" : "grid grid-cols-2 gap-1"} ${className ?? ""}`}>
       {media.slice(0, 4).map((item, index) => {
         const isVideo = item.type === "video" || item.type === "animated_gif";
         const previewSrc = item.previewUrl || item.url;

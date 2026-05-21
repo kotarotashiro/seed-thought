@@ -21,15 +21,24 @@ import {
   ExternalLink,
   FileText,
   Image as ImageIcon,
+  Languages,
   Layers,
   Lightbulb,
   ListChecks,
+  Loader2,
   Newspaper,
   Pencil,
   Sparkles,
   Trash2,
   User,
 } from "lucide-react";
+
+const PROGRESS_STEPS = [
+  "① 記事を読み込み中...",
+  "② 構造を抽出中...",
+  "③ 手順を生成中...",
+  "④ マニュアル化中...",
+] as const;
 
 const ARTICLE_PREVIEW_CHARS = 240;
 
@@ -116,9 +125,23 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
   // Delete state
   const [deleting, setDeleting] = useState(false);
 
+  // Pseudo-progress state for generation
+  const [progressStep, setProgressStep] = useState(0);
+
   const [articleExpanded, setArticleExpanded] = useState(false);
 
   const article = useMemo(() => (post ? parseArticleContent(post.urlCardJson) : null), [post]);
+
+  useEffect(() => {
+    if (!generating) {
+      setProgressStep(0);
+      return;
+    }
+    const interval = setInterval(() => {
+      setProgressStep((prev) => Math.min(prev + 1, PROGRESS_STEPS.length - 1));
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [generating]);
 
   const output = useMemo(() => parseLearningOutput(card), [card]);
 
@@ -356,7 +379,10 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
         <p className="whitespace-pre-wrap text-sm leading-relaxed text-text">{post.text}</p>
         {post.translatedText && (
           <div className="mt-3 rounded-xl border border-border bg-border-light px-4 py-3">
-            <p className="mb-1 text-xs font-medium text-text-muted">日本語訳</p>
+            <p className="mb-1 flex items-center gap-1 text-xs font-semibold text-text-secondary">
+              <Languages className="h-3.5 w-3.5" />
+              日本語訳
+            </p>
             <p className="whitespace-pre-wrap text-sm leading-relaxed text-text-secondary">{post.translatedText}</p>
           </div>
         )}
@@ -379,7 +405,7 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
             {(article.pastedContent || article.title || article.description) && (
               <div className="rounded-xl border border-border bg-border-light px-4 py-3">
                 <div className="mb-2 flex items-center justify-between gap-2">
-                  <p className="flex items-center gap-1.5 text-xs font-medium text-text-muted">
+                  <p className="flex items-center gap-1.5 text-xs font-semibold text-text-secondary">
                     <Newspaper className="h-3.5 w-3.5 text-accent" />
                     {article.pastedContent ? "記事テキスト（貼り付け済み）" : "記事プレビュー"}
                   </p>
@@ -437,30 +463,56 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
 
       {!card || !output ? (
         <Card>
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          {generating ? (
             <div>
-              <h2 className="mb-1 text-base font-bold text-text">
-                {generating ? "学習カードを生成しています…" : error ? "学習カードを生成できませんでした" : "学習カードを準備中…"}
-              </h2>
-              <p className="text-sm text-text-secondary">
-                {error
-                  ? "もう一度試してください。"
-                  : "この投稿からノウハウ・手順・マニュアルを自動生成します。"}
-              </p>
+              <h2 className="mb-4 text-base font-bold text-text">学習カードを生成しています…</h2>
+              <div className="space-y-3">
+                {PROGRESS_STEPS.map((step, i) => (
+                  <div
+                    key={step}
+                    className={`flex items-center gap-3 text-sm ${
+                      i < progressStep
+                        ? "text-success"
+                        : i === progressStep
+                        ? "font-medium text-text"
+                        : "text-text-muted"
+                    }`}
+                  >
+                    {i < progressStep ? (
+                      <CheckCircle2 className="h-4 w-4 flex-shrink-0 text-success" />
+                    ) : i === progressStep ? (
+                      <Loader2 className="h-4 w-4 flex-shrink-0 animate-spin text-accent" />
+                    ) : (
+                      <div className="h-4 w-4 flex-shrink-0 rounded-full border-2 border-border-light" />
+                    )}
+                    {step}
+                  </div>
+                ))}
+              </div>
+              <p className="mt-4 text-xs text-text-muted">平均30秒前後かかります</p>
             </div>
-            <Button onClick={handleGenerate} loading={generating} loadingLabel="生成中..." className="w-full sm:w-auto">
-              <Sparkles className="mr-1.5 h-4 w-4" />
-              {error ? "再生成" : "学ぶ"}
-            </Button>
-          </div>
+          ) : (
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h2 className="mb-1 text-base font-bold text-text">
+                  {error ? "学習カードを生成できませんでした" : "学習カードを準備中…"}
+                </h2>
+                <p className="text-sm text-text-secondary">
+                  {error
+                    ? "もう一度試してください。"
+                    : "この投稿からノウハウ・手順・マニュアルを自動生成します。"}
+                </p>
+              </div>
+              <Button onClick={handleGenerate} loading={generating} loadingLabel="生成中..." className="w-full sm:w-auto">
+                <Sparkles className="mr-1.5 h-4 w-4" />
+                {error ? "再生成" : "学ぶ"}
+              </Button>
+            </div>
+          )}
         </Card>
       ) : (
         <>
           <div className="flex flex-col gap-3 sm:flex-row">
-            <Button onClick={handleSave} loading={saving} loadingLabel="保存中..." className="flex-1">
-              <CheckCircle2 className="mr-1.5 h-4 w-4" />
-              学習カードに保存
-            </Button>
             <Button variant="secondary" onClick={() => setActiveTab("画像生成プロンプト")} className="flex-1">
               <ImageIcon className="mr-1.5 h-4 w-4" />
               解説画像を生成
@@ -468,6 +520,10 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
             <Button variant="secondary" onClick={() => setActiveTab("マニュアル")} className="flex-1">
               <FileText className="mr-1.5 h-4 w-4" />
               マニュアルを見る
+            </Button>
+            <Button onClick={handleSave} loading={saving} loadingLabel="保存中..." className="flex-1">
+              <CheckCircle2 className="mr-1.5 h-4 w-4" />
+              学習カードに保存
             </Button>
           </div>
 
@@ -502,7 +558,10 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
           <Card>
             {activeTab === "要約" && (
               <div>
-                <SectionHeader icon={Sparkles} title={output.title} />
+                <SectionHeader icon={Sparkles} title="要約" />
+                {output.title && (
+                  <p className="mb-4 text-base font-semibold text-text">{output.title}</p>
+                )}
                 <div className="space-y-4">
                   <p className="whitespace-pre-wrap text-sm leading-relaxed text-text">{output.summary}</p>
                   <div className="grid gap-3 sm:grid-cols-2">
@@ -605,7 +664,7 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
 
             {activeTab === "図解構成" && (
               <div>
-                <SectionHeader icon={ImageIcon} title={output.diagramStructure.title} />
+                <SectionHeader icon={ImageIcon} title="図解構成" />
                 <div className="space-y-3">
                   {output.diagramStructure.sections.map((section, index) => (
                     <div key={`${section.heading}-${index}`} className="rounded-xl border border-border px-4 py-3">

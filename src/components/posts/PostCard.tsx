@@ -244,19 +244,26 @@ export function PostCard({
     <>
       <Card
         hoverable
-        className={`group flex flex-col cursor-pointer ${selectMode && selected ? "ring-2 ring-accent" : ""}`}
+        className={`group relative flex flex-col cursor-pointer ${
+          selectMode
+            ? selected
+              ? "ring-2 ring-accent"
+              : "ring-2 ring-dashed ring-accent/40 hover:ring-accent/60"
+            : ""
+        }`}
         onClick={handleCardClick}
       >
         {selectMode && (
-          <div className="-mt-1 mb-3 flex items-center gap-2">
+          <div className="absolute top-3 right-3 z-10">
             {selected ? (
-              <CheckSquare className="h-5 w-5 text-accent" />
+              <div className="flex h-7 w-7 items-center justify-center rounded-full bg-accent shadow-sm">
+                <CheckSquare className="h-4 w-4 text-white" />
+              </div>
             ) : (
-              <Square className="h-5 w-5 text-text-muted" />
+              <div className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-text-muted bg-white">
+                <Square className="h-3.5 w-3.5 text-text-muted" />
+              </div>
             )}
-            <span className="text-xs text-text-secondary">
-              {selected ? "選択中" : "クリックして選択"}
-            </span>
           </div>
         )}
 
@@ -289,8 +296,8 @@ export function PostCard({
         {/* Translation */}
         {post.translatedText && !isUrlOnly && (
           <div className="mb-4 rounded-xl border border-border bg-border-light px-3 py-2">
-            <p className="mb-0.5 text-xs font-medium text-text-muted">日本語訳</p>
-            <p className="text-xs leading-relaxed text-text-secondary">{post.translatedText}</p>
+            <p className="mb-0.5 text-xs font-semibold text-text-secondary">日本語訳</p>
+            <p className="line-clamp-2 text-xs leading-relaxed text-text-secondary">{post.translatedText}</p>
           </div>
         )}
 
@@ -314,7 +321,7 @@ export function PostCard({
                 {/* Pasted content preview */}
                 {pastedContent && !pasteOpen && (
                   <div className="relative rounded-xl border border-border bg-border-light px-3 py-2">
-                    <p className="text-xs leading-relaxed text-text-secondary line-clamp-4 whitespace-pre-wrap pr-7">
+                    <p className="line-clamp-3 whitespace-pre-wrap pr-7 text-xs leading-relaxed text-text-secondary">
                       {pastedContent}
                     </p>
                     <button
@@ -414,7 +421,7 @@ export function PostCard({
           </div>
         )}
 
-        <PostMediaGrid media={parsePostMedia(post.mediaJson)} sourceUrl={post.sourceUrl} />
+        <PostMediaGrid media={parsePostMedia(post.mediaJson)} sourceUrl={post.sourceUrl} className="max-h-[220px]" />
 
         {/* Classification Badges */}
         {post.classification && (
@@ -437,9 +444,9 @@ export function PostCard({
 
         {/* Recommend Reason */}
         {showRecommendReason && post.classification?.recommendReason && (
-          <div className="bg-accent-subtle rounded-xl px-4 py-3 mb-4">
-            <p className="text-xs font-medium text-accent mb-1">💡 おすすめ理由</p>
-            <p className="text-xs text-text-secondary leading-relaxed">
+          <div className="mb-4 rounded-xl bg-accent-subtle px-4 py-3">
+            <p className="mb-1 text-xs font-medium text-accent">💡 おすすめ理由</p>
+            <p className="line-clamp-2 text-xs leading-relaxed text-text-secondary">
               {post.classification.recommendReason}
             </p>
           </div>
