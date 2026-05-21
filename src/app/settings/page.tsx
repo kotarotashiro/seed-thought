@@ -380,7 +380,16 @@ export default function SettingsPage() {
               接続テスト
             </Button>
             {aiSettings.keySource === "ui" && (
-              <Button variant="ghost" onClick={() => handleSaveAi(true)} disabled={savingAi} className="w-full sm:w-auto">
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  if (confirm("保存済みAPIキーを削除しますか？この操作は元に戻せません。")) {
+                    void handleSaveAi(true);
+                  }
+                }}
+                disabled={savingAi}
+                className="w-full text-danger hover:text-danger sm:w-auto"
+              >
                 保存済みキーを削除
               </Button>
             )}

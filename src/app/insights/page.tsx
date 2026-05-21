@@ -23,6 +23,8 @@ interface InsightData {
   };
 }
 
+const badgeSizeClasses = ["text-base font-semibold px-4 py-2", "text-sm font-medium px-3 py-1.5", "text-sm px-3 py-1.5"];
+
 function InsightSection({
   title,
   icon: Icon,
@@ -40,9 +42,12 @@ function InsightSection({
         <Icon className={`w-5 h-5 ${color}`} />
         <h3 className="text-sm font-semibold text-text">{title}</h3>
       </div>
-      <div className="flex flex-wrap gap-2">
-        {items.map((item) => (
-          <span key={item} className="text-sm bg-border-light text-text-secondary px-3 py-1.5 rounded-full">
+      <div className="flex flex-wrap items-center gap-2">
+        {items.map((item, index) => (
+          <span
+            key={item}
+            className={`bg-border-light text-text-secondary rounded-full ${badgeSizeClasses[Math.min(index, badgeSizeClasses.length - 1)]}`}
+          >
             {item}
           </span>
         ))}
@@ -185,14 +190,16 @@ export default function InsightsPage() {
               <ArrowRight className="w-5 h-5 text-accent" />
               <h3 className="text-sm font-semibold text-text">次に学ぶとよいトピック</h3>
             </div>
-            <ul className="space-y-2">
-              {data.insight.recommendedNextTopics.map((topic) => (
-                <li key={topic} className="flex items-center gap-2 text-sm text-text">
-                  <span className="w-1.5 h-1.5 rounded-full bg-accent flex-shrink-0" />
-                  {topic}
+            <ol className="space-y-2">
+              {data.insight.recommendedNextTopics.map((topic, index) => (
+                <li key={topic} className="flex items-start gap-3 rounded-xl border border-border px-4 py-3">
+                  <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-accent-subtle text-xs font-bold text-accent">
+                    {index + 1}
+                  </span>
+                  <span className="text-sm text-text">{topic}</span>
                 </li>
               ))}
-            </ul>
+            </ol>
           </div>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">

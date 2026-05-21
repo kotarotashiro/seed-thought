@@ -17,6 +17,7 @@ import {
   Trash2,
   User,
   ExternalLink,
+  Languages,
   MessageCircle,
   Newspaper,
   Clipboard,
@@ -244,6 +245,7 @@ export function PostCard({
     <>
       <Card
         hoverable
+        padding="sm"
         className={`group relative flex flex-col cursor-pointer ${
           selectMode
             ? selected
@@ -296,7 +298,10 @@ export function PostCard({
         {/* Translation */}
         {post.translatedText && !isUrlOnly && (
           <div className="mb-4 rounded-xl border border-border bg-border-light px-3 py-2">
-            <p className="mb-0.5 text-xs font-semibold text-text-secondary">日本語訳</p>
+            <p className="mb-0.5 flex items-center gap-1 text-xs font-semibold text-text-secondary">
+              <Languages className="h-3 w-3" />
+              日本語訳
+            </p>
             <p className="line-clamp-2 text-xs leading-relaxed text-text-secondary">{post.translatedText}</p>
           </div>
         )}
