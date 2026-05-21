@@ -7,20 +7,19 @@ import { Card } from "@/components/ui/Card";
 import { PostTypeBadge, SavedTypeBadge, Badge, LearningStatusBadge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { PostMediaGrid, parsePostMedia } from "@/components/posts/PostMediaGrid";
+import { LinkifiedText } from "@/components/ui/LinkifiedText";
 import {
-  ArrowRight,
   BookOpen,
-  CheckCircle2,
   CheckSquare,
   Square,
   Trash2,
   User,
-  ExternalLink,
   Languages,
   Newspaper,
   Clipboard,
   Pencil,
   Loader2,
+  ExternalLink,
 } from "lucide-react";
 
 interface ArticlePreview {
@@ -44,7 +43,6 @@ interface PostCardProps {
     savedAt: Date | string;
     savedType?: string;
     threadPosts?: { id: string }[];
-    deepDiveSessions?: { id: string; status: string }[];
     learningCard?: { id: string; status: string } | null;
     classification?: {
       postType: string;
@@ -289,7 +287,9 @@ export function PostCard({
         {isUrlOnly ? (
           <p className="text-xs text-text-muted mb-3 truncate">{post.text.trim()}</p>
         ) : (
-          <p className="text-sm text-text leading-relaxed mb-4 line-clamp-3">{post.text}</p>
+          <p className="text-sm text-text leading-relaxed mb-4 line-clamp-3">
+            <LinkifiedText text={post.text} />
+          </p>
         )}
 
         {/* Translation */}
@@ -434,12 +434,6 @@ export function PostCard({
             {(post.threadPosts?.length ?? 0) > 0 && (
               <Badge variant="success">ツリー {(post.threadPosts?.length ?? 0) + 1}投稿</Badge>
             )}
-            {(post.deepDiveSessions?.length ?? 0) > 0 && (
-              <Badge variant="success" className="gap-1">
-                <CheckCircle2 className="h-3 w-3" />
-                深掘り済み
-              </Badge>
-            )}
             <LearningStatusBadge learningCard={post.learningCard} />
           </div>
         )}
@@ -458,13 +452,13 @@ export function PostCard({
         <div className="mt-auto flex items-center gap-1.5 pt-2" onClick={stop}>
           <Link href={`/posts/${post.id}/confirm`} className="min-w-0 flex-1" onClick={stop}>
             <Button variant="primary" size="sm" className="w-full group-hover:shadow-md">
-              深掘る
-              <ArrowRight className="w-4 h-4 ml-1.5" />
+              <BookOpen className="w-4 h-4 mr-1.5" />
+              学習する
             </Button>
           </Link>
           {showLearningButton && (
             <Link href={`/posts/${post.id}/learning`} onClick={stop}>
-              <Button variant="ghost" size="sm" title="学ぶ">
+              <Button variant="ghost" size="sm" title="学習カードへ">
                 <BookOpen className="w-4 h-4" />
               </Button>
             </Link>
@@ -475,8 +469,9 @@ export function PostCard({
               target="_blank"
               rel="noreferrer"
               onClick={stop}
+              title="元記事を開く"
             >
-              <Button variant="ghost" size="sm" title="元記事を開く">
+              <Button variant="ghost" size="sm">
                 <ExternalLink className="w-4 h-4" />
               </Button>
             </a>

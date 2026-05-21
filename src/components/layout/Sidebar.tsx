@@ -7,8 +7,6 @@ import {
   Home,
   Archive,
   PenSquare,
-  Layers,
-  FileText,
   Link2,
   Settings,
   ChevronLeft,
@@ -26,8 +24,6 @@ const menuItems = [
   { href: "/search", label: "ノウハウ検索", icon: Search },
   { href: "/insights", label: "いいね傾向分析", icon: TrendingUp },
   { href: "/posts/new", label: "投稿を追加", icon: PenSquare },
-  { href: "/deep-dives", label: "深掘り履歴", icon: Layers },
-  { href: "/notes", label: "要点まとめ", icon: FileText },
   { href: "/settings/x", label: "X連携", icon: Link2 },
   { href: "/settings", label: "設定", icon: Settings },
 ];

@@ -16,7 +16,7 @@ export default function NewPostPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
-  const handleSave = async (andDeepDive: boolean = false) => {
+  const handleSave = async (andLearn: boolean = false) => {
     if (!text.trim()) {
       setError("投稿本文を入力してください");
       return;
@@ -44,7 +44,7 @@ export default function NewPostPage() {
 
       const post = await res.json();
 
-      if (andDeepDive) {
+      if (andLearn) {
         router.push(`/posts/${post.id}/confirm`);
       } else {
         router.push("/posts");
@@ -66,7 +66,7 @@ export default function NewPostPage() {
         <div>
           <h1 className="text-2xl font-bold text-text">投稿を追加</h1>
           <p className="text-sm text-text-secondary">
-            深掘りしたい投稿を手動で追加できます
+            学びにしたい投稿を手動で追加できます
           </p>
         </div>
       </div>
@@ -78,7 +78,7 @@ export default function NewPostPage() {
             label="投稿本文"
             value={text}
             onChange={(e) => setText(e.target.value)}
-            placeholder="深掘りしたい投稿の内容を貼り付けるか、入力してください..."
+            placeholder="学びにしたい投稿の内容を貼り付けるか、入力してください..."
             error={error}
             className="min-h-[160px]"
           />
@@ -130,7 +130,7 @@ export default function NewPostPage() {
               loadingLabel="保存中..."
               className="flex-1"
             >
-              保存して深掘りする
+              保存して学ぶ
             </Button>
           </div>
         </div>

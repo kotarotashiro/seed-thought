@@ -4,8 +4,6 @@ import type {
   ChatMessage,
   ClassifyPostInput,
   PostClassificationResult,
-  GenerateDeepDiveSessionInput,
-  GeneratedDeepDiveSessionResult,
   GenerateOutputInput,
   GeneratedOutputResult,
   LearningOutput,
@@ -20,7 +18,6 @@ import type {
 import {
   buildChatPrompt,
   buildClassifyPrompt,
-  buildDeepDivePrompt,
   buildLearningPrompt,
   buildOutputPrompt,
   buildSemanticSearchPrompt,
@@ -76,12 +73,6 @@ export const openaiProvider: AiProvider = {
     const prompt = buildLearningPrompt(input);
     const result = await callOpenAI(prompt);
     return JSON.parse(result) as LearningOutput;
-  },
-
-  async generateDeepDiveSession(input: GenerateDeepDiveSessionInput): Promise<GeneratedDeepDiveSessionResult> {
-    const prompt = await buildDeepDivePrompt(input);
-    const result = await callOpenAI(prompt);
-    return JSON.parse(result) as GeneratedDeepDiveSessionResult;
   },
 
   async generateOutput(input: GenerateOutputInput): Promise<GeneratedOutputResult> {

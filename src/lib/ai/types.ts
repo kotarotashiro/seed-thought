@@ -82,37 +82,20 @@ export interface PostClassificationResult {
   thinkingPotentialScore: number;
   learningPotentialScore: number;
   outputPotentialScore: number;
-  recommendedMode: "thought_lens" | "learning_lesson" | "unknown";
+  /** Kept for storage compatibility; not used to drive UI flows. */
+  recommendedMode: string;
 }
 
-export interface GenerateDeepDiveSessionInput {
-  mode: "thought_lens" | "learning_lesson";
-  postText: string;
-  classification: PostClassificationResult;
-  articleTitle?: string;
-  articleDescription?: string;
-}
-
-export interface DeepDiveStepContent {
-  stepIndex: number;
-  stepKey: string;
-  title: string;
-  question: string;
-  aiContent: {
-    explanation: string;
-    keyPoints?: string[];
-    examples?: string[];
-    promptForUser?: string;
-  };
-}
-
-export interface GeneratedDeepDiveSessionResult {
-  steps: DeepDiveStepContent[];
-  recommendedModeReason?: string;
-}
+export type OutputType =
+  | "x"
+  | "instagram"
+  | "note"
+  | "markdown_log"
+  | "seminar"
+  | "strict_learning";
 
 export interface GenerateOutputInput {
-  outputType: "x" | "instagram" | "note" | "markdown_log" | "seminar";
+  outputType: OutputType;
   postText: string;
   classification: PostClassificationResult;
   steps: {
@@ -129,6 +112,39 @@ export interface GeneratedOutputResult {
   title: string;
   content: string;
   contentJson?: Record<string, unknown>;
+}
+
+export interface StrictLearningOutput {
+  oneLiner: string;
+  whyItMatters: string;
+  prerequisites: string;
+  claimBreakdown: {
+    claim: string;
+    background: string;
+    assumption: string;
+    evidence: string;
+    counterExample: string;
+    limit: string;
+  };
+  strictLearningView: {
+    positiveExamples: string[];
+    negativeExamples: string[];
+    boundaryExamples: string[];
+    necessaryConditions: string[];
+    typicalFeatures: string[];
+    essence: string;
+  };
+  abstraction: string;
+  transferToOtherFields: {
+    field: string;
+    application: string;
+  }[];
+  applyToYourself: string;
+  fifteenMinuteExercise: {
+    goal: string;
+    steps: string[];
+    deliverable: string;
+  };
 }
 
 export interface PostSummaryForSearch {
@@ -185,24 +201,8 @@ export interface AiProvider {
   classifyPost(input: ClassifyPostInput): Promise<PostClassificationResult>;
   translateText(input: TranslateTextInput): Promise<string>;
   generateLearningCard(input: SourcePostForLearning): Promise<LearningOutput>;
-  generateDeepDiveSession(input: GenerateDeepDiveSessionInput): Promise<GeneratedDeepDiveSessionResult>;
   generateOutput(input: GenerateOutputInput): Promise<GeneratedOutputResult>;
   searchSemantically(query: string, posts: PostSummaryForSearch[]): Promise<SemanticSearchResult>;
   analyzeLikeTrends(posts: PostSummaryForTrend[]): Promise<TrendInsight>;
   chat(message: string, history: ChatMessage[], posts: PostContext[]): Promise<string>;
-}
-
-export interface ConfirmationInsight {
-  summary: string;
-  gains: {
-    basicUnderstanding: string;
-    practicalPattern: string;
-    outputApplication: string;
-    thoughtOrganization: string;
-  };
-}
-
-export interface ModeRecommendation {
-  recommendedMode: "thought_lens" | "learning_lesson";
-  reason: string;
 }

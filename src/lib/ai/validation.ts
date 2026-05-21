@@ -1,15 +1,14 @@
 import type {
-  GeneratedDeepDiveSessionResult,
   GeneratedOutputResult,
   LearningOutput,
   PostClassificationResult,
   SemanticSearchResult,
+  StrictLearningOutput,
   TrendInsight,
 } from "./types";
 
 const postTypes = ["thought", "learning", "output_material", "unknown"];
 const difficultyLevels = ["beginner", "intermediate", "advanced", "unknown"];
-const recommendationModes = ["thought_lens", "learning_lesson", "unknown"];
 
 export function isPostClassificationResult(
   value: unknown
@@ -25,31 +24,8 @@ export function isPostClassificationResult(
     isScore(value.thinkingPotentialScore) &&
     isScore(value.learningPotentialScore) &&
     isScore(value.outputPotentialScore) &&
-    isOneOf(value.recommendedMode, recommendationModes)
+    typeof value.recommendedMode === "string"
   );
-}
-
-export function isGeneratedDeepDiveSessionResult(
-  value: unknown
-): value is GeneratedDeepDiveSessionResult {
-  if (!isRecord(value) || !Array.isArray(value.steps) || value.steps.length === 0) {
-    return false;
-  }
-
-  return value.steps.every((step) => {
-    if (!isRecord(step) || !isRecord(step.aiContent)) return false;
-    return (
-      typeof step.stepIndex === "number" &&
-      typeof step.stepKey === "string" &&
-      typeof step.title === "string" &&
-      typeof step.question === "string" &&
-      typeof step.aiContent.explanation === "string" &&
-      (step.aiContent.keyPoints === undefined || isStringArray(step.aiContent.keyPoints)) &&
-      (step.aiContent.examples === undefined || isStringArray(step.aiContent.examples)) &&
-      (step.aiContent.promptForUser === undefined ||
-        typeof step.aiContent.promptForUser === "string")
-    );
-  });
 }
 
 export function isGeneratedOutputResult(
@@ -127,6 +103,44 @@ export function isLearningOutput(value: unknown): value is LearningOutput {
     typeof value.imageExplanationPrompt === "string" &&
     typeof value.userLearningMemo === "string" &&
     (value.status === "draft" || value.status === "saved")
+  );
+}
+
+export function isStrictLearningOutput(value: unknown): value is StrictLearningOutput {
+  if (!isRecord(value)) return false;
+  if (!isRecord(value.claimBreakdown)) return false;
+  if (!isRecord(value.strictLearningView)) return false;
+  if (!isRecord(value.fifteenMinuteExercise)) return false;
+  if (!Array.isArray(value.transferToOtherFields)) return false;
+
+  const cb = value.claimBreakdown;
+  const sv = value.strictLearningView;
+  const ex = value.fifteenMinuteExercise;
+
+  return (
+    typeof value.oneLiner === "string" &&
+    typeof value.whyItMatters === "string" &&
+    typeof value.prerequisites === "string" &&
+    typeof cb.claim === "string" &&
+    typeof cb.background === "string" &&
+    typeof cb.assumption === "string" &&
+    typeof cb.evidence === "string" &&
+    typeof cb.counterExample === "string" &&
+    typeof cb.limit === "string" &&
+    isStringArray(sv.positiveExamples) &&
+    isStringArray(sv.negativeExamples) &&
+    isStringArray(sv.boundaryExamples) &&
+    isStringArray(sv.necessaryConditions) &&
+    isStringArray(sv.typicalFeatures) &&
+    typeof sv.essence === "string" &&
+    typeof value.abstraction === "string" &&
+    value.transferToOtherFields.every(
+      (t) => isRecord(t) && typeof t.field === "string" && typeof t.application === "string"
+    ) &&
+    typeof value.applyToYourself === "string" &&
+    typeof ex.goal === "string" &&
+    isStringArray(ex.steps) &&
+    typeof ex.deliverable === "string"
   );
 }
 

@@ -2,7 +2,6 @@ import { getProfile } from "@/lib/profile/fixedProfile";
 import type {
   ChatMessage,
   ClassifyPostInput,
-  GenerateDeepDiveSessionInput,
   GenerateOutputInput,
   PostContext,
   PostSummaryForSearch,
@@ -10,7 +9,7 @@ import type {
   SourcePostForLearning,
   TranslateTextInput,
 } from "./types";
-import { beginnerTeachingRules, strictLearningKnowledge } from "./knowledge";
+import { strictLearningKnowledge } from "./knowledge";
 
 export async function buildClassifyPrompt(input: ClassifyPostInput): Promise<string> {
   const profile = await getProfile();
@@ -40,12 +39,12 @@ ${input.authorUsername ? `アカウント: @${input.authorUsername}` : ""}
   "primaryCategory": "カテゴリ名",
   "tags": ["タグ1", "タグ2", "タグ3"],
   "summary": "投稿の要点を40-60文字で簡潔に要約。ツール名・技術名（Claude, ChatGPT, Cursor等）は省略せず記載。「●●を使って○○する方法」「●●で○○が可能」のような具体的・実用的な一文にする。抽象的な表現は避ける",
-  "recommendReason": "ユーザーのプロフィールに照らして、なぜ深掘りする価値があるか（80-120文字）",
+  "recommendReason": "ユーザーのプロフィールに照らして、なぜ学習する価値があるか（80-120文字）",
   "difficultyLevel": "beginner" | "intermediate" | "advanced" | "unknown",
   "thinkingPotentialScore": 0-100,
   "learningPotentialScore": 0-100,
   "outputPotentialScore": 0-100,
-  "recommendedMode": "thought_lens" | "learning_lesson" | "unknown"
+  "recommendedMode": "unknown"
 }
 
 ## 分類基準
@@ -147,30 +146,16 @@ ${JSON.stringify(input, null, 2)}
 JSONのみ返してください。説明文は不要です。`;
 }
 
-export async function buildDeepDivePrompt(input: GenerateDeepDiveSessionInput): Promise<string> {
+export async function buildStrictLearningPrompt(input: {
+  postText: string;
+  classification: { primaryCategory: string; summary: string };
+  learningCardJson: string;
+  userMemo?: string | null;
+}): Promise<string> {
   const profile = await getProfile();
-  const modeSteps = input.mode === "thought_lens"
-    ? [
-        { key: "surface_claim", title: "表面的な主張" },
-        { key: "hidden_premise", title: "背後にある前提" },
-        { key: "essence", title: "この投稿の本質" },
-        { key: "counter_argument", title: "反論・成立条件" },
-        { key: "apply_to_work", title: "自分の仕事に置き換える" },
-        { key: "own_words", title: "自分の言葉でまとめる" },
-      ]
-    : [
-        { key: "what_to_learn", title: "この投稿から学べること" },
-        { key: "basics", title: "基礎知識" },
-        { key: "mechanism", title: "仕組み" },
-        { key: "practical_steps", title: "実践手順" },
-        { key: "examples", title: "具体例" },
-        { key: "try_with_theme", title: "自分のテーマで試す" },
-        { key: "comprehension_check", title: "理解チェック" },
-      ];
-
-  const stepsDescription = modeSteps.map((s, i) => `${i + 1}. ${s.key}: ${s.title}`).join("\n");
 
   return `あなたはSeedThoughtの専属学習コーチです。
+保存済み投稿を、さとり式「厳密学習」のテンプレートに沿って1ショットで構造化してください。
 
 ## ユーザープロフィール
 名前: ${profile.name}
@@ -180,60 +165,82 @@ export async function buildDeepDivePrompt(input: GenerateDeepDiveSessionInput): 
 
 ## 元投稿
 ${input.postText}
-${input.articleTitle || input.articleDescription ? `
-## 記事情報（投稿リンク先の内容）
-${input.articleTitle ? `タイトル: ${input.articleTitle}` : ""}
-${input.articleDescription ? `内容: ${input.articleDescription}` : ""}` : ""}
 
 ## 投稿分類
-タイプ: ${input.classification.postType}
 カテゴリ: ${input.classification.primaryCategory}
 要約: ${input.classification.summary}
 
-## モード: ${input.mode === "thought_lens" ? "思考レンズ" : "厳密学習レッスン"}
+## 学習カードの既存解析
+${input.learningCardJson}
 
-## 重要方針
-${input.mode === "learning_lesson" ? `- あなたは塾の先生、ユーザーは生徒です。
-- ユーザーに考えさせる前に、元投稿を教材として「何を学ぶべきか」「背景知識」「仕組み」「具体例」「実務での使い方」をあなたが具体的に教えてください。
-- 各ステップのexplanationは、投稿本文の内容に必ず触れ、抽象論だけで終わらせないでください。
-- questionは宿題ではなく、理解確認の短い問いにしてください。
-- keyPointsとexamplesは、投稿固有の内容に合わせてください。
-- 正例・反例・境界事例・必要条件・典型特徴を、難しい言葉にせず必ず説明に含めてください。
-- 「初心者が最初に誤解しそうな点」を明示して、やさしく修正してください。
+${input.userMemo ? `## ユーザーメモ\n${input.userMemo}\n` : ""}
 
-${beginnerTeachingRules}
+## 厳密学習OS（必ず参照してください）
+${strictLearningKnowledge}
 
-${strictLearningKnowledge}` : `- 投稿の主張、前提、本質、反論、自分への応用を順に分解してください。
-- 投稿固有の言葉や文脈を使い、汎用的な自己啓発文にしないでください。`}
+## 出力ルール
+- 元投稿の固有の言葉・文脈を使うこと。汎用的な自己啓発文にしないこと。
+- 正例・反例・境界事例は、投稿の領域に即した具体例にすること。
+- 「自分に使うなら」はユーザープロフィールのテーマに紐づけること。
+- 15分ワークは、机上のメモではなく、実際に15分で成果物が一つ残る手順にすること。
+- 抽象論で終わらず、必要条件・典型特徴・本質を明確に分けること。
 
-## ステップ
-${stepsDescription}
-
-以下のJSON形式で、全ステップ分の内容を一括生成してください。
-
+## 出力形式（必ず以下のJSONのみ。説明文は不要）
 {
-  "steps": [
-    {
-      "stepIndex": 0,
-      "stepKey": "ステップキー",
-      "title": "ステップタイトル",
-      "question": "ユーザーへの問いかけ（80文字程度）",
-      "aiContent": {
-        "explanation": "${input.mode === "learning_lesson" ? "先生としての解説（500-900文字。投稿固有の内容、背景、具体例を含める）" : "AIの解説（250-500文字。投稿固有の内容に触れる）"}",
-        "keyPoints": ["ポイント1", "ポイント2", "ポイント3"],
-        "examples": ["具体例1", "具体例2"],
-        "promptForUser": "ユーザーが考えるためのヒント（50文字程度）"
-      }
+  "title": "厳密学習: 〜（一言でいうとの内容を要約したタイトル、40文字以内）",
+  "content": "oneLinerとwhyItMattersをそのまま読めるテキストとして結合した短いプレーンテキスト",
+  "contentJson": {
+    "oneLiner": "一言でいうと（40-80文字、投稿の本質を凝縮）",
+    "whyItMatters": "何が重要なのか（120-200文字、なぜユーザーにとってこの学びが価値あるか）",
+    "prerequisites": "前提知識（80-160文字、これを理解するために必要な土台）",
+    "claimBreakdown": {
+      "claim": "投稿の主張を一文で",
+      "background": "背景・文脈",
+      "assumption": "暗黙の前提",
+      "evidence": "主張を支える根拠",
+      "counterExample": "反例・成立しないケース",
+      "limit": "限界・適用範囲"
+    },
+    "strictLearningView": {
+      "positiveExamples": ["正例1（当てはまる具体例）", "正例2", "正例3"],
+      "negativeExamples": ["反例1（似ているが違う例）", "反例2"],
+      "boundaryExamples": ["境界事例1（判断が難しい例）", "境界事例2"],
+      "necessaryConditions": ["必要条件1", "必要条件2"],
+      "typicalFeatures": ["典型特徴1（よく見られるが本質ではない）", "典型特徴2"],
+      "essence": "典型特徴と分けた本質（80-160文字）"
+    },
+    "abstraction": "抽象化すると（80-160文字、構造として一段抽象化）",
+    "transferToOtherFields": [
+      { "field": "別分野名1", "application": "どう転用できるか（60-120文字）" },
+      { "field": "別分野名2", "application": "どう転用できるか" }
+    ],
+    "applyToYourself": "自分に使うなら（120-240文字、ユーザーのテーマ・役割に即した使い方）",
+    "fifteenMinuteExercise": {
+      "goal": "15分で達成するゴール",
+      "steps": ["手順1", "手順2", "手順3", "手順4"],
+      "deliverable": "15分後に残る成果物"
     }
-  ]
+  }
 }
 
-各ステップは前のステップの上に積み上がる構造にしてください。
-最後のステップでは、ユーザーが自分の言葉でまとめられるよう促してください。
-JSONのみ返してください。`;
+JSONのみ返してください。説明文は不要です。`;
 }
 
 export async function buildOutputPrompt(input: GenerateOutputInput): Promise<string> {
+  if (input.outputType === "strict_learning") {
+    const learningCardJson =
+      input.steps.find((s) => s.title === "学習内容")?.aiContent || "{}";
+    return buildStrictLearningPrompt({
+      postText: input.postText,
+      classification: {
+        primaryCategory: input.classification.primaryCategory,
+        summary: input.classification.summary,
+      },
+      learningCardJson,
+      userMemo: input.userFinalNote ?? null,
+    });
+  }
+
   const profile = await getProfile();
   const stepsContext = input.steps
     .map((s, i) => `### ステップ${i + 1}: ${s.title}\n問い: ${s.question}\nAI解説: ${s.aiContent}\nユーザーメモ: ${s.userNote || "なし"}`)

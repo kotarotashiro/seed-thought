@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, use } from "react";
-import { useRouter } from "next/navigation";
 import { useSafeBack } from "@/hooks/useSafeBack";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -9,6 +8,8 @@ import { Badge, LearningStatusBadge } from "@/components/ui/Badge";
 import { PostMediaGrid, parsePostMedia } from "@/components/posts/PostMediaGrid";
 import { OutputTypeCard } from "@/components/outputs/OutputTypeCard";
 import { OutputPreview } from "@/components/outputs/OutputPreview";
+import { LinkifiedText } from "@/components/ui/LinkifiedText";
+import { OpenInXButton } from "@/components/ui/OpenInXButton";
 import type { LearningOutput } from "@/lib/ai/types";
 import { parseArticleContent } from "@/lib/posts/articleContent";
 import {
@@ -44,7 +45,7 @@ const PROGRESS_STEPS = [
 
 const ARTICLE_PREVIEW_CHARS = 240;
 
-const OUTPUT_TYPES = ["x", "instagram", "note", "markdown_log", "seminar"] as const;
+const OUTPUT_TYPES = ["x", "instagram", "note", "markdown_log", "seminar", "strict_learning"] as const;
 
 const tabs = [
   "要約",
@@ -106,7 +107,6 @@ function SectionHeader({ icon: Icon, title }: { icon: typeof BookOpen; title: st
 
 export default function PostLearningPage({ params }: { params: Promise<{ postId: string }> }) {
   const { postId } = use(params);
-  const router = useRouter();
   const safeBack = useSafeBack();
   const [post, setPost] = useState<PostView | null>(null);
   const [card, setCard] = useState<LearningCardView | null>(null);
@@ -279,7 +279,7 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
 
   const handleDelete = async () => {
     if (!card) return;
-    if (!confirm("この学習カードを削除しますか？削除後はまた「学ぶ」から再生成できます。")) return;
+    if (!confirm("この学習カードを削除しますか？削除後はそのままこのページで再生成できます。")) return;
     setDeleting(true);
     setError(null);
     setMessage(null);
@@ -289,9 +289,20 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
         const errData = await res.json().catch(() => ({}));
         throw new Error((errData as { error?: string }).error || "学習カードの削除に失敗しました");
       }
-      router.push("/knowhow");
+      // Stay on this page and reset to the pre-generation state so the user can
+      // regenerate without leaving the post context. Prevent the auto-generate
+      // effect from immediately firing — the user must click the button.
+      autoGenerateTriedRef.current = true;
+      setCard(null);
+      setMemo("");
+      setSelectedOutput(null);
+      setGeneratedOutput(null);
+      setOutputHistory([]);
+      setActiveTab("要約");
+      setMessage("学習カードを削除しました。もう一度「学習する」を押すと再生成できます。");
     } catch (deleteError) {
       setError(deleteError instanceof Error ? deleteError.message : "学習カードの削除に失敗しました");
+    } finally {
       setDeleting(false);
     }
   };
@@ -405,7 +416,9 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
 
         {postExpanded && (
           <div className="mt-4">
-            <p className="whitespace-pre-wrap text-sm leading-relaxed text-text">{post.text}</p>
+            <p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-text">
+              <LinkifiedText text={post.text} />
+            </p>
             {post.translatedText && (
               <div className="mt-3 rounded-xl border border-border bg-border-light px-4 py-3">
                 <p className="mb-1 flex items-center gap-1 text-xs font-semibold text-text-secondary">
@@ -476,15 +489,9 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
             )}
             <PostMediaGrid media={parsePostMedia(post.mediaJson)} />
             {post.sourceUrl && (
-              <a
-                href={post.sourceUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="mt-4 inline-flex items-center gap-1.5 text-sm font-medium text-accent hover:text-accent-hover"
-              >
-                投稿URLを開く
-                <ExternalLink className="h-4 w-4" />
-              </a>
+              <div className="mt-4">
+                <OpenInXButton href={post.sourceUrl} />
+              </div>
             )}
           </div>
         )}
@@ -550,7 +557,7 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
               </div>
               <Button onClick={handleGenerate} loading={generating} loadingLabel="生成中..." className="w-full sm:w-auto">
                 <Sparkles className="mr-1.5 h-4 w-4" />
-                {error ? "再生成" : "学ぶ"}
+                {error ? "再生成" : "学習する"}
               </Button>
             </div>
           )}
@@ -558,9 +565,38 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
       ) : (
         <>
           <div className="flex flex-col gap-3 sm:flex-row">
-            <Button variant="secondary" onClick={() => setActiveTab("画像生成プロンプト")} className="flex-1">
-              <ImageIcon className="mr-1.5 h-4 w-4" />
-              解説画像を生成
+            <Button
+              variant="secondary"
+              onClick={async () => {
+                setSelectedOutput("strict_learning");
+                setGeneratedOutput(null);
+                setOutputError(null);
+                // generate immediately for quick-path UX
+                if (!card) return;
+                setGeneratingOutput(true);
+                try {
+                  const res = await fetch(`/api/learning-cards/${card.id}/outputs`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ outputType: "strict_learning" }),
+                  });
+                  const data = await res.json();
+                  if (!res.ok) throw new Error(data.error || "厳密学習の生成に失敗しました");
+                  setGeneratedOutput(data);
+                  if (data.warning) setOutputError(data.warning);
+                  await loadOutputHistory(card.id);
+                } catch (genErr) {
+                  setOutputError(genErr instanceof Error ? genErr.message : "厳密学習の生成に失敗しました");
+                } finally {
+                  setGeneratingOutput(false);
+                }
+              }}
+              loading={generatingOutput && selectedOutput === "strict_learning"}
+              loadingLabel="厳密学習で出力中..."
+              className="flex-1"
+            >
+              <Sparkles className="mr-1.5 h-4 w-4" />
+              厳密学習で出力
             </Button>
             <Button variant="secondary" onClick={() => setActiveTab("マニュアル")} className="flex-1">
               <FileText className="mr-1.5 h-4 w-4" />
@@ -769,9 +805,9 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
               <h3 className="text-base font-bold text-text">SNS発信コンテンツ</h3>
             </div>
             <p className="mb-4 text-sm text-text-secondary">
-              学習内容を発信用コンテンツに変換します。
+              学習内容を発信用コンテンツや厳密学習カードに変換します。
             </p>
-            <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-5">
+            <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
               {OUTPUT_TYPES.map((type) => (
                 <OutputTypeCard
                   key={type}
@@ -836,7 +872,7 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
                     </div>
                   ) : (
                     outputHistory.map((item) => {
-                      const typeLabels: Record<string, string> = { x: "X投稿", instagram: "Instagram", note: "note", markdown_log: "Markdown", seminar: "セミナー" };
+                      const typeLabels: Record<string, string> = { x: "X投稿", instagram: "Instagram", note: "note", markdown_log: "Markdown", seminar: "セミナー", strict_learning: "厳密学習" };
                       const parsedJson = item.contentJson ? (() => { try { return JSON.parse(item.contentJson); } catch { return null; } })() : null;
                       return (
                         <OutputPreview

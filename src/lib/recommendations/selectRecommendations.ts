@@ -16,26 +16,24 @@ export async function selectRecommendations(
         where: savedTypeWhere,
         orderBy: { savedAt: "desc" },
         take: count,
-        include: { classification: true, deepDiveSessions: true, threadPosts: true, learningCard: true },
+        include: { classification: true, threadPosts: true, learningCard: true },
       });
       return posts;
     }
 
     case "random": {
-      // SQLite doesn't have RANDOM() in Prisma, so fetch all and shuffle
       const allPosts = await prisma.post.findMany({
         where: savedTypeWhere,
-        include: { classification: true, deepDiveSessions: true, threadPosts: true, learningCard: true },
+        include: { classification: true, threadPosts: true, learningCard: true },
       });
       return shuffleAndTake(allPosts, count);
     }
 
     case "genre": {
       if (!genre) {
-        // Fallback to random
         const allPosts = await prisma.post.findMany({
           where: savedTypeWhere,
-          include: { classification: true, deepDiveSessions: true, threadPosts: true, learningCard: true },
+          include: { classification: true, threadPosts: true, learningCard: true },
         });
         return shuffleAndTake(allPosts, count);
       }
@@ -46,7 +44,7 @@ export async function selectRecommendations(
             primaryCategory: genre,
           },
         },
-        include: { classification: true, deepDiveSessions: true, threadPosts: true, learningCard: true },
+        include: { classification: true, threadPosts: true, learningCard: true },
       });
       return shuffleAndTake(genrePosts, count);
     }
@@ -55,11 +53,9 @@ export async function selectRecommendations(
       const posts = await prisma.post.findMany({
         where: {
           ...savedTypeWhere,
-          deepDiveSessions: {
-            none: {},
-          },
+          learningCard: null,
         },
-        include: { classification: true, deepDiveSessions: true, threadPosts: true, learningCard: true },
+        include: { classification: true, threadPosts: true, learningCard: true },
         take: count,
         orderBy: { savedAt: "desc" },
       });

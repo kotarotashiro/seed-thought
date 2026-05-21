@@ -1,8 +1,8 @@
 import type {
-  DeepDiveStepContent,
-  GeneratedDeepDiveSessionResult,
   GeneratedOutputResult,
+  OutputType,
   PostClassificationResult,
+  StrictLearningOutput,
 } from "./types";
 
 const learningWords = [
@@ -175,19 +175,18 @@ export function createFallbackClassification(input: {
 }): PostClassificationResult {
   const postType = inferPostType(input.text);
   const primaryCategory = inferCategory(input.text);
-  const recommendedMode = postType === "learning" ? "learning_lesson" : "thought_lens";
 
   return {
     postType,
     primaryCategory,
-    tags: [primaryCategory, postType === "learning" ? "ノウハウ" : "視点", "深掘り候補"],
+    tags: [primaryCategory, postType === "learning" ? "ノウハウ" : "視点", "学習候補"],
     summary: buildSummary(input.text),
     recommendReason: buildRecommendReason(postType, primaryCategory),
     difficultyLevel: postType === "learning" ? "intermediate" : "beginner",
     thinkingPotentialScore: postType === "thought" ? 85 : 65,
     learningPotentialScore: postType === "learning" ? 85 : 60,
     outputPotentialScore: postType === "output_material" ? 85 : 70,
-    recommendedMode,
+    recommendedMode: "unknown",
   };
 }
 
@@ -230,188 +229,58 @@ export function mergeClassificationFallback(
       classification.recommendReason.length < 18
         ? fallback.recommendReason
         : classification.recommendReason,
-    recommendedMode:
-      classification.recommendedMode === "unknown"
-        ? fallback.recommendedMode
-        : classification.recommendedMode,
   };
 }
 
-function step(
-  stepIndex: number,
-  stepKey: string,
-  title: string,
-  question: string,
-  explanation: string,
-  keyPoints: string[],
-  examples: string[],
-  promptForUser: string
-): DeepDiveStepContent {
+export function createFallbackStrictLearning(input: {
+  postText: string;
+  classification: PostClassificationResult;
+}): StrictLearningOutput {
+  const summary = input.classification.summary || buildSummary(input.postText);
+  const lesson = inferLearningTopic(input.postText);
+  const category = input.classification.primaryCategory || "学び";
+
   return {
-    stepIndex,
-    stepKey,
-    title,
-    question,
-    aiContent: {
-      explanation,
-      keyPoints,
-      examples,
-      promptForUser,
+    oneLiner: lesson.topic,
+    whyItMatters: `${summary} この投稿は${category}領域で、保存して終わりにせず構造化することで応用が利く学びです。`,
+    prerequisites: lesson.basics,
+    claimBreakdown: {
+      claim: summary,
+      background: lesson.basics,
+      assumption: "受け取る側が前提知識を持ち、自分の文脈に置き換える意思があること。",
+      evidence: lesson.mechanism,
+      counterExample: "状況が大きく違う領域では、そのまま当てはめると外れることがある。",
+      limit: `主に${category}領域で有効。文脈が変わると必要条件が変わる。`,
+    },
+    strictLearningView: {
+      positiveExamples: lesson.examples.slice(0, 3),
+      negativeExamples: ["表面だけ真似て前提を省くと再現しない例", "領域違いに無理に当てはめた例"],
+      boundaryExamples: ["前提が一部しか揃っていない中規模の例", "目的は同じだが手段が異なる例"],
+      necessaryConditions: lesson.practicalSteps.slice(0, 3),
+      typicalFeatures: ["短く言い切る形をとっている", "具体的な手順や視点を含んでいる"],
+      essence: lesson.mechanism,
+    },
+    abstraction: `${category}固有の話に見えるが、根は「目的を明確にしてから手段を選ぶ」「成立条件と典型特徴を分ける」という普遍的構造に還元できる。`,
+    transferToOtherFields: [
+      { field: "別のSNS発信", application: "投稿の型を別チャネル向けに置き換えて、必要条件を再確認する。" },
+      { field: "顧客対応／コンサル", application: "同じ構造を顧客の課題に当てはめ、本質と典型特徴を分けて説明する。" },
+    ],
+    applyToYourself: "自分のテーマで一つ題材を選び、必要条件・典型特徴・本質に分けてから、15分で短いアウトプットに変換する。",
+    fifteenMinuteExercise: {
+      goal: "投稿の構造を自分のテーマに移植した短文を一つ完成させる。",
+      steps: [
+        "投稿の一言要約を自分の言葉で書く",
+        "必要条件と典型特徴を分けて列挙する",
+        "自分のテーマに置き換えた具体例を一つ作る",
+        "X投稿または学習メモとして出力する",
+      ],
+      deliverable: "自分のテーマに合わせた短い学習メモ（X投稿1本分または100-200文字のメモ）",
     },
   };
 }
 
-export function createFallbackDeepDiveSession(input: {
-  mode: "thought_lens" | "learning_lesson";
-  postText: string;
-  classification: PostClassificationResult;
-}): GeneratedDeepDiveSessionResult {
-  const summary = input.classification.summary || buildSummary(input.postText);
-  const category = input.classification.primaryCategory;
-  const lesson = inferLearningTopic(input.postText);
-
-  const steps =
-    input.mode === "thought_lens"
-      ? [
-          step(
-            0,
-            "surface_claim",
-            "表面的な主張",
-            "この投稿は、何を一番伝えようとしていると思いますか？",
-            `まずは投稿の主張を短く抜き出します。今回の中心は「${summary}」です。言葉の強さや例えに引っ張られず、何を正しいと言っているのかを一文にします。`,
-            ["主張を一文にする", "例えと結論を分ける", "断定している部分を見る"],
-            ["この投稿は、市場で利益が生まれる順番について述べている", "この投稿は、発信や事業の勝ち筋を説明している"],
-            "まずは結論だけを一文で書いてください。"
-          ),
-          step(
-            1,
-            "hidden_premise",
-            "背後にある前提",
-            "この主張が成り立つには、どんな前提が必要ですか？",
-            `投稿の裏には、${category}に関する前提があります。誰が先に得をするのか、どの条件なら再現できるのかを分けると、投稿の使える範囲が見えてきます。`,
-            ["成立条件を見る", "対象者を限定する", "例外を探す"],
-            ["市場が拡大している場合に成り立つ", "買う側が成果を出せる設計が必要になる"],
-            "この考えが外れるケースを書いてください。"
-          ),
-          step(
-            2,
-            "essence",
-            "この投稿の本質",
-            "この投稿の本質を、もっと抽象化すると何になりますか？",
-            "本質は、具体例の奥にある構造です。誰かのノウハウをそのまま真似るのではなく、利益、信頼、需要、継続性の関係として捉えると応用しやすくなります。",
-            ["具体から構造へ移す", "因果関係を見る", "自分のテーマに使える形にする"],
-            ["道具を売る側と使う側の関係", "市場の入口と出口の違い"],
-            "この投稿を一段抽象化して書いてください。"
-          ),
-          step(
-            3,
-            "counter_argument",
-            "反論・成立条件",
-            "反論するとしたら、どこに違和感がありますか？",
-            "深掘りでは、納得した点だけでなく反論も大事です。反論を置くことで、盲信ではなく自分の判断として扱えるようになります。",
-            ["反例を探す", "短期と長期を分ける", "自分の実感と照らす"],
-            ["売る側だけが儲かる市場は長続きしない", "買う側の成果がないと信用が落ちる"],
-            "納得できる点と疑問点を分けて書いてください。"
-          ),
-          step(
-            4,
-            "apply_to_work",
-            "自分の仕事に置き換える",
-            "この視点を、自分の発信や仕事に置き換えると何が言えますか？",
-            "自分のテーマに置き換えると、保存しただけの情報が使える知識になります。あなたの発信、商品、導線、企画に当てはめて考えます。",
-            ["自分のテーマへ翻訳する", "顧客の立場で考える", "次の投稿ネタにする"],
-            ["AI活用の発信なら、ツール紹介だけでなく成果設計まで話す", "LINE導線なら、設定方法より売上までの流れを示す"],
-            "自分の仕事ならどう言い換えられるか書いてください。"
-          ),
-          step(
-            5,
-            "own_words",
-            "自分の言葉でまとめる",
-            "最後に、自分の言葉で一段落にまとめるとどうなりますか？",
-            "ここでは投稿の引用ではなく、あなたの理解としてまとめます。あとでX投稿、note、学習ログに変換しやすい形にしておきます。",
-            ["引用ではなく自分の言葉にする", "一文目に結論を書く", "実務への示唆で締める"],
-            ["市場を見るときは、誰が先に儲かるかだけでなく、その後誰が成果を出すかまで見る必要がある"],
-            "自分の結論を一段落で書いてください。"
-          ),
-        ]
-      : [
-          step(
-            0,
-            "what_to_learn",
-            "この投稿から学べること",
-            `まず、この投稿は何を教えてくれていると思いますか？`,
-            `この投稿は「${lesson.topic}」を学ぶための教材です。最初に難しく考えなくて大丈夫です。まずは「この投稿は、何をできるようにする話なのか」をつかみます。そのうえで、正例、つまり当てはまる例と、反例、つまり一見似ているけれど違う例を比べながら、投稿の本質を絞っていきます。`,
-            ["一言でいうと何の話かを見る", "当てはまる例と違う例を比べる", "自分が使える場面まで落とす"],
-            lesson.examples,
-            "一言でいうと何の話かを書いてみてください。"
-          ),
-          step(
-            1,
-            "basics",
-            "基礎知識",
-            "理解するために必要な基礎知識は何ですか？",
-            `${lesson.basics}\n\nここで大事なのは、言葉を覚えることではなく「何と何を区別すればいいか」です。初心者のうちは、似た言葉をまとめて理解しがちです。だからまず、投稿の中心語を一つ選び、何を指していて、何を指していないのかを分けます。`,
-            ["専門用語は一言で言い換える", "似ているものとの違いを見る", "覚えるより使いどころをつかむ"],
-            lesson.examples,
-            "まだ曖昧な言葉や前提を書き出してください。"
-          ),
-          step(
-            2,
-            "mechanism",
-            "仕組み",
-            "なぜこの方法や考え方が機能するのですか？",
-            `${lesson.mechanism}\n\n仕組みは、入力、処理、出力に分けると急にわかりやすくなります。入力は最初に入れるもの、処理は中で起きること、出力は最後に得られる結果です。この3つに分けると、どこを変えれば結果が変わるのかが見えてきます。`,
-            ["入力・処理・出力に分ける", "何が結果を変えているかを見る", "成立する条件と失敗する条件を分ける"],
-            lesson.examples,
-            "なぜこの考え方が役に立つのかを一文で書いてください。"
-          ),
-          step(
-            3,
-            "practical_steps",
-            "実践手順",
-            "自分が試すなら、最初の3ステップは何ですか？",
-            "学んだ内容を使うには、最初から大きく変えないことが大切です。小さく試せる手順にします。ここでは、投稿の考え方をそのまま信じるのではなく、必要条件、つまり「これがないと成立しにくいもの」を確認してから、自分の作業に当てはめます。",
-            [...lesson.practicalSteps, "うまくいかない反例を1つ考える"].slice(0, 4),
-            lesson.examples,
-            "今日試せる最初の一歩を書いてください。"
-          ),
-          step(
-            4,
-            "examples",
-            "具体例",
-            "自分のテーマなら、どんな具体例になりますか？",
-            `具体例にすると理解が定着します。${lesson.topic}を、あなたのテーマや読者の悩みに置き換えて説明してみます。さらに、境界事例、つまり当てはまるか迷う例も見ると、どこまで使える考え方なのかがはっきりします。`,
-            ["当てはまる例を見る", "当てはまらない例を見る", "判断に迷う例で境界線を引く"],
-            lesson.examples,
-            "自分の読者向けの例を書いてください。"
-          ),
-          step(
-            5,
-            "try_with_theme",
-            "自分のテーマで試す",
-            "この学びを、どのテーマで試しますか？",
-            "テーマを決めるとアウトプットに変わります。保存した情報を、あなたの発信や仕事の文脈に接続します。",
-            ["テーマを一つ選ぶ", "使う媒体を決める", "読者の悩みに合わせる"],
-            ["X投稿にする", "noteの見出しにする", "セミナー資料の1枚にする"],
-            "試すテーマと媒体を書いてください。"
-          ),
-          step(
-            6,
-            "comprehension_check",
-            "理解チェック",
-            "誰かに説明するとしたら、どう説明しますか？",
-            "最後に説明できるか確認します。説明できる形になれば、単なる保存ではなく使える知識になります。",
-            ["一文で説明する", "例を添える", "次に使う場面を書く"],
-            ["この投稿から学べるのは、情報ではなく構造を見ることだと説明する"],
-            "一文説明と具体例を書いてください。"
-          ),
-        ];
-
-  return { steps };
-}
-
 export function createFallbackOutput(input: {
-  outputType: "x" | "instagram" | "note" | "markdown_log" | "seminar";
+  outputType: OutputType;
   postText: string;
   classification: PostClassificationResult;
   finalSummary?: string | null;
@@ -423,7 +292,7 @@ export function createFallbackOutput(input: {
   if (input.outputType === "x") {
     return {
       title: "X投稿下書き",
-      content: `${summary}\n\n保存した投稿から学べるのは、情報そのものより「どう自分の仕事に置き換えるか」。一度、自分のテーマで使える形に言い換えてみる。${note ? "\n\n#AI活用 #学び" : "\n\n#AI活用 #学び"}`,
+      content: `${summary}\n\n保存した投稿から学べるのは、情報そのものより「どう自分の仕事に置き換えるか」。一度、自分のテーマで使える形に言い換えてみる。\n\n#${input.classification.primaryCategory} #学び`,
     };
   }
 
@@ -445,6 +314,18 @@ export function createFallbackOutput(input: {
     return {
       title: "保存した投稿からの学び",
       content: `# 保存した投稿からの学び\n\n${summary}\n\n## なぜ気になったか\n${input.classification.recommendReason}\n\n## 自分の仕事に置き換えるなら\n${input.userFinalNote || "この視点を自分の発信テーマや導線設計に置き換えて考える。"}${note}`,
+    };
+  }
+
+  if (input.outputType === "strict_learning") {
+    const fallback = createFallbackStrictLearning({
+      postText: input.postText,
+      classification: input.classification,
+    });
+    return {
+      title: `厳密学習: ${fallback.oneLiner}`,
+      content: `${fallback.oneLiner}\n\n${fallback.whyItMatters}`,
+      contentJson: fallback as unknown as Record<string, unknown>,
     };
   }
 

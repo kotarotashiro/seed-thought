@@ -4,8 +4,6 @@ import type {
   AiProvider,
   ChatMessage,
   ClassifyPostInput,
-  GenerateDeepDiveSessionInput,
-  GeneratedDeepDiveSessionResult,
   GenerateOutputInput,
   GeneratedOutputResult,
   LearningOutput,
@@ -21,7 +19,6 @@ import type {
 import {
   buildChatPrompt,
   buildClassifyPrompt,
-  buildDeepDivePrompt,
   buildLearningPrompt,
   buildOutputPrompt,
   buildSemanticSearchPrompt,
@@ -30,7 +27,6 @@ import {
 } from "./prompts";
 import { parseAiJson } from "./json";
 import {
-  isGeneratedDeepDiveSessionResult,
   isGeneratedOutputResult,
   isLearningOutput,
   isPostClassificationResult,
@@ -205,17 +201,6 @@ export function getAiProvider(): AiProvider {
       const prompt = buildLearningPrompt(input);
       const result = await callConfiguredAi(prompt);
       return parseAiJson(result, isLearningOutput, "学習カード");
-    },
-
-    async generateDeepDiveSession(
-      input: GenerateDeepDiveSessionInput
-    ): Promise<GeneratedDeepDiveSessionResult> {
-      const settings = await getAiRuntimeSettings();
-      if (settings.provider === "mock") return mockProvider.generateDeepDiveSession(input);
-
-      const prompt = await buildDeepDivePrompt(input);
-      const result = await callConfiguredAi(prompt);
-      return parseAiJson(result, isGeneratedDeepDiveSessionResult, "深掘りセッション");
     },
 
     async generateOutput(input: GenerateOutputInput): Promise<GeneratedOutputResult> {

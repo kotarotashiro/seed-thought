@@ -38,6 +38,227 @@ export function OutputPreview({ title, content, contentJson, outputType }: Outpu
     setTimeout(() => setCopied(false), 2000);
   };
 
+  // ---------- Strict Learning display ----------
+  if (outputType === "strict_learning" && contentJson) {
+    type StrictJson = {
+      oneLiner?: string;
+      whyItMatters?: string;
+      prerequisites?: string;
+      claimBreakdown?: {
+        claim?: string;
+        background?: string;
+        assumption?: string;
+        evidence?: string;
+        counterExample?: string;
+        limit?: string;
+      };
+      strictLearningView?: {
+        positiveExamples?: string[];
+        negativeExamples?: string[];
+        boundaryExamples?: string[];
+        necessaryConditions?: string[];
+        typicalFeatures?: string[];
+        essence?: string;
+      };
+      abstraction?: string;
+      transferToOtherFields?: Array<{ field: string; application: string }>;
+      applyToYourself?: string;
+      fifteenMinuteExercise?: {
+        goal?: string;
+        steps?: string[];
+        deliverable?: string;
+      };
+    };
+    const j = contentJson as StrictJson;
+    const fullText = [
+      `# ${title}`,
+      "",
+      `## 一言でいうと`,
+      j.oneLiner ?? "",
+      "",
+      `## 何が重要なのか`,
+      j.whyItMatters ?? "",
+      "",
+      `## 前提知識`,
+      j.prerequisites ?? "",
+      "",
+      `## 主張の分解`,
+      `- 主張: ${j.claimBreakdown?.claim ?? ""}`,
+      `- 背景: ${j.claimBreakdown?.background ?? ""}`,
+      `- 前提: ${j.claimBreakdown?.assumption ?? ""}`,
+      `- 根拠: ${j.claimBreakdown?.evidence ?? ""}`,
+      `- 反例: ${j.claimBreakdown?.counterExample ?? ""}`,
+      `- 限界: ${j.claimBreakdown?.limit ?? ""}`,
+      "",
+      `## 厳密学習で見る`,
+      `- 正例: ${(j.strictLearningView?.positiveExamples ?? []).join(" / ")}`,
+      `- 反例: ${(j.strictLearningView?.negativeExamples ?? []).join(" / ")}`,
+      `- 境界事例: ${(j.strictLearningView?.boundaryExamples ?? []).join(" / ")}`,
+      `- 必要条件: ${(j.strictLearningView?.necessaryConditions ?? []).join(" / ")}`,
+      `- 典型特徴: ${(j.strictLearningView?.typicalFeatures ?? []).join(" / ")}`,
+      `- 本質: ${j.strictLearningView?.essence ?? ""}`,
+      "",
+      `## 抽象化すると`,
+      j.abstraction ?? "",
+      "",
+      `## 別分野に転用すると`,
+      ...((j.transferToOtherFields ?? []).map((t) => `- ${t.field}: ${t.application}`)),
+      "",
+      `## 自分に使うなら`,
+      j.applyToYourself ?? "",
+      "",
+      `## 15分ワーク`,
+      `ゴール: ${j.fifteenMinuteExercise?.goal ?? ""}`,
+      ...((j.fifteenMinuteExercise?.steps ?? []).map((s, i) => `${i + 1}. ${s}`)),
+      `成果物: ${j.fifteenMinuteExercise?.deliverable ?? ""}`,
+    ].join("\n");
+
+    const handleCopyFull = async () => {
+      await navigator.clipboard.writeText(fullText);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    };
+
+    const renderList = (items?: string[]) =>
+      (items ?? []).length > 0 ? (
+        <ul className="space-y-1">
+          {(items ?? []).map((s, i) => (
+            <li key={i} className="text-sm text-text-secondary">・{s}</li>
+          ))}
+        </ul>
+      ) : null;
+
+    return (
+      <Card>
+        <div className="mb-4 flex items-center justify-between">
+          <h3 className="text-base font-bold text-text">{title}</h3>
+          <Button variant="secondary" size="sm" onClick={handleCopyFull} className="gap-1.5">
+            {copied ? (
+              <><Check className="h-3.5 w-3.5" />コピーしました</>
+            ) : (
+              <><Copy className="h-3.5 w-3.5" />全文コピー</>
+            )}
+          </Button>
+        </div>
+
+        {j.oneLiner && (
+          <div className="mb-4 rounded-xl bg-accent-subtle px-4 py-3">
+            <p className="mb-1 text-xs font-medium text-accent">一言でいうと</p>
+            <p className="text-base font-semibold text-text">{j.oneLiner}</p>
+          </div>
+        )}
+
+        <div className="space-y-3">
+          {j.whyItMatters && (
+            <SeminarSection label="何が重要なのか">
+              <p className="whitespace-pre-wrap text-sm leading-relaxed text-text">{j.whyItMatters}</p>
+            </SeminarSection>
+          )}
+          {j.prerequisites && (
+            <SeminarSection label="前提知識">
+              <p className="whitespace-pre-wrap text-sm leading-relaxed text-text">{j.prerequisites}</p>
+            </SeminarSection>
+          )}
+          {j.claimBreakdown && (
+            <SeminarSection label="主張の分解">
+              <div className="space-y-2 text-sm">
+                {j.claimBreakdown.claim && <p><span className="font-medium text-text">主張: </span><span className="text-text-secondary">{j.claimBreakdown.claim}</span></p>}
+                {j.claimBreakdown.background && <p><span className="font-medium text-text">背景: </span><span className="text-text-secondary">{j.claimBreakdown.background}</span></p>}
+                {j.claimBreakdown.assumption && <p><span className="font-medium text-text">前提: </span><span className="text-text-secondary">{j.claimBreakdown.assumption}</span></p>}
+                {j.claimBreakdown.evidence && <p><span className="font-medium text-text">根拠: </span><span className="text-text-secondary">{j.claimBreakdown.evidence}</span></p>}
+                {j.claimBreakdown.counterExample && <p><span className="font-medium text-text">反例: </span><span className="text-text-secondary">{j.claimBreakdown.counterExample}</span></p>}
+                {j.claimBreakdown.limit && <p><span className="font-medium text-text">限界: </span><span className="text-text-secondary">{j.claimBreakdown.limit}</span></p>}
+              </div>
+            </SeminarSection>
+          )}
+          {j.strictLearningView && (
+            <SeminarSection label="厳密学習で見る">
+              <div className="space-y-3 text-sm">
+                {(j.strictLearningView.positiveExamples?.length ?? 0) > 0 && (
+                  <div>
+                    <p className="mb-1 text-xs font-medium text-success">✅ 正例（当てはまる例）</p>
+                    {renderList(j.strictLearningView.positiveExamples)}
+                  </div>
+                )}
+                {(j.strictLearningView.negativeExamples?.length ?? 0) > 0 && (
+                  <div>
+                    <p className="mb-1 text-xs font-medium text-danger">❌ 反例（似ているが違う例）</p>
+                    {renderList(j.strictLearningView.negativeExamples)}
+                  </div>
+                )}
+                {(j.strictLearningView.boundaryExamples?.length ?? 0) > 0 && (
+                  <div>
+                    <p className="mb-1 text-xs font-medium text-text-muted">⚖️ 境界事例</p>
+                    {renderList(j.strictLearningView.boundaryExamples)}
+                  </div>
+                )}
+                {(j.strictLearningView.necessaryConditions?.length ?? 0) > 0 && (
+                  <div>
+                    <p className="mb-1 text-xs font-medium text-accent">必要条件</p>
+                    {renderList(j.strictLearningView.necessaryConditions)}
+                  </div>
+                )}
+                {(j.strictLearningView.typicalFeatures?.length ?? 0) > 0 && (
+                  <div>
+                    <p className="mb-1 text-xs font-medium text-text-muted">典型特徴（本質ではない）</p>
+                    {renderList(j.strictLearningView.typicalFeatures)}
+                  </div>
+                )}
+                {j.strictLearningView.essence && (
+                  <div className="rounded-lg bg-accent-subtle px-3 py-2">
+                    <p className="mb-1 text-xs font-medium text-accent">本質</p>
+                    <p className="text-text">{j.strictLearningView.essence}</p>
+                  </div>
+                )}
+              </div>
+            </SeminarSection>
+          )}
+          {j.abstraction && (
+            <SeminarSection label="抽象化すると">
+              <p className="whitespace-pre-wrap text-sm leading-relaxed text-text">{j.abstraction}</p>
+            </SeminarSection>
+          )}
+          {(j.transferToOtherFields?.length ?? 0) > 0 && (
+            <SeminarSection label="別分野に転用すると">
+              <div className="space-y-2">
+                {j.transferToOtherFields!.map((t, i) => (
+                  <div key={i} className="rounded-lg border border-border px-3 py-2 text-sm">
+                    <p className="font-semibold text-text">{t.field}</p>
+                    <p className="mt-0.5 text-text-secondary">{t.application}</p>
+                  </div>
+                ))}
+              </div>
+            </SeminarSection>
+          )}
+          {j.applyToYourself && (
+            <SeminarSection label="自分に使うなら">
+              <p className="whitespace-pre-wrap text-sm leading-relaxed text-text">{j.applyToYourself}</p>
+            </SeminarSection>
+          )}
+          {j.fifteenMinuteExercise && (
+            <SeminarSection label="15分ワーク">
+              <div className="space-y-2 text-sm">
+                {j.fifteenMinuteExercise.goal && (
+                  <p><span className="font-medium text-text">ゴール: </span><span className="text-text-secondary">{j.fifteenMinuteExercise.goal}</span></p>
+                )}
+                {(j.fifteenMinuteExercise.steps?.length ?? 0) > 0 && (
+                  <ol className="list-inside list-decimal space-y-1">
+                    {j.fifteenMinuteExercise.steps!.map((s, i) => (
+                      <li key={i} className="text-text-secondary">{s}</li>
+                    ))}
+                  </ol>
+                )}
+                {j.fifteenMinuteExercise.deliverable && (
+                  <p className="rounded-lg bg-border-light px-3 py-2"><span className="font-medium text-text">成果物: </span><span className="text-text-secondary">{j.fifteenMinuteExercise.deliverable}</span></p>
+                )}
+              </div>
+            </SeminarSection>
+          )}
+        </div>
+      </Card>
+    );
+  }
+
   // ---------- Seminar rich display ----------
   if (outputType === "seminar" && contentJson) {
     type SeminarJson = {

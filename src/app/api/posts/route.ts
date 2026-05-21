@@ -4,6 +4,29 @@ import { getAiProvider } from "@/lib/ai/provider";
 import type { Prisma } from "@/generated/prisma/client";
 import { createFallbackClassification } from "@/lib/ai/fallback";
 
+const CORS_HEADERS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS, DELETE",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Extension-Token",
+};
+
+function corsJson(body: unknown, init?: ResponseInit) {
+  const response = NextResponse.json(body, init);
+  Object.entries(CORS_HEADERS).forEach(([k, v]) => response.headers.set(k, v));
+  return response;
+}
+
+function isExtensionAuthorized(request: Request): boolean {
+  const expected = process.env.EXTENSION_TOKEN;
+  if (!expected) return true; // unset = open (personal-use default)
+  const header = request.headers.get("x-extension-token") || "";
+  return header === expected;
+}
+
+export async function OPTIONS() {
+  return new NextResponse(null, { status: 204, headers: CORS_HEADERS });
+}
+
 const sortOptions = {
   savedAt_desc: { savedAt: "desc" },
   savedAt_asc: { savedAt: "asc" },
@@ -48,9 +71,9 @@ export async function GET(request: Request) {
       if (postType) where.classification.postType = postType;
     }
     if (digestStatus === "undigested") {
-      where.deepDiveSessions = { none: {} };
+      where.learningCard = null;
     } else if (digestStatus === "digested") {
-      where.deepDiveSessions = { some: {} };
+      where.learningCard = { isNot: null };
     }
 
     const posts = await prisma.post.findMany({
@@ -58,7 +81,6 @@ export async function GET(request: Request) {
       include: {
         classification: true,
         threadPosts: { select: { id: true } },
-        deepDiveSessions: { select: { id: true, status: true } },
         learningCard: { select: { id: true, status: true } },
       },
       orderBy: [
@@ -108,22 +130,81 @@ export async function DELETE(request: Request) {
   }
 }
 
-// POST /api/posts - Create a new post manually
+// POST /api/posts - Create a new post manually OR via browser extension.
+// Extension submissions include source="web" and a sourceUrl. They are stored
+// as manual-style posts and run through the same classification pipeline.
 export async function POST(request: Request) {
+  if (!isExtensionAuthorized(request)) {
+    return corsJson({ error: "認証されていません" }, { status: 401 });
+  }
+
   try {
     const body = await request.json();
-    const { text, genre, postType: inputPostType } = body;
+    const {
+      text,
+      genre,
+      postType: inputPostType,
+      source,
+      sourceUrl,
+      title,
+      content,
+      authorName,
+      authorUsername,
+    } = body as {
+      text?: string;
+      genre?: string;
+      postType?: string;
+      source?: string;
+      sourceUrl?: string;
+      title?: string;
+      content?: string;
+      authorName?: string;
+      authorUsername?: string;
+    };
 
-    if (!text || typeof text !== "string" || text.trim().length === 0) {
-      return NextResponse.json({ error: "投稿本文を入力してください" }, { status: 400 });
+    const isWeb = source === "web";
+
+    // For web submissions, build a "text" body that includes title + URL so the
+    // classifier sees something coherent even when the user clipped a long page.
+    const effectiveText = (() => {
+      if (text && typeof text === "string" && text.trim().length > 0) return text.trim();
+      if (isWeb) {
+        const parts: string[] = [];
+        if (title) parts.push(title);
+        if (sourceUrl) parts.push(sourceUrl);
+        if (content) parts.push(content);
+        const joined = parts.join("\n\n").trim();
+        return joined.length > 0 ? joined : null;
+      }
+      return null;
+    })();
+
+    if (!effectiveText) {
+      return corsJson({ error: "投稿本文を入力してください" }, { status: 400 });
     }
+
+    // For web submissions we keep the article body in urlCardJson so existing
+    // article-aware classification / learning prompts pick it up.
+    const urlCardJson = isWeb && sourceUrl
+      ? JSON.stringify({
+          expandedUrl: sourceUrl,
+          title: title || null,
+          description: content ? content.slice(0, 300) : null,
+          pastedContent: content || null,
+          pastedByUser: Boolean(content),
+        })
+      : null;
 
     // Create the post
     const post = await prisma.post.create({
       data: {
-        source: "manual",
+        source: isWeb ? "web" : "manual",
         savedType: "manual",
-        text: text.trim(),
+        text: effectiveText,
+        sourceUrl: isWeb ? sourceUrl ?? null : null,
+        authorName: authorName ?? (isWeb && sourceUrl ? hostnameOf(sourceUrl) : null),
+        authorUsername: authorUsername ?? null,
+        urlCardJson,
         savedAt: new Date(),
       },
     });
@@ -131,7 +212,10 @@ export async function POST(request: Request) {
     // Attempt AI classification
     try {
       const provider = getAiProvider();
-      const classification = await provider.classifyPost({ text: text.trim() });
+      const classification = await provider.classifyPost({
+        text: effectiveText,
+        articleContent: isWeb ? content : undefined,
+      });
 
       await prisma.postClassification.create({
         data: {
@@ -150,7 +234,7 @@ export async function POST(request: Request) {
       });
     } catch (error) {
       console.error("Manual post classification failed, using fallback:", error);
-      const classification = createFallbackClassification({ text: text.trim() });
+      const classification = createFallbackClassification({ text: effectiveText });
       await prisma.postClassification.create({
         data: {
           postId: post.id,
@@ -173,9 +257,17 @@ export async function POST(request: Request) {
       include: { classification: true },
     });
 
-    return NextResponse.json(result, { status: 201 });
+    return corsJson(result, { status: 201 });
   } catch (error) {
     console.error("Failed to create post:", error);
-    return NextResponse.json({ error: "投稿の保存に失敗しました" }, { status: 500 });
+    return corsJson({ error: "投稿の保存に失敗しました" }, { status: 500 });
+  }
+}
+
+function hostnameOf(url: string): string | null {
+  try {
+    return new URL(url).hostname;
+  } catch {
+    return null;
   }
 }

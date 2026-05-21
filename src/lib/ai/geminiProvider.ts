@@ -4,8 +4,6 @@ import type {
   ChatMessage,
   ClassifyPostInput,
   PostClassificationResult,
-  GenerateDeepDiveSessionInput,
-  GeneratedDeepDiveSessionResult,
   GenerateOutputInput,
   GeneratedOutputResult,
   LearningOutput,
@@ -20,7 +18,6 @@ import type {
 import {
   buildChatPrompt,
   buildClassifyPrompt,
-  buildDeepDivePrompt,
   buildLearningPrompt,
   buildOutputPrompt,
   buildSemanticSearchPrompt,
@@ -29,7 +26,6 @@ import {
 } from "./prompts";
 import { parseAiJson } from "./json";
 import {
-  isGeneratedDeepDiveSessionResult,
   isGeneratedOutputResult,
   isLearningOutput,
   isPostClassificationResult,
@@ -88,12 +84,6 @@ export const geminiProvider: AiProvider = {
     const prompt = buildLearningPrompt(input);
     const result = await callGemini(prompt);
     return parseAiJson(result, isLearningOutput, "学習カード");
-  },
-
-  async generateDeepDiveSession(input: GenerateDeepDiveSessionInput): Promise<GeneratedDeepDiveSessionResult> {
-    const prompt = await buildDeepDivePrompt(input);
-    const result = await callGemini(prompt);
-    return parseAiJson(result, isGeneratedDeepDiveSessionResult, "深掘りセッション");
   },
 
   async generateOutput(input: GenerateOutputInput): Promise<GeneratedOutputResult> {

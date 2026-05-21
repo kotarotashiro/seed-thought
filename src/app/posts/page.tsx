@@ -30,7 +30,6 @@ interface PostListItem {
     primaryCategory: string;
   } | null;
   threadPosts?: { id: string }[];
-  deepDiveSessions?: { id: string; status: string }[];
   learningCard?: { id: string; status: string } | null;
 }
 

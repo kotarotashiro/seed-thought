@@ -207,9 +207,8 @@ async function main() {
   console.log("🌱 Seeding database...");
 
   // Clear existing data
-  await prisma.generatedOutput.deleteMany();
-  await prisma.deepDiveStep.deleteMany();
-  await prisma.deepDiveSession.deleteMany();
+  await prisma.learningCardOutput.deleteMany();
+  await prisma.learningCard.deleteMany();
   await prisma.postClassification.deleteMany();
   await prisma.xSyncRun.deleteMany();
   await prisma.xAccount.deleteMany();

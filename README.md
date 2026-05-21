@@ -1,8 +1,8 @@
 # SeedThought
 
 SeedThought turns saved X posts into learning notes and publishing drafts. It
-supports manual posts, Gemini-powered classification, guided deep-dive sessions,
-generated outputs, and X OAuth sync.
+supports manual posts, Gemini-powered classification, one-shot learning cards,
+strict-learning (さとり式) output, generated SNS drafts, and X OAuth sync.
 
 ## Local Setup
 
@@ -124,12 +124,22 @@ pnpm run db:studio
 
 1. Add a manual post from `/posts/new`.
 2. Confirm the Gemini classification appears on the home page and post detail.
-3. Start both deep-dive modes from a post.
-4. Save progress, resume from `/deep-dives`, and complete the session.
-5. Generate X, Instagram, note, and Markdown outputs from the complete page.
-6. Confirm completed sessions appear in `/notes`.
+3. Open `/posts/[id]/confirm` and click "学習カードを生成".
+4. Confirm the learning card renders (要約・構造・手順・マニュアル・応用・図解・画像生成プロンプト).
+5. From the learning card page, click "厳密学習で出力" and confirm the 9-section
+   strict-learning view renders.
+6. Generate X / Instagram / note / Markdown / セミナー outputs and confirm
+   history is preserved per learning card.
 7. Connect X from `/settings/x`, then disconnect to verify the full OAuth loop.
 8. If `like.read` and `bookmark.read` are enabled, run likes/bookmarks sync.
+
+## Browser Extension
+
+`extension/` contains a Manifest V3 Chrome extension that lets you send any
+webpage (note, Zenn, Qiita, blogs, …) to SeedThought via right-click or a popup
+button. Load it from `chrome://extensions` in developer mode and point it at
+your SeedThought URL. See [extension/README.md](extension/README.md) for setup
+and the optional `EXTENSION_TOKEN` shared-secret flow.
 
 ## Git/Data Notes
 

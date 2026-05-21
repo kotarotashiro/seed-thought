@@ -1,20 +1,18 @@
 "use client";
 
 import { useState, useEffect, use } from "react";
-import { useRouter } from "next/navigation";
 import { useSafeBack } from "@/hooks/useSafeBack";
 import Link from "next/link";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { PostTypeBadge, Badge, LearningStatusBadge } from "@/components/ui/Badge";
 import { PostMediaGrid, parsePostMedia } from "@/components/posts/PostMediaGrid";
+import { LinkifiedText } from "@/components/ui/LinkifiedText";
+import { OpenInXButton } from "@/components/ui/OpenInXButton";
 import {
   AlertCircle,
   ArrowLeft,
-  ArrowRight,
   BookOpen,
-  ChevronDown,
-  ChevronUp,
   ExternalLink,
   GitBranch,
   Languages,
@@ -24,22 +22,18 @@ import {
 } from "lucide-react";
 
 const X_ARTICLE_RE = /(?:x|twitter)\.com\/i\/article\//i;
-const ARTICLE_PREVIEW_CHARS = 240;
 
 export default function ConfirmPage({ params }: { params: Promise<{ postId: string }> }) {
   const { postId } = use(params);
-  const router = useRouter();
   const safeBack = useSafeBack();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [post, setPost] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [fetchingThread, setFetchingThread] = useState(false);
   const [deletingThread, setDeletingThread] = useState(false);
-  const [creatingDeepDive, setCreatingDeepDive] = useState(false);
   const [selectedThreadIds, setSelectedThreadIds] = useState<string[]>([]);
   const [threadMessage, setThreadMessage] = useState<string | null>(null);
   const [threadError, setThreadError] = useState<string | null>(null);
-  const [articleExpanded, setArticleExpanded] = useState(false);
 
   const loadPost = async () => {
     try {
@@ -135,29 +129,6 @@ export default function ConfirmPage({ params }: { params: Promise<{ postId: stri
     }
   };
 
-  const handleStartDeepDive = async () => {
-    setCreatingDeepDive(true);
-
-    try {
-      const res = await fetch("/api/deep-dive/sessions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ postId, mode: "thought_lens" }),
-      });
-      const data = await res.json();
-
-      if (!res.ok || data.error) {
-        throw new Error(data.error || "深掘りセッションの作成に失敗しました");
-      }
-
-      router.push(`/deep-dive/${data.id}/thought`);
-    } catch (error) {
-      console.error("Failed to create thought session:", error);
-      alert(error instanceof Error ? error.message : "深掘りセッションの作成に失敗しました");
-      setCreatingDeepDive(false);
-    }
-  };
-
   if (loading) {
     return (
       <div className="max-w-2xl mx-auto space-y-6 animate-pulse">
@@ -193,7 +164,7 @@ export default function ConfirmPage({ params }: { params: Promise<{ postId: stri
 
       {/* Title */}
       <div>
-        <h1 className="mb-2 text-xl font-bold text-text sm:text-2xl">この投稿を深掘る？</h1>
+        <h1 className="mb-2 text-xl font-bold text-text sm:text-2xl">この投稿を学ぶ？</h1>
         <p className="text-sm text-text-secondary">
           始める前に、投稿の内容を確認します。
         </p>
@@ -217,17 +188,7 @@ export default function ConfirmPage({ params }: { params: Promise<{ postId: stri
               </p>
             </div>
           </div>
-          {post.sourceUrl && (
-            <a
-              href={post.sourceUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="flex items-center gap-1.5 flex-shrink-0 text-xs text-text-muted hover:text-accent transition-colors rounded-lg border border-border px-2.5 py-1.5"
-            >
-              <ExternalLink className="w-3.5 h-3.5" />
-              Xで開く
-            </a>
-          )}
+          {post.sourceUrl && <OpenInXButton href={post.sourceUrl} />}
         </div>
         {(() => {
           const isUrlOnly = /^https?:\/\/\S+$/.test((post.text || "").trim());
@@ -251,7 +212,7 @@ export default function ConfirmPage({ params }: { params: Promise<{ postId: stri
 
             return (
               <>
-                <p className="mb-3 truncate text-xs text-text-muted">{post.text.trim()}</p>
+                <p className="mb-3 whitespace-pre-wrap break-all text-xs text-text-muted">{post.text.trim()}</p>
                 {isXArticle && expandedUrl ? (
                   <a
                     href={expandedUrl}
@@ -283,12 +244,12 @@ export default function ConfirmPage({ params }: { params: Promise<{ postId: stri
                     )}
                     <div className="px-4 py-3">
                       {urlCard.title && (
-                        <p className="mb-1 line-clamp-2 text-sm font-medium text-text">{urlCard.title}</p>
+                        <p className="mb-1 text-sm font-medium text-text">{urlCard.title}</p>
                       )}
                       {urlCard.description && (
-                        <p className="line-clamp-3 text-xs text-text-secondary">{urlCard.description}</p>
+                        <p className="whitespace-pre-wrap text-xs leading-relaxed text-text-secondary">{urlCard.description}</p>
                       )}
-                      <p className="mt-1 truncate text-xs text-text-muted">{expandedUrl}</p>
+                      <p className="mt-1 break-all text-xs text-text-muted">{expandedUrl}</p>
                     </div>
                   </a>
                 ) : expandedUrl ? (
@@ -299,40 +260,17 @@ export default function ConfirmPage({ params }: { params: Promise<{ postId: stri
                     className="flex items-center gap-2 rounded-xl border border-border px-3 py-2 text-xs text-text-secondary transition-colors hover:border-accent/40"
                   >
                     <ExternalLink className="h-3.5 w-3.5 flex-shrink-0" />
-                    <span className="flex-1 truncate">{expandedUrl}</span>
+                    <span className="flex-1 break-all">{expandedUrl}</span>
                   </a>
                 ) : null}
                 {pastedContent && (
                   <div className="mt-3 rounded-xl border border-border bg-border-light px-4 py-3">
-                    <div className="mb-2 flex items-center justify-between gap-2">
-                      <p className="flex items-center gap-1 text-xs font-semibold text-text-secondary">
-                        <Newspaper className="h-3.5 w-3.5 text-accent" />
-                        記事テキスト（貼り付け済み）
-                      </p>
-                      {pastedContent.length > ARTICLE_PREVIEW_CHARS && (
-                        <button
-                          type="button"
-                          onClick={() => setArticleExpanded((v) => !v)}
-                          className="flex items-center gap-1 text-xs text-accent hover:text-accent-hover"
-                        >
-                          {articleExpanded ? (
-                            <>
-                              折りたたむ
-                              <ChevronUp className="h-3 w-3" />
-                            </>
-                          ) : (
-                            <>
-                              全文を見る
-                              <ChevronDown className="h-3 w-3" />
-                            </>
-                          )}
-                        </button>
-                      )}
-                    </div>
+                    <p className="mb-2 flex items-center gap-1 text-xs font-semibold text-text-secondary">
+                      <Newspaper className="h-3.5 w-3.5 text-accent" />
+                      記事テキスト（貼り付け済み）
+                    </p>
                     <p className="whitespace-pre-wrap text-sm leading-relaxed text-text">
-                      {articleExpanded || pastedContent.length <= ARTICLE_PREVIEW_CHARS
-                        ? pastedContent
-                        : pastedContent.slice(0, ARTICLE_PREVIEW_CHARS) + "…"}
+                      {pastedContent}
                     </p>
                   </div>
                 )}
@@ -340,7 +278,9 @@ export default function ConfirmPage({ params }: { params: Promise<{ postId: stri
             );
           }
           return (
-            <p className="whitespace-pre-wrap text-sm leading-relaxed text-text">{post.text}</p>
+            <p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-text">
+              <LinkifiedText text={post.text} />
+            </p>
           );
         })()}
         {post.translatedText && (
@@ -402,7 +342,7 @@ export default function ConfirmPage({ params }: { params: Promise<{ postId: stri
           </div>
           <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-xs text-text-muted">
-              選択した続き投稿だけ削除できます。深掘り作成時は、残っているツリー全体を含めます。
+              選択した続き投稿だけ削除できます。学習カード生成時は、残っているツリー全体を含めます。
             </p>
             <Button
               variant="danger"
@@ -428,8 +368,8 @@ export default function ConfirmPage({ params }: { params: Promise<{ postId: stri
                   />
                   {threadPost.threadOrder + 1}投稿目
                 </label>
-                <p className="whitespace-pre-wrap text-sm leading-relaxed text-text">
-                  {threadPost.text}
+                <p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-text">
+                  <LinkifiedText text={threadPost.text} />
                 </p>
                 {threadPost.translatedText && (
                   <p className="mt-2 rounded-lg bg-white/70 px-3 py-2 text-sm leading-relaxed text-text-secondary">
@@ -463,17 +403,9 @@ export default function ConfirmPage({ params }: { params: Promise<{ postId: stri
         <Link href={`/posts/${postId}/learning`} className="flex-1">
           <Button className="w-full">
             <BookOpen className="w-4 h-4 mr-2" />
-            学ぶ
+            学習カードを生成
           </Button>
         </Link>
-        <Button
-          onClick={handleStartDeepDive}
-          loading={creatingDeepDive}
-          loadingLabel="開始中..."
-          className="flex-1"
-        >
-          深掘りを始める
-        </Button>
       </div>
 
       {/* Bottom back button */}

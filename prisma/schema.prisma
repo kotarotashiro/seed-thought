@@ -30,7 +30,6 @@ model Post {
   updatedAt       DateTime @updatedAt
 
   classification  PostClassification?
-  deepDiveSessions DeepDiveSession[]
   threadPosts      ThreadPost[]
   learningCard     LearningCard?
 
@@ -59,7 +58,7 @@ model LearningCard {
 model LearningCardOutput {
   id             String   @id @default(cuid())
   learningCardId String
-  outputType     String   // "x" | "instagram" | "note" | "markdown_log" | "seminar"
+  outputType     String   // "x" | "instagram" | "note" | "markdown_log" | "seminar" | "strict_learning"
   title          String
   content        String
   contentJson    String?  // JSON object
@@ -110,55 +109,6 @@ model PostClassification {
   updatedAt             DateTime @updatedAt
 
   post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
-}
-
-model DeepDiveSession {
-  id            String    @id @default(cuid())
-  postId        String
-  mode          String    // "thought_lens" | "learning_lesson"
-  status        String    @default("in_progress") // "in_progress" | "completed" | "archived"
-  currentStep   Int       @default(0)
-  finalSummary  String?
-  userFinalNote String?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  completedAt   DateTime?
-
-  post  Post             @relation(fields: [postId], references: [id], onDelete: Cascade)
-  steps DeepDiveStep[]
-  outputs GeneratedOutput[]
-}
-
-model DeepDiveStep {
-  id            String   @id @default(cuid())
-  sessionId     String
-  stepIndex     Int
-  stepKey       String
-  title         String
-  question      String
-  aiContentJson String   // JSON object
-  userNote      String?
-  completed     Boolean  @default(false)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-
-  session DeepDiveSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-
-  @@unique([sessionId, stepIndex])
-}
-
-model GeneratedOutput {
-  id          String   @id @default(cuid())
-  sessionId   String
-  outputType  String   // "x" | "instagram" | "note" | "markdown_log"
-  title       String
-  content     String
-  contentJson String?  // JSON object
-  status      String   @default("draft") // "draft" | "copied" | "exported"
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  session DeepDiveSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 }
 
 model XAccount {

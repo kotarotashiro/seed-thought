@@ -79,8 +79,8 @@ export function PostFilters({
             onChange={(e) => onDigestStatusChange(e.target.value)}
             options={[
               { value: "", label: "すべての状態" },
-              { value: "undigested", label: "未消化" },
-              { value: "digested", label: "深掘り済み" },
+              { value: "undigested", label: "未学習" },
+              { value: "digested", label: "学習済み" },
             ]}
           />
         </div>

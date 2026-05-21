@@ -20,10 +20,6 @@ export async function GET(
       include: {
         classification: true,
         threadPosts: { orderBy: { threadOrder: "asc" } },
-        deepDiveSessions: {
-          include: { steps: true },
-          orderBy: { createdAt: "desc" },
-        },
         learningCard: true,
       },
     });
@@ -41,10 +37,6 @@ export async function GET(
           include: {
             classification: true,
             threadPosts: { orderBy: { threadOrder: "asc" } },
-            deepDiveSessions: {
-              include: { steps: true },
-              orderBy: { createdAt: "desc" },
-            },
             learningCard: true,
           },
         });
@@ -109,10 +101,6 @@ export async function GET(
         include: {
           classification: true,
           threadPosts: { orderBy: { threadOrder: "asc" } },
-          deepDiveSessions: {
-            include: { steps: true },
-            orderBy: { createdAt: "desc" },
-          },
           learningCard: true,
         },
       });
