@@ -34,6 +34,7 @@ Required local and production variables:
 
 ```env
 DATABASE_URL="postgresql://USER:PASSWORD@HOST/DB?sslmode=require"
+DIRECT_URL="postgresql://USER:PASSWORD@DIRECT_HOST/DB?sslmode=require"
 AI_PROVIDER="gemini"
 GEMINI_API_KEY="..."
 GEMINI_MODEL="gemini-2.0-flash"
@@ -50,7 +51,9 @@ values. For a demo without external AI, set `AI_PROVIDER="mock"`.
 ## Database
 
 Create a Neon or Vercel Postgres database and set `DATABASE_URL` to its pooled
-or serverless-safe connection string. Apply migrations with:
+or serverless-safe connection string. On Neon, also set `DIRECT_URL` to the
+non-pooled connection string so Prisma CLI migrations avoid pooler advisory lock
+issues. Apply migrations with:
 
 ```bash
 pnpm run db:deploy
@@ -72,11 +75,13 @@ pnpm run db:seed
 
 1. Create a Vercel project from this repository.
 2. Connect Neon/Vercel Postgres and set `DATABASE_URL`.
-3. Add the required environment variables in Vercel Project Settings.
-4. Set `X_REDIRECT_URI` to `https://<vercel-domain>/api/x/callback`.
-5. Run `pnpm run db:deploy` against the production `DATABASE_URL`.
-6. Deploy with the configured `pnpm build` command.
-7. Enable Vercel Deployment Protection or Password Protection for personal use.
+3. Add `DIRECT_URL` in Vercel Project Settings when using Neon; use the
+   connection string without `-pooler` in the host.
+4. Add the required environment variables in Vercel Project Settings.
+5. Set `X_REDIRECT_URI` to `https://<vercel-domain>/api/x/callback`.
+6. Run `pnpm run db:deploy` against the production database.
+7. Deploy with the configured `pnpm build` command.
+8. Enable Vercel Deployment Protection or Password Protection for personal use.
 
 The app does not include application-level login. Do not expose the production
 deployment without Vercel-side protection unless you add authentication first.
