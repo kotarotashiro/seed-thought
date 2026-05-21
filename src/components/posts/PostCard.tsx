@@ -7,7 +7,6 @@ import { Card } from "@/components/ui/Card";
 import { PostTypeBadge, SavedTypeBadge, Badge, LearningStatusBadge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { PostMediaGrid, parsePostMedia } from "@/components/posts/PostMediaGrid";
-import { PostChatModal } from "@/components/posts/PostChatModal";
 import {
   ArrowRight,
   BookOpen,
@@ -18,7 +17,6 @@ import {
   User,
   ExternalLink,
   Languages,
-  MessageCircle,
   Newspaper,
   Clipboard,
   Pencil,
@@ -92,7 +90,6 @@ export function PostCard({
   onToggleSelect,
 }: PostCardProps) {
   const router = useRouter();
-  const [chatOpen, setChatOpen] = useState(false);
   const [article, setArticle] = useState<ArticlePreview | null>(() => {
     if (!post.urlCardJson) return null;
     try {
@@ -472,14 +469,6 @@ export function PostCard({
               </Button>
             </Link>
           )}
-          <Button
-            variant="ghost"
-            size="sm"
-            title="この投稿についてチャット"
-            onClick={(e) => { stop(e); setChatOpen(true); }}
-          >
-            <MessageCircle className="w-4 h-4" />
-          </Button>
           {(post.sourceUrl || articleUrl) && (
             <a
               href={post.sourceUrl || articleUrl!}
@@ -505,12 +494,6 @@ export function PostCard({
         </div>
       </Card>
 
-      {chatOpen && (
-        <PostChatModal
-          post={{ id: post.id, text: post.text, authorName: post.authorName, classification: post.classification ?? null }}
-          onClose={() => setChatOpen(false)}
-        />
-      )}
     </>
   );
 }

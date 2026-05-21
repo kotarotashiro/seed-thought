@@ -201,20 +201,33 @@ export default function ConfirmPage({ params }: { params: Promise<{ postId: stri
 
       {/* Original Post */}
       <Card>
-        <div className="mb-3 flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-accent-light flex items-center justify-center overflow-hidden">
-            {post.authorAvatarUrl ? (
-              <img src={post.authorAvatarUrl} alt="" className="w-full h-full object-cover" />
-            ) : (
-              <User className="w-5 h-5 text-accent" />
-            )}
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-10 h-10 rounded-full bg-accent-light flex items-center justify-center overflow-hidden flex-shrink-0">
+              {post.authorAvatarUrl ? (
+                <img src={post.authorAvatarUrl} alt="" className="w-full h-full object-cover" />
+              ) : (
+                <User className="w-5 h-5 text-accent" />
+              )}
+            </div>
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-text">{post.authorName || "手動追加"}</p>
+              <p className="text-xs text-text-muted">
+                {post.authorUsername ? `@${post.authorUsername}` : ""}
+              </p>
+            </div>
           </div>
-          <div>
-            <p className="text-sm font-medium text-text">{post.authorName || "手動追加"}</p>
-            <p className="text-xs text-text-muted">
-              {post.authorUsername ? `@${post.authorUsername}` : ""}
-            </p>
-          </div>
+          {post.sourceUrl && (
+            <a
+              href={post.sourceUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="flex items-center gap-1.5 flex-shrink-0 text-xs text-text-muted hover:text-accent transition-colors rounded-lg border border-border px-2.5 py-1.5"
+            >
+              <ExternalLink className="w-3.5 h-3.5" />
+              Xで開く
+            </a>
+          )}
         </div>
         {(() => {
           const isUrlOnly = /^https?:\/\/\S+$/.test((post.text || "").trim());

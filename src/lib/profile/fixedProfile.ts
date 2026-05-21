@@ -6,6 +6,7 @@ export const fixedProfile = {
   themes: ["AI活用", "Instagram", "公式LINE", "チラシ", "セミナー", "マーケティング"],
   outputChannels: ["X", "Instagram", "note"],
   tone: "やさしく、実用的で、少し本音感のある文章",
+  knowledge: "",
 } as const;
 
 export type FixedProfile = {
@@ -14,6 +15,7 @@ export type FixedProfile = {
   themes: string[];
   outputChannels: string[];
   tone: string;
+  knowledge: string;
 };
 
 const PROFILE_SETTING_KEY = "profile";
@@ -38,6 +40,7 @@ export function normalizeProfile(value: ProfileInput): FixedProfile {
     themes: normalizeList(value.themes, fixedProfile.themes),
     outputChannels: normalizeList(value.outputChannels, fixedProfile.outputChannels),
     tone: String(value.tone || fixedProfile.tone).trim() || fixedProfile.tone,
+    knowledge: typeof value.knowledge === "string" ? value.knowledge : fixedProfile.knowledge,
   };
 }
 

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Archive, BookOpen, Home, MessageCircle, Search, Settings, Sprout } from "lucide-react";
+import { Archive, BookOpen, Home, Search, Settings, Sprout } from "lucide-react";
 import { clsx } from "clsx";
 
 const mobileItems = [
@@ -10,7 +10,6 @@ const mobileItems = [
   { href: "/posts", label: "保存", icon: Archive },
   { href: "/knowhow", label: "カード", icon: BookOpen },
   { href: "/search", label: "検索", icon: Search },
-  { href: "/chat", label: "チャット", icon: MessageCircle },
   { href: "/settings", label: "設定", icon: Settings },
 ];
 
@@ -34,7 +33,7 @@ export function MobileNav() {
       </header>
 
       <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-border bg-white/95 px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur md:hidden">
-        <div className="grid grid-cols-6 gap-1">
+        <div className="grid grid-cols-5 gap-1">
           {mobileItems.map((item) => {
             const Icon = item.icon;
             const active = isActivePath(pathname, item.href);

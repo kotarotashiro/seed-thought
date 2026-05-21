@@ -5,7 +5,7 @@ import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Select } from "@/components/ui/Select";
-import { AlertCircle, CheckCircle, Cpu, KeyRound, Settings, User, Save } from "lucide-react";
+import { AlertCircle, CheckCircle, Cpu, KeyRound, Settings, User, Save, RefreshCw } from "lucide-react";
 
 type ProfileForm = {
   name: string;
@@ -13,6 +13,7 @@ type ProfileForm = {
   themes: string[];
   outputChannels: string[];
   tone: string;
+  knowledge: string;
 };
 
 type AiProviderOption = {
@@ -96,11 +97,13 @@ export default function SettingsPage() {
     themes: [],
     outputChannels: [],
     tone: "",
+    knowledge: "",
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [savingAi, setSavingAi] = useState(false);
   const [testingAi, setTestingAi] = useState(false);
+  const [refreshingModels, setRefreshingModels] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -134,6 +137,7 @@ export default function SettingsPage() {
           themes: profileData.themes || [],
           outputChannels: profileData.outputChannels || [],
           tone: profileData.tone || "",
+          knowledge: profileData.knowledge || "",
         });
       } catch {
         if (!cancelled) setError("設定の読み込みに失敗しました");
@@ -163,6 +167,7 @@ export default function SettingsPage() {
           themes: profile.themes,
           outputChannels: profile.outputChannels,
           tone: profile.tone,
+          knowledge: profile.knowledge,
         }),
       });
       const data = await res.json();
@@ -178,6 +183,7 @@ export default function SettingsPage() {
         themes: data.themes || [],
         outputChannels: data.outputChannels || [],
         tone: data.tone,
+        knowledge: data.knowledge || "",
       });
       window.dispatchEvent(new CustomEvent("profile-updated", { detail: data }));
       setMessage("プロフィール設定を保存しました。次回のAI分類・深掘り・アウトプット生成から反映されます。");
@@ -234,6 +240,30 @@ export default function SettingsPage() {
       setError("AI設定の保存に失敗しました");
     } finally {
       setSavingAi(false);
+    }
+  };
+
+  const handleRefreshModels = async () => {
+    setRefreshingModels(true);
+    setError(null);
+    setMessage(null);
+
+    try {
+      const res = await fetch("/api/settings/ai");
+      const data = await res.json();
+      if (!res.ok || data.error) {
+        setError(data.error || "モデルの取得に失敗しました");
+        return;
+      }
+      setAiSettings((current) => ({
+        ...current,
+        providers: data.providers || [],
+      }));
+      setMessage("利用可能なモデルを最新情報に更新しました。");
+    } catch {
+      setError("モデルの取得に失敗しました");
+    } finally {
+      setRefreshingModels(false);
     }
   };
 
@@ -320,11 +350,22 @@ export default function SettingsPage() {
                 }
                 options={getModelOptions(aiSettings)}
               />
-              <p className="mt-1.5 text-xs text-text-muted">
-                {getCurrentProviderOption(aiSettings)?.modelsSource === "live"
-                  ? "公式APIから取得した最新候補です。"
-                  : "公式APIで取得できない場合の推奨候補です。"}
-              </p>
+              <div className="mt-1.5 flex items-center gap-2">
+                <p className="flex-1 text-xs text-text-muted">
+                  {getCurrentProviderOption(aiSettings)?.modelsSource === "live"
+                    ? "公式APIから取得した最新候補です。"
+                    : "公式APIで取得できない場合の推奨候補です。"}
+                </p>
+                <button
+                  type="button"
+                  onClick={handleRefreshModels}
+                  disabled={refreshingModels || savingAi}
+                  className="flex items-center gap-1 text-xs text-accent hover:text-accent-hover disabled:opacity-50 transition-colors"
+                >
+                  <RefreshCw className={`w-3 h-3 ${refreshingModels ? "animate-spin" : ""}`} />
+                  更新
+                </button>
+              </div>
             </div>
           </div>
           <label className="block">
@@ -469,6 +510,21 @@ export default function SettingsPage() {
               onChange={(e) => setProfile((current) => ({ ...current, tone: e.target.value }))}
               options={toneOptions.map((value) => ({ value, label: value }))}
             />
+            <label className="block">
+              <span className="block text-sm font-medium text-text mb-1">
+                ナレッジ・発信コンテキスト
+              </span>
+              <p className="mb-2 text-xs text-text-muted">
+                あなたの専門性・発信背景・ターゲット読者などをAIに伝えるテキストです。アウトプット生成やセミナー作成の精度が上がります。
+              </p>
+              <textarea
+                value={profile.knowledge}
+                onChange={(e) => setProfile((current) => ({ ...current, knowledge: e.target.value }))}
+                placeholder={"例）私はAI活用×Instagram集客を専門とする個人クリエイターです。\n主なターゲットは地方の女性起業家（30〜50代）で、難しい専門用語を使わず、すぐに行動できる実用的なノウハウを届けています。\nSNSの発信歴は3年で、フォロワーは約2,000人です。"}
+                rows={6}
+                className="w-full rounded-xl border border-border bg-white px-4 py-3 text-sm text-text outline-none focus:border-accent resize-none leading-relaxed"
+              />
+            </label>
           </div>
         )}
       </Card>

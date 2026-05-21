@@ -23,7 +23,7 @@ export async function buildClassifyPrompt(input: ClassifyPostInput): Promise<str
 役割: ${profile.role}
 テーマ: ${profile.themes.join("、")}
 出力チャンネル: ${profile.outputChannels.join("、")}
-トーン: ${profile.tone}
+トーン: ${profile.tone}${profile.knowledge ? `\nナレッジ・コンテキスト: ${profile.knowledge}` : ""}
 
 ## 投稿本文
 ${input.text}
@@ -176,7 +176,7 @@ export async function buildDeepDivePrompt(input: GenerateDeepDiveSessionInput): 
 名前: ${profile.name}
 役割: ${profile.role}
 テーマ: ${profile.themes.join("、")}
-トーン: ${profile.tone}
+トーン: ${profile.tone}${profile.knowledge ? `\nナレッジ・コンテキスト: ${profile.knowledge}` : ""}
 
 ## 元投稿
 ${input.postText}
@@ -258,7 +258,7 @@ export async function buildOutputPrompt(input: GenerateOutputInput): Promise<str
 役割: ${profile.role}
 テーマ: ${profile.themes.join("、")}
 出力チャンネル: ${profile.outputChannels.join("、")}
-トーン: ${profile.tone}
+トーン: ${profile.tone}${profile.knowledge ? `\nナレッジ・コンテキスト: ${profile.knowledge}` : ""}
 
 ## 元投稿（参考のみ、転載禁止）
 ${input.postText}
