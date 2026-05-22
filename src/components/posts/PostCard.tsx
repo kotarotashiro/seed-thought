@@ -456,13 +456,6 @@ export function PostCard({
               学習する
             </Button>
           </Link>
-          {showLearningButton && (
-            <Link href={`/posts/${post.id}/learning`} onClick={stop}>
-              <Button variant="ghost" size="sm" title="学習カードへ">
-                <BookOpen className="w-4 h-4" />
-              </Button>
-            </Link>
-          )}
           {(post.sourceUrl || articleUrl) && (
             <a
               href={post.sourceUrl || articleUrl!}
