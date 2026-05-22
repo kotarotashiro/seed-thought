@@ -151,7 +151,7 @@ export async function PUT(
 }
 
 // PATCH /api/posts/[postId]
-// Partial update — currently supports: urlCardJson
+// Partial update — supports: urlCardJson, videoTranscriptText
 // When urlCardJson is updated with newly-pasted article content, the post's
 // classification is cleared so the next GET reclassifies using the article
 // body (rather than the bare URL, which usually classifies as 不明).
@@ -161,26 +161,31 @@ export async function PATCH(
 ) {
   const { postId } = await params;
   try {
-    const body = (await request.json()) as { urlCardJson?: string };
-    if (body.urlCardJson === undefined) {
+    const body = (await request.json()) as { urlCardJson?: string; videoTranscriptText?: string | null };
+    if (body.urlCardJson === undefined && body.videoTranscriptText === undefined) {
       return NextResponse.json({ error: "更新するフィールドがありません" }, { status: 400 });
     }
 
-    // Detect whether the incoming urlCardJson includes user-pasted article
-    // content. If so, also wipe the existing classification so it will be
-    // regenerated next time the post is fetched, this time with the article
-    // body fed to the classify prompt.
+    const updateData: { urlCardJson?: string; videoTranscriptText?: string | null } = {};
+
     let hasNewPastedContent = false;
-    try {
-      const incoming = JSON.parse(body.urlCardJson) as { pastedByUser?: boolean; pastedContent?: string };
-      if (incoming.pastedByUser && typeof incoming.pastedContent === "string" && incoming.pastedContent.trim().length > 0) {
-        hasNewPastedContent = true;
-      }
-    } catch { /* invalid JSON — fall through */ }
+    if (body.urlCardJson !== undefined) {
+      updateData.urlCardJson = body.urlCardJson;
+      try {
+        const incoming = JSON.parse(body.urlCardJson) as { pastedByUser?: boolean; pastedContent?: string };
+        if (incoming.pastedByUser && typeof incoming.pastedContent === "string" && incoming.pastedContent.trim().length > 0) {
+          hasNewPastedContent = true;
+        }
+      } catch { /* invalid JSON — fall through */ }
+    }
+
+    if (body.videoTranscriptText !== undefined) {
+      updateData.videoTranscriptText = body.videoTranscriptText;
+    }
 
     await prisma.post.update({
       where: { id: postId },
-      data: { urlCardJson: body.urlCardJson },
+      data: updateData,
     });
 
     if (hasNewPastedContent) {

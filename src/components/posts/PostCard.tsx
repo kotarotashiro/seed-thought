@@ -36,6 +36,7 @@ interface PostCardProps {
     translatedText?: string | null;
     mediaJson?: string | null;
     urlCardJson?: string | null;
+    videoTranscriptText?: string | null;
     sourceUrl?: string | null;
     authorName?: string | null;
     authorUsername?: string | null;
@@ -114,8 +115,17 @@ export function PostCard({
     } catch { return null; }
   });
 
+  // Video transcript paste state
+  const [transcriptOpen, setTranscriptOpen] = useState(false);
+  const [transcriptValue, setTranscriptValue] = useState("");
+  const [transcriptSaving, setTranscriptSaving] = useState(false);
+  const [transcriptError, setTranscriptError] = useState<string | null>(null);
+  const [savedTranscript, setSavedTranscript] = useState<string | null>(post.videoTranscriptText ?? null);
+
   const isUrlOnly = URL_ONLY_RE.test(post.text.trim());
   const articleUrl = isUrlOnly ? post.text.trim() : null;
+  const postMedia = parsePostMedia(post.mediaJson);
+  const hasVideoMedia = postMedia.some(m => m.type === "video" || m.type === "animated_gif");
   const initialExpandedUrl = getExpandedUrl(post.urlCardJson);
   const [resolvedUrl, setResolvedUrl] = useState<string | null>(initialExpandedUrl);
   const isXArticle = resolvedUrl ? X_ARTICLE_RE.test(resolvedUrl) : false;
@@ -223,6 +233,32 @@ export function PostCard({
       setPasteError(err instanceof Error ? err.message : "保存に失敗しました");
     } finally {
       setPasteSaving(false);
+    }
+  };
+
+  const handleTranscriptSave = async (e: React.MouseEvent) => {
+    stop(e);
+    const text = transcriptValue.trim();
+    if (!text || transcriptSaving) return;
+    setTranscriptSaving(true);
+    setTranscriptError(null);
+    try {
+      const res = await fetch(`/api/posts/${post.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ videoTranscriptText: text }),
+      });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error((errData as { error?: string }).error || "保存に失敗しました");
+      }
+      setSavedTranscript(text);
+      setTranscriptOpen(false);
+      setTranscriptValue("");
+    } catch (err) {
+      setTranscriptError(err instanceof Error ? err.message : "保存に失敗しました");
+    } finally {
+      setTranscriptSaving(false);
     }
   };
 
@@ -423,7 +459,68 @@ export function PostCard({
           </div>
         )}
 
-        <PostMediaGrid media={parsePostMedia(post.mediaJson)} sourceUrl={post.sourceUrl} className="max-h-[220px]" />
+        <PostMediaGrid media={postMedia} sourceUrl={post.sourceUrl} className="max-h-[220px]" />
+
+        {/* Video transcript paste */}
+        {hasVideoMedia && (
+          <div className="mt-2" onClick={stop}>
+            {savedTranscript && !transcriptOpen && (
+              <div className="relative rounded-xl border border-border bg-border-light px-3 py-2">
+                <p className="line-clamp-3 whitespace-pre-wrap pr-7 text-xs leading-relaxed text-text-secondary">
+                  {savedTranscript}
+                </p>
+                <button
+                  className="absolute top-2 right-2 p-0.5 text-text-muted hover:text-accent transition-colors"
+                  onClick={(e) => { stop(e); setTranscriptValue(savedTranscript); setTranscriptOpen(true); }}
+                  title="編集"
+                >
+                  <Pencil className="w-3 h-3" />
+                </button>
+              </div>
+            )}
+            {!transcriptOpen && !savedTranscript && (
+              <button
+                className="w-full flex items-center justify-center gap-1.5 text-xs text-text-muted hover:text-accent transition-colors py-1.5 rounded-xl border border-dashed border-border hover:border-accent/40"
+                onClick={(e) => { stop(e); setTranscriptOpen(true); }}
+              >
+                <Clipboard className="w-3 h-3" />
+                動画の文字起こしを貼り付ける
+              </button>
+            )}
+            {transcriptOpen && (
+              <div className="space-y-2" onClick={stop}>
+                <textarea
+                  value={transcriptValue}
+                  onChange={(e) => setTranscriptValue(e.target.value)}
+                  placeholder="動画の文字起こしテキストをここに貼り付けてください..."
+                  className="w-full rounded-xl border border-border bg-white text-xs p-3 text-text resize-none focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent"
+                  rows={5}
+                  autoFocus
+                />
+                {transcriptError && (
+                  <p className="text-xs text-danger">{transcriptError}</p>
+                )}
+                <div className="flex gap-2 justify-end">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={(e) => { stop(e); setTranscriptOpen(false); setTranscriptValue(""); setTranscriptError(null); }}
+                  >
+                    キャンセル
+                  </Button>
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={handleTranscriptSave}
+                    disabled={!transcriptValue.trim() || transcriptSaving}
+                  >
+                    {transcriptSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "保存"}
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Classification Badges */}
         {post.classification && (

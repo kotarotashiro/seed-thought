@@ -34,6 +34,8 @@ export interface SourcePostForLearning {
   /** Article content when the post is a link to an external article */
   articleTitle?: string;
   articleDescription?: string;
+  /** User-pasted video transcript */
+  videoTranscript?: string;
   /** Learning mode: "content" extracts the topic itself, "format" extracts reusable patterns */
   learningMode?: "content" | "format";
 }

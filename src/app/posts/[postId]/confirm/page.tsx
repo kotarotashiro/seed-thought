@@ -295,6 +295,17 @@ export default function ConfirmPage({ params }: { params: Promise<{ postId: stri
           </div>
         )}
         <PostMediaGrid media={postMedia} />
+        {post.videoTranscriptText && (
+          <div className="mt-3 rounded-xl border border-border bg-border-light px-4 py-3">
+            <p className="mb-2 flex items-center gap-1 text-xs font-semibold text-text-secondary">
+              <Newspaper className="h-3.5 w-3.5 text-accent" />
+              動画文字起こし（貼り付け済み）
+            </p>
+            <p className="whitespace-pre-wrap text-sm leading-relaxed text-text">
+              {post.videoTranscriptText}
+            </p>
+          </div>
+        )}
         {post.classification && (
           <div className="flex gap-2 mt-3">
             <PostTypeBadge type={post.classification.postType} />

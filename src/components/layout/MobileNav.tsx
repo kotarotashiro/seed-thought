@@ -23,6 +23,7 @@ const mobileItems = [
   { href: "/posts", label: "保存", icon: Archive },
   { href: "/knowhow", label: "カード", icon: BookOpen },
   { href: "/search", label: "検索", icon: Search },
+  { href: "/settings/x", label: "X連携", icon: Link2 },
 ];
 
 const drawerItems = [
@@ -105,17 +106,6 @@ export function MobileNav() {
               </Link>
             );
           })}
-          <button
-            type="button"
-            onClick={() => setDrawerOpen(true)}
-            className={clsx(
-              "flex min-w-0 flex-col items-center justify-center gap-1 rounded-xl px-1 py-2 text-[10px] font-medium transition-colors",
-              "text-text-secondary hover:bg-border-light hover:text-text"
-            )}
-          >
-            <Menu className="h-5 w-5" />
-            <span className="truncate">メニュー</span>
-          </button>
         </div>
       </nav>
 
