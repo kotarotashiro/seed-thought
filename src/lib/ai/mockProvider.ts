@@ -11,6 +11,7 @@ import type {
   PostSummaryForTrend,
   SemanticSearchResult,
   SourcePostForLearning,
+  StrictLearningOutput,
   TranslateTextInput,
   TrendInsight,
 } from "./types";
@@ -170,6 +171,30 @@ export const mockProvider: AiProvider = {
       default:
         return { title: "出力", content: context };
     }
+  },
+
+  async generateStrictLearning(input: {
+    postText: string;
+    classification: { primaryCategory: string; summary: string };
+    learningCardJson?: string;
+    userMemo?: string | null;
+  }): Promise<StrictLearningOutput> {
+    await delay(600);
+    return createFallbackStrictLearning({
+      postText: input.postText,
+      classification: {
+        postType: "learning",
+        primaryCategory: input.classification.primaryCategory,
+        tags: [],
+        summary: input.classification.summary,
+        recommendReason: "",
+        difficultyLevel: "beginner",
+        thinkingPotentialScore: 70,
+        learningPotentialScore: 85,
+        outputPotentialScore: 60,
+        recommendedMode: "unknown",
+      },
+    });
   },
 
   async searchSemantically(_query: string, posts: PostSummaryForSearch[]): Promise<SemanticSearchResult> {

@@ -13,6 +13,7 @@ import type {
   PostSummaryForTrend,
   SemanticSearchResult,
   SourcePostForLearning,
+  StrictLearningOutput,
   TranslateTextInput,
   TrendInsight,
 } from "./types";
@@ -22,6 +23,7 @@ import {
   buildLearningPrompt,
   buildOutputPrompt,
   buildSemanticSearchPrompt,
+  buildStrictLearningPrompt,
   buildTranslatePrompt,
   buildTrendAnalysisPrompt,
 } from "./prompts";
@@ -31,6 +33,7 @@ import {
   isLearningOutput,
   isPostClassificationResult,
   isSemanticSearchResult,
+  isStrictLearningOutput,
   isTrendInsight,
   isTranslatedTextResult,
 } from "./validation";
@@ -210,6 +213,29 @@ export function getAiProvider(): AiProvider {
       const prompt = await buildOutputPrompt(input);
       const result = await callConfiguredAi(prompt);
       return parseAiJson(result, isGeneratedOutputResult, "アウトプット生成");
+    },
+
+    async generateStrictLearning(input: {
+      postText: string;
+      classification: { primaryCategory: string; summary: string };
+      learningCardJson?: string;
+      userMemo?: string | null;
+    }): Promise<StrictLearningOutput> {
+      const settings = await getAiRuntimeSettings();
+      if (settings.provider === "mock") return mockProvider.generateStrictLearning(input);
+
+      const prompt = await buildStrictLearningPrompt({
+        postText: input.postText,
+        classification: input.classification,
+        learningCardJson: input.learningCardJson,
+        userMemo: input.userMemo,
+      });
+      const result = await callConfiguredAi(prompt);
+      const wrapper = parseAiJson(result, isGeneratedOutputResult, "厳密学習");
+      if (!isStrictLearningOutput(wrapper.contentJson)) {
+        throw new Error("厳密学習の形式が不正です");
+      }
+      return wrapper.contentJson as unknown as StrictLearningOutput;
     },
 
     async searchSemantically(query: string, posts: PostSummaryForSearch[]): Promise<SemanticSearchResult> {

@@ -77,16 +77,30 @@ ${input.text}
 }
 
 export function buildLearningPrompt(input: SourcePostForLearning): string {
-  return `あなたは、X APIで収集された投稿データを、ユーザーが再利用できる「学習資産」に変換するAIです。
+  const mode = input.learningMode ?? "content";
 
-以下の投稿データを読み取り、単なる要約ではなく、ユーザーがあとから実践・応用・発信に使える形に変換してください。
+  const modeInstruction =
+    mode === "content"
+      ? `あなたは、X投稿（およびそのツリー）に含まれる事実・知識・手順を、
+ユーザーが自分の生活や仕事で実際に使えるように整理する学習コーチです。
+
+重要なのは、投稿を「発信の型」として分析することではなく、
+投稿の中で語られている内容そのもの（具体的な手順・知識・推奨事項・データ）を
+ユーザーが理解し、実践し、応用できる形に整えることです。
+
+- 投稿のテーマ領域（例：健康・薄毛なら健康分野）に踏み込んで、内容として学ぶ
+- 投稿者の主張・根拠・推奨アクションを尊重する
+- ユーザープロフィールへの転用は「応用アイデア」セクションでのみ行い、
+  要約・構造・手順・マニュアルでは投稿のテーマそのものを扱う
+- ツリー投稿が含まれている場合は、ツリー全体を1つの教材として扱う`
+      : `あなたは、X投稿を発信者視点で分析し、再利用可能な「型」を抽出するAIです。
 
 重要なのは、投稿を保存することではなく、投稿の中にある
-「構造」
-「手順」
-「発想」
-「応用可能な型」
-を抽出することです。
+「構造」「手順」「発想」「応用可能な型」
+を抽出することです。ユーザーのテーマ（SNS発信・コンテンツ制作）に転用できる
+形で構造化してください。`;
+
+  return `${modeInstruction}
 
 以下を必ず出力してください。
 
@@ -149,7 +163,7 @@ JSONのみ返してください。説明文は不要です。`;
 export async function buildStrictLearningPrompt(input: {
   postText: string;
   classification: { primaryCategory: string; summary: string };
-  learningCardJson: string;
+  learningCardJson?: string;
   userMemo?: string | null;
 }): Promise<string> {
   const profile = await getProfile();
@@ -170,9 +184,7 @@ ${input.postText}
 カテゴリ: ${input.classification.primaryCategory}
 要約: ${input.classification.summary}
 
-## 学習カードの既存解析
-${input.learningCardJson}
-
+${input.learningCardJson && input.learningCardJson !== "{}" ? `## 学習カードの既存解析（参考）\n${input.learningCardJson}\n` : ""}
 ${input.userMemo ? `## ユーザーメモ\n${input.userMemo}\n` : ""}
 
 ## 厳密学習OS（必ず参照してください）
