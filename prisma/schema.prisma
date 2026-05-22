@@ -51,11 +51,57 @@ model LearningCard {
   status       String   @default("draft") // "draft" | "saved"
   learningMode      String   @default("content")  // "content" | "format"
   strictLearningJson String?
+  // SRS (spaced repetition)
+  reviewLevel    Int       @default(0)
+  lastReviewedAt DateTime?
+  nextDueAt      DateTime?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
   sourcePost Post @relation(fields: [sourcePostId], references: [id], onDelete: Cascade)
   outputs    LearningCardOutput[]
+  images     LearningCardImage[]
+  collectionItems CollectionItem[]
+}
+
+model LearningCardImage {
+  id             String   @id @default(cuid())
+  learningCardId String
+  // "explanation" | "diagram"
+  kind           String
+  prompt         String
+  mimeType       String   @default("image/png")
+  dataBase64     String
+  createdAt      DateTime @default(now())
+
+  learningCard LearningCard @relation(fields: [learningCardId], references: [id], onDelete: Cascade)
+
+  @@index([learningCardId])
+}
+
+model Collection {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  outputJson  String?  // last generated bundled output (e.g. seminar)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  items CollectionItem[]
+}
+
+model CollectionItem {
+  id             String   @id @default(cuid())
+  collectionId   String
+  learningCardId String
+  order          Int      @default(0)
+  createdAt      DateTime @default(now())
+
+  collection   Collection   @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  learningCard LearningCard @relation(fields: [learningCardId], references: [id], onDelete: Cascade)
+
+  @@unique([collectionId, learningCardId])
+  @@index([collectionId, order])
 }
 
 model LearningCardOutput {

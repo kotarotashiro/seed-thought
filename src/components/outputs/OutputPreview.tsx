@@ -2,7 +2,7 @@
 
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
-import { Copy, Check, ChevronDown, ChevronUp } from "lucide-react";
+import { Copy, Check, ChevronDown, ChevronUp, ExternalLink, Send } from "lucide-react";
 import { useState } from "react";
 
 interface OutputPreviewProps {
@@ -31,12 +31,39 @@ function SeminarSection({ label, children }: { label: string; children: React.Re
 
 export function OutputPreview({ title, content, contentJson, outputType }: OutputPreviewProps) {
   const [copied, setCopied] = useState(false);
+  const [posting, setPosting] = useState(false);
+  const [postedUrl, setPostedUrl] = useState<string | null>(null);
+  const [postError, setPostError] = useState<string | null>(null);
 
   const handleCopy = async () => {
     await navigator.clipboard.writeText(content);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
+
+  const handlePostToX = async () => {
+    if (!confirm("Xに投稿します。続行しますか？\n（280字を超える場合は自動でスレッド分割されます）")) {
+      return;
+    }
+    setPosting(true);
+    setPostError(null);
+    try {
+      const res = await fetch("/api/x/post", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "投稿に失敗しました");
+      setPostedUrl(data.firstUrl || null);
+    } catch (e) {
+      setPostError((e as Error).message);
+    } finally {
+      setPosting(false);
+    }
+  };
+
+  const showXPostButton = outputType === "x";
 
   // ---------- Strict Learning display ----------
   if (outputType === "strict_learning" && contentJson) {
@@ -430,15 +457,29 @@ export function OutputPreview({ title, content, contentJson, outputType }: Outpu
   // ---------- Default display ----------
   return (
     <Card>
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
         <h3 className="text-base font-bold text-text">{title}</h3>
-        <Button variant="secondary" size="sm" onClick={handleCopy} className="gap-1.5">
-          {copied ? (
-            <><Check className="w-3.5 h-3.5" />コピーしました</>
-          ) : (
-            <><Copy className="w-3.5 h-3.5" />コピーする</>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="secondary" size="sm" onClick={handleCopy} className="gap-1.5">
+            {copied ? (
+              <><Check className="w-3.5 h-3.5" />コピーしました</>
+            ) : (
+              <><Copy className="w-3.5 h-3.5" />コピーする</>
+            )}
+          </Button>
+          {showXPostButton && (
+            <Button
+              size="sm"
+              onClick={handlePostToX}
+              loading={posting}
+              loadingLabel="投稿中..."
+              className="gap-1.5"
+            >
+              <Send className="w-3.5 h-3.5" />
+              Xに投稿
+            </Button>
           )}
-        </Button>
+        </div>
       </div>
 
       <div className="bg-border-light rounded-xl p-4">
@@ -446,6 +487,25 @@ export function OutputPreview({ title, content, contentJson, outputType }: Outpu
           {content}
         </pre>
       </div>
+
+      {postError && (
+        <div className="mt-3 rounded-lg border border-danger/30 bg-danger/5 px-3 py-2 text-xs text-danger">
+          {postError}
+        </div>
+      )}
+      {postedUrl && (
+        <div className="mt-3 rounded-lg border border-accent/30 bg-accent-light/30 px-3 py-2 text-xs">
+          <a
+            href={postedUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 font-medium text-accent hover:underline"
+          >
+            投稿しました
+            <ExternalLink className="h-3 w-3" />
+          </a>
+        </div>
+      )}
 
       {/* Instagram carousel slides preview */}
       {outputType === "instagram" && contentJson && "slides" in contentJson && (

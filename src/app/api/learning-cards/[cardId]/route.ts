@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
+import { initialDueDate } from "@/lib/srs/schedule";
 
 function mergeUserMemo(outputJson: string, userMemo: string | null | undefined): string {
   try {
@@ -56,6 +57,10 @@ export async function PUT(
       return NextResponse.json({ error: "学習カードが見つかりません" }, { status: 404 });
     }
 
+    // When a card is first promoted to "saved", schedule its first review.
+    const shouldScheduleFirstReview =
+      status === "saved" && current.status !== "saved" && !current.nextDueAt;
+
     const learningCard = await prisma.learningCard.update({
       where: { id: cardId },
       data: {
@@ -63,6 +68,7 @@ export async function PUT(
         ...(userMemo !== undefined
           ? { userMemo, outputJson: mergeUserMemo(current.outputJson, userMemo) }
           : {}),
+        ...(shouldScheduleFirstReview ? { nextDueAt: initialDueDate() } : {}),
       },
     });
 

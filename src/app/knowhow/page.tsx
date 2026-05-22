@@ -7,6 +7,7 @@ import {
   BookOpen,
   Calendar,
   CheckSquare,
+  Download,
   ExternalLink,
   FileText,
   Layers,
@@ -204,7 +205,7 @@ export default function KnowhowPage() {
       </div>
 
       {selectMode && (
-        <div className="flex items-center justify-between rounded-xl border border-border bg-white px-4 py-3">
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border bg-white px-4 py-3">
           <Button variant="ghost" size="sm" onClick={toggleSelectAll}>
             {allFilteredSelected ? (
               <CheckSquare className="h-4 w-4 mr-1.5 text-accent" />
@@ -213,15 +214,19 @@ export default function KnowhowPage() {
             )}
             全選択
           </Button>
-          <Button
-            variant="danger"
-            size="sm"
-            disabled={selectedIds.size === 0 || deleting}
-            onClick={() => handleDelete(Array.from(selectedIds))}
-          >
-            <Trash2 className="h-4 w-4 mr-1.5" />
-            削除 ({selectedIds.size})
-          </Button>
+          <div className="flex gap-2">
+            <ExportButton ids={Array.from(selectedIds)} format="zip" />
+            <ExportButton ids={Array.from(selectedIds)} format="bundle" />
+            <Button
+              variant="danger"
+              size="sm"
+              disabled={selectedIds.size === 0 || deleting}
+              onClick={() => handleDelete(Array.from(selectedIds))}
+            >
+              <Trash2 className="h-4 w-4 mr-1.5" />
+              削除 ({selectedIds.size})
+            </Button>
+          </div>
         </div>
       )}
 
@@ -350,5 +355,53 @@ export default function KnowhowPage() {
         </div>
       )}
     </div>
+  );
+}
+
+function ExportButton({ ids, format }: { ids: string[]; format: "zip" | "bundle" }) {
+  const [busy, setBusy] = useState(false);
+
+  const exportNow = async () => {
+    if (ids.length === 0) {
+      if (!confirm("選択がないため、保存済みカード全件を書き出します。続行しますか？")) return;
+    }
+    setBusy(true);
+    try {
+      const res = await fetch("/api/export", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids, format }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "エクスポートに失敗しました");
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      const stamp = new Date().toISOString().slice(0, 10);
+      a.download =
+        format === "zip" ? `seedthought-${stamp}.zip` : `seedthought-${stamp}.md`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      alert((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Button
+      variant="secondary"
+      size="sm"
+      onClick={exportNow}
+      loading={busy}
+      loadingLabel="作成中..."
+    >
+      <Download className="mr-1.5 h-4 w-4" />
+      {format === "zip" ? "ZIPで書き出す" : "1本のMDで書き出す"}
+    </Button>
   );
 }

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Badge, LearningStatusBadge } from "@/components/ui/Badge";
 import { PostMediaGrid, parsePostMedia } from "@/components/posts/PostMediaGrid";
+import { LearningCardImages } from "@/components/posts/LearningCardImages";
 import { OutputTypeCard } from "@/components/outputs/OutputTypeCard";
 import { OutputPreview } from "@/components/outputs/OutputPreview";
 import { LinkifiedText } from "@/components/ui/LinkifiedText";
@@ -996,6 +997,17 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
                   <Copy className="mr-1.5 h-4 w-4" />
                   コピー
                 </Button>
+
+                {card?.id && (
+                  <div className="mt-8">
+                    <SectionHeader icon={ImageIcon} title="生成画像" />
+                    <LearningCardImages
+                      cardId={card.id}
+                      explanationPrompt={output.imageExplanationPrompt || card.imagePrompt}
+                      diagramPrompt={card.diagramPrompt}
+                    />
+                  </div>
+                )}
               </div>
             )}
 

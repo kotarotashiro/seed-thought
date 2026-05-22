@@ -14,14 +14,20 @@ import {
   BookOpen,
   Search,
   TrendingUp,
+  Flame,
+  Layers,
+  MessageSquare,
 } from "lucide-react";
 import { clsx } from "clsx";
 
 const menuItems = [
   { href: "/", label: "ホーム", icon: Home },
+  { href: "/review", label: "今日の復習", icon: Flame },
   { href: "/posts", label: "保存一覧", icon: Archive },
   { href: "/knowhow", label: "学習カード一覧", icon: BookOpen },
+  { href: "/collections", label: "コレクション", icon: Layers },
   { href: "/search", label: "ノウハウ検索", icon: Search },
+  { href: "/chat", label: "ナレッジチャット", icon: MessageSquare },
   { href: "/insights", label: "いいね傾向分析", icon: TrendingUp },
   { href: "/posts/new", label: "投稿を追加", icon: PenSquare },
   { href: "/settings/x", label: "X連携", icon: Link2 },

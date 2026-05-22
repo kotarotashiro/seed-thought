@@ -38,10 +38,11 @@ DIRECT_URL="postgresql://USER:PASSWORD@DIRECT_HOST/DB?sslmode=require"
 AI_PROVIDER="gemini"
 GEMINI_API_KEY="..."
 GEMINI_MODEL="gemini-2.0-flash"
+GEMINI_IMAGE_MODEL="imagen-4.0-generate-001"
 X_CLIENT_ID="..."
 X_CLIENT_SECRET="..."
 X_REDIRECT_URI="http://localhost:3003/api/x/callback"
-X_SCOPES="tweet.read users.read offline.access"
+X_SCOPES="tweet.read tweet.write users.read offline.access"
 TOKEN_ENCRYPTION_KEY="replace-with-a-long-random-string"
 ```
 
@@ -97,6 +98,7 @@ match the environment values you use:
 Minimum scopes for OAuth connection:
 
 - `tweet.read`
+- `tweet.write` (for one-click X posting from generated drafts)
 - `users.read`
 - `offline.access`
 

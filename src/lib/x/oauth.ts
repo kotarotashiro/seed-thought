@@ -4,7 +4,7 @@ import crypto from "crypto";
 const AUTH_URL = "https://twitter.com/i/oauth2/authorize";
 const TOKEN_URL = "https://api.twitter.com/2/oauth2/token";
 
-const DEFAULT_SCOPES = ["tweet.read", "users.read", "offline.access"];
+const DEFAULT_SCOPES = ["tweet.read", "tweet.write", "users.read", "offline.access"];
 
 function getClientId(): string {
   const clientId = process.env.X_CLIENT_ID;
