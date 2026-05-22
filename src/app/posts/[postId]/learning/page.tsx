@@ -469,14 +469,14 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
                   <MoreVertical className="h-4 w-4" />
                 </button>
                 {menuOpen && (
-                  <div className="absolute right-0 top-full z-10 mt-1 min-w-[160px] rounded-xl border border-border bg-white py-1 shadow-md">
+                  <div className="absolute right-0 top-full z-10 mt-1 rounded-xl border border-border bg-white py-1 shadow-md">
                     <button
                       type="button"
                       onClick={() => { setMenuOpen(false); void handleDelete(); }}
                       disabled={deleting}
-                      className="flex w-full items-center gap-2 px-4 py-2 text-sm text-danger hover:bg-border-light disabled:opacity-50"
+                      className="flex w-full items-center gap-2 whitespace-nowrap px-4 py-2 text-sm text-danger hover:bg-border-light disabled:opacity-50"
                     >
-                      <Trash2 className="h-4 w-4" />
+                      <Trash2 className="h-4 w-4 flex-shrink-0" />
                       {deleting ? "削除中..." : "学習カードを削除"}
                     </button>
                   </div>
@@ -684,15 +684,9 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
       ) : (
         <>
           {(message || error) && (
-            <div
-              className={
-                error
-                  ? "rounded-xl border border-danger/20 bg-danger-light px-4 py-3 text-sm text-danger"
-                  : "rounded-xl border border-success/20 bg-success-light px-4 py-3 text-sm text-success"
-              }
-            >
+            <p className={`text-xs ${error ? "text-danger" : "text-text-muted"}`}>
               {error || message}
-            </div>
+            </p>
           )}
 
           {/* Tabs */}
