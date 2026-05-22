@@ -100,6 +100,7 @@ async function buildSourcePost(
     userMemo: post.learningCard?.userMemo || undefined,
     articleTitle,
     articleDescription,
+    videoTranscript: post.videoTranscriptText || undefined,
   };
 }
 

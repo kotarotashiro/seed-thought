@@ -154,6 +154,8 @@ export function buildLearningPrompt(input: SourcePostForLearning): string {
 ${input.articleTitle || input.articleDescription ? `## 記事情報（投稿リンク先の内容）
 ${input.articleTitle ? `タイトル: ${input.articleTitle}` : ""}
 ${input.articleDescription ? `内容: ${input.articleDescription}` : ""}
+` : ""}${input.videoTranscript ? `## 動画文字起こし（ユーザーが貼り付けた動画の文字起こしテキスト）
+${input.videoTranscript}
 ` : ""}投稿データ:
 ${JSON.stringify(input, null, 2)}
 
