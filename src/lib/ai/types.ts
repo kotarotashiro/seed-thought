@@ -34,6 +34,8 @@ export interface SourcePostForLearning {
   /** Article content when the post is a link to an external article */
   articleTitle?: string;
   articleDescription?: string;
+  /** Learning mode: "content" extracts the topic itself, "format" extracts reusable patterns */
+  learningMode?: "content" | "format";
 }
 
 export interface LearningOutput {
@@ -202,6 +204,12 @@ export interface AiProvider {
   translateText(input: TranslateTextInput): Promise<string>;
   generateLearningCard(input: SourcePostForLearning): Promise<LearningOutput>;
   generateOutput(input: GenerateOutputInput): Promise<GeneratedOutputResult>;
+  generateStrictLearning(input: {
+    postText: string;
+    classification: { primaryCategory: string; summary: string };
+    learningCardJson?: string;
+    userMemo?: string | null;
+  }): Promise<StrictLearningOutput>;
   searchSemantically(query: string, posts: PostSummaryForSearch[]): Promise<SemanticSearchResult>;
   analyzeLikeTrends(posts: PostSummaryForTrend[]): Promise<TrendInsight>;
   chat(message: string, history: ChatMessage[], posts: PostContext[]): Promise<string>;

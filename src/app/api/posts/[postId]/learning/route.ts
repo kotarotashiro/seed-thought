@@ -76,10 +76,9 @@ async function getPostForLearning(postId: string) {
 
 async function buildSourcePost(
   post: NonNullable<Awaited<ReturnType<typeof getPostForLearning>>>
-): Promise<SourcePostForLearning> {
+): Promise<Omit<SourcePostForLearning, "learningMode">> {
   const threadMedia = post.threadPosts.flatMap((threadPost) => parseMedia(threadPost.mediaJson));
 
-  // Resolve article content: user-pasted > cached metadata > live fetch
   const { title: articleTitle, description: articleDescription } = await resolveArticleForAi(
     post.urlCardJson,
     post.text,
@@ -116,7 +115,11 @@ export async function GET(
       return NextResponse.json({ error: "投稿が見つかりません" }, { status: 404 });
     }
 
-    return NextResponse.json({ post, learningCard: post.learningCard });
+    const strictLearning = post.learningCard?.strictLearningJson
+      ? (() => { try { return JSON.parse(post.learningCard!.strictLearningJson!); } catch { return null; } })()
+      : null;
+
+    return NextResponse.json({ post, learningCard: post.learningCard, strictLearning });
   } catch (error) {
     console.error("Failed to fetch learning card:", error);
     return NextResponse.json({ error: "学習カードの取得に失敗しました" }, { status: 500 });
@@ -130,13 +133,31 @@ export async function POST(
   const { postId } = await params;
 
   try {
+    const body = await request.json().catch(() => ({}));
+    const learningMode: "content" | "format" =
+      (body as { learningMode?: string }).learningMode === "format" ? "format" : "content";
+
     const post = await getPostForLearning(postId);
     if (!post) {
       return NextResponse.json({ error: "投稿が見つかりません" }, { status: 404 });
     }
 
-    const output = await getAiProvider().generateLearningCard(await buildSourcePost(post));
-    const draftOutput = { ...output, sourcePostId: post.id, status: "draft" as const };
+    const source = await buildSourcePost(post);
+    const sourceWithMode: SourcePostForLearning = { ...source, learningMode };
+
+    const [learningOutput, strictLearningOutput] = await Promise.all([
+      getAiProvider().generateLearningCard(sourceWithMode),
+      getAiProvider().generateStrictLearning({
+        postText: sourceWithMode.text,
+        classification: {
+          primaryCategory: post.classification?.primaryCategory || "",
+          summary: post.classification?.summary || "",
+        },
+        userMemo: post.learningCard?.userMemo ?? null,
+      }),
+    ]);
+
+    const draftOutput = { ...learningOutput, sourcePostId: post.id, status: "draft" as const };
 
     const learningCard = await prisma.learningCard.upsert({
       where: { sourcePostId: post.id },
@@ -151,6 +172,8 @@ export async function POST(
         outputJson: JSON.stringify(draftOutput),
         userMemo: draftOutput.userLearningMemo,
         status: "draft",
+        learningMode,
+        strictLearningJson: JSON.stringify(strictLearningOutput),
       },
       update: {
         title: draftOutput.title,
@@ -162,10 +185,15 @@ export async function POST(
         outputJson: JSON.stringify(draftOutput),
         userMemo: draftOutput.userLearningMemo,
         status: "draft",
+        learningMode,
+        strictLearningJson: JSON.stringify(strictLearningOutput),
       },
     });
 
-    return NextResponse.json({ learningCard, output: draftOutput }, { status: 201 });
+    return NextResponse.json(
+      { learningCard, output: draftOutput, strictLearning: strictLearningOutput },
+      { status: 201 }
+    );
   } catch (error) {
     console.error("Failed to generate learning card:", error);
     return NextResponse.json(

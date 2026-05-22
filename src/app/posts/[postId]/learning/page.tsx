@@ -10,7 +10,7 @@ import { OutputTypeCard } from "@/components/outputs/OutputTypeCard";
 import { OutputPreview } from "@/components/outputs/OutputPreview";
 import { LinkifiedText } from "@/components/ui/LinkifiedText";
 import { OpenInXButton } from "@/components/ui/OpenInXButton";
-import type { LearningOutput } from "@/lib/ai/types";
+import type { LearningOutput, StrictLearningOutput } from "@/lib/ai/types";
 import { parseArticleContent } from "@/lib/posts/articleContent";
 import {
   AlertCircle,
@@ -23,12 +23,14 @@ import {
   Copy,
   ExternalLink,
   FileText,
+  GitBranch,
   Image as ImageIcon,
   Languages,
   Layers,
   Lightbulb,
   ListChecks,
   Loader2,
+  MoreVertical,
   Newspaper,
   Pencil,
   Sparkles,
@@ -37,24 +39,25 @@ import {
 } from "lucide-react";
 
 const PROGRESS_STEPS = [
-  "① 記事を読み込み中...",
+  "① 投稿とツリーを読み込み中...",
   "② 構造を抽出中...",
   "③ 手順を生成中...",
   "④ マニュアル化中...",
+  "⑤ 厳密学習を構造化中...",
 ] as const;
 
 const ARTICLE_PREVIEW_CHARS = 240;
 
-const OUTPUT_TYPES = ["x", "instagram", "note", "markdown_log", "seminar", "strict_learning"] as const;
+const OUTPUT_TYPES = ["x", "instagram", "note", "markdown_log", "seminar"] as const;
 
 const tabs = [
   "要約",
   "構造",
   "手順",
   "マニュアル",
+  "厳密学習",
   "応用アイデア",
-  "図解構成",
-  "画像生成プロンプト",
+  "図解",
   "自分用メモ",
 ] as const;
 
@@ -71,6 +74,16 @@ interface LearningCardView {
   outputJson: string;
   userMemo?: string | null;
   status: "draft" | "saved";
+  learningMode?: string | null;
+  strictLearningJson?: string | null;
+}
+
+interface ThreadPostView {
+  id: string;
+  text: string;
+  translatedText?: string | null;
+  mediaJson?: string | null;
+  threadOrder: number;
 }
 
 interface PostView {
@@ -85,6 +98,7 @@ interface PostView {
   authorAvatarUrl?: string | null;
   postedAt?: string | null;
   learningCard?: { id: string; status: string } | null;
+  threadPosts?: ThreadPostView[] | null;
 }
 
 function parseLearningOutput(card?: LearningCardView | null): LearningOutput | null {
@@ -119,6 +133,11 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
   const [error, setError] = useState<string | null>(null);
   const autoGenerateTriedRef = useRef(false);
 
+  const [learningMode, setLearningMode] = useState<"content" | "format">("content");
+  const [strictLearning, setStrictLearning] = useState<StrictLearningOutput | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
   // SNS output state
   const [selectedOutput, setSelectedOutput] = useState<string | null>(null);
   const [generatedOutput, setGeneratedOutput] = useState<{ id?: string; title: string; content: string; contentJson?: Record<string, unknown> | null; warning?: string | null } | null>(null);
@@ -148,9 +167,20 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
     }
     const interval = setInterval(() => {
       setProgressStep((prev) => Math.min(prev + 1, PROGRESS_STEPS.length - 1));
-    }, 5000);
+    }, 4000);
     return () => clearInterval(interval);
   }, [generating]);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [menuOpen]);
 
   const output = useMemo(() => parseLearningOutput(card), [card]);
 
@@ -161,14 +191,14 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
       setPost(data.post || null);
       setCard(data.learningCard || null);
       setMemo(data.learningCard?.userMemo || "");
+      setLearningMode(data.learningCard?.learningMode === "format" ? "format" : "content");
+      setStrictLearning(data.strictLearning || null);
       if (data.learningCard?.id) {
         void loadOutputHistory(data.learningCard.id);
       }
     } catch (loadError) {
       console.error("Failed to fetch learning card:", loadError);
       setError("学習カードの取得に失敗しました");
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -183,6 +213,8 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
         setPost(data.post || null);
         setCard(data.learningCard || null);
         setMemo(data.learningCard?.userMemo || "");
+        setLearningMode(data.learningCard?.learningMode === "format" ? "format" : "content");
+        setStrictLearning(data.strictLearning || null);
         if (data.learningCard?.id) {
           void loadOutputHistory(data.learningCard.id);
         }
@@ -200,7 +232,9 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
     };
   }, [postId]);
 
-  const handleGenerate = async () => {
+  const handleGenerate = async (mode?: "content" | "format") => {
+    const activeMode = mode ?? learningMode;
+    if (mode !== undefined) setLearningMode(mode);
     setGenerating(true);
     setError(null);
     setMessage(null);
@@ -209,16 +243,32 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
       const res = await fetch(`/api/posts/${postId}/learning`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ learningMode: activeMode }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "学習カードの生成に失敗しました");
-      await loadLearning();
+      setCard(data.learningCard || null);
+      setStrictLearning(data.strictLearning || null);
+      setMemo(data.learningCard?.userMemo || "");
+      if (data.learningCard?.id) {
+        void loadOutputHistory(data.learningCard.id);
+      }
       setMessage("学習カードを作成しました");
     } catch (generateError) {
       console.error("Failed to generate learning card:", generateError);
       setError(generateError instanceof Error ? generateError.message : "学習カードの生成に失敗しました");
     } finally {
       setGenerating(false);
+    }
+  };
+
+  const handleModeToggle = (newMode: "content" | "format") => {
+    if (newMode === learningMode) return;
+    if (card) {
+      if (!confirm(`「${newMode === "content" ? "内容モード" : "型モード"}」に切り替えて再生成しますか？`)) return;
+      void handleGenerate(newMode);
+    } else {
+      setLearningMode(newMode);
     }
   };
 
@@ -229,7 +279,7 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
     if (generating) return;
     if (autoGenerateTriedRef.current) return;
     autoGenerateTriedRef.current = true;
-    handleGenerate();
+    void handleGenerate();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading, post, card, generating]);
 
@@ -289,11 +339,10 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
         const errData = await res.json().catch(() => ({}));
         throw new Error((errData as { error?: string }).error || "学習カードの削除に失敗しました");
       }
-      // Stay on this page and reset to the pre-generation state so the user can
-      // regenerate without leaving the post context. Prevent the auto-generate
-      // effect from immediately firing — the user must click the button.
       autoGenerateTriedRef.current = true;
       setCard(null);
+      setStrictLearning(null);
+      setLearningMode("content");
       setMemo("");
       setSelectedOutput(null);
       setGeneratedOutput(null);
@@ -335,7 +384,6 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
       if (!res.ok) throw new Error(data.error || "アウトプットの生成に失敗しました");
       setGeneratedOutput(data);
       if (data.warning) setOutputError(data.warning);
-      // Refresh history
       await loadOutputHistory(card.id);
     } catch (genErr) {
       setOutputError(genErr instanceof Error ? genErr.message : "アウトプットの生成に失敗しました");
@@ -372,6 +420,7 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
         戻る
       </button>
 
+      {/* Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <div className="mb-2 flex items-center gap-2">
@@ -382,9 +431,69 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
             保存済み投稿を、実践マニュアルと応用メモに変換します。
           </p>
         </div>
-        <LearningStatusBadge learningCard={card} />
+        <div className="flex flex-col items-start gap-2 sm:items-end">
+          <div className="flex items-center gap-2">
+            {/* Mode toggle */}
+            <div className="flex rounded-full border border-border bg-border-light p-0.5">
+              <button
+                type="button"
+                onClick={() => handleModeToggle("content")}
+                className={
+                  learningMode === "content"
+                    ? "rounded-full bg-white px-3 py-1 text-xs font-medium text-text shadow-sm"
+                    : "rounded-full px-3 py-1 text-xs font-medium text-text-secondary hover:text-text"
+                }
+              >
+                内容
+              </button>
+              <button
+                type="button"
+                onClick={() => handleModeToggle("format")}
+                className={
+                  learningMode === "format"
+                    ? "rounded-full bg-white px-3 py-1 text-xs font-medium text-text shadow-sm"
+                    : "rounded-full px-3 py-1 text-xs font-medium text-text-secondary hover:text-text"
+                }
+              >
+                型
+              </button>
+            </div>
+            <LearningStatusBadge learningCard={card} />
+            {card && (
+              <div className="relative" ref={menuRef}>
+                <button
+                  type="button"
+                  onClick={() => setMenuOpen((v) => !v)}
+                  className="rounded-lg p-1.5 text-text-muted hover:bg-border-light hover:text-text"
+                >
+                  <MoreVertical className="h-4 w-4" />
+                </button>
+                {menuOpen && (
+                  <div className="absolute right-0 top-full z-10 mt-1 min-w-[160px] rounded-xl border border-border bg-white py-1 shadow-md">
+                    <button
+                      type="button"
+                      onClick={() => { setMenuOpen(false); void handleDelete(); }}
+                      disabled={deleting}
+                      className="flex w-full items-center gap-2 px-4 py-2 text-sm text-danger hover:bg-border-light disabled:opacity-50"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      {deleting ? "削除中..." : "学習カードを削除"}
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+          {card && output && (
+            <Button size="sm" onClick={handleSave} loading={saving} loadingLabel="保存中...">
+              <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />
+              学習カードに保存
+            </Button>
+          )}
+        </div>
       </div>
 
+      {/* Post card */}
       <Card>
         <button
           type="button"
@@ -405,6 +514,12 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
               {post.postedAt ? ` ・ ${new Date(post.postedAt).toLocaleDateString("ja-JP")}` : ""}
             </p>
           </div>
+          {post.threadPosts && post.threadPosts.length > 0 && (
+            <Badge variant="success" className="flex-shrink-0 flex items-center gap-1">
+              <GitBranch className="w-3 h-3" />
+              <span>ツリー {post.threadPosts.length + 1}</span>
+            </Badge>
+          )}
           <span className="flex items-center gap-1 text-xs text-accent">
             {postExpanded ? (
               <>折りたたむ <ChevronUp className="h-3.5 w-3.5" /></>
@@ -456,15 +571,9 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
                           className="flex items-center gap-1 text-xs text-accent hover:text-accent-hover"
                         >
                           {articleExpanded ? (
-                            <>
-                              折りたたむ
-                              <ChevronUp className="h-3 w-3" />
-                            </>
+                            <>折りたたむ<ChevronUp className="h-3 w-3" /></>
                           ) : (
-                            <>
-                              全文を見る
-                              <ChevronDown className="h-3 w-3" />
-                            </>
+                            <>全文を見る<ChevronDown className="h-3 w-3" /></>
                           )}
                         </button>
                       )}
@@ -493,25 +602,35 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
                 <OpenInXButton href={post.sourceUrl} />
               </div>
             )}
+
+            {/* Thread posts display */}
+            {post.threadPosts && post.threadPosts.length > 0 && (
+              <div className="mt-4 border-t border-border pt-4">
+                <p className="mb-3 flex items-center gap-1.5 text-xs font-semibold text-text-secondary">
+                  <GitBranch className="h-3.5 w-3.5 text-accent" />
+                  ツリー投稿 ({post.threadPosts.length}件) — 学習に含まれています
+                </p>
+                <div className="space-y-3">
+                  {post.threadPosts.map((tp) => (
+                    <div key={tp.id} className="rounded-xl bg-border-light px-4 py-3">
+                      <p className="mb-1 text-xs font-medium text-text-muted">{tp.threadOrder + 1}投稿目</p>
+                      <p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-text">
+                        <LinkifiedText text={tp.text} />
+                      </p>
+                      {tp.translatedText && (
+                        <p className="mt-2 rounded-lg bg-white/70 px-3 py-2 text-sm leading-relaxed text-text-secondary">
+                          {tp.translatedText}
+                        </p>
+                      )}
+                      <PostMediaGrid media={parsePostMedia(tp.mediaJson)} />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </Card>
-
-      {card && (
-        <div className="flex justify-end">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleDelete}
-            disabled={deleting}
-            loading={deleting}
-            loadingLabel="削除中..."
-          >
-            <Trash2 className="h-4 w-4 mr-1.5 text-danger" />
-            <span className="text-danger">学習カードを削除</span>
-          </Button>
-        </div>
-      )}
 
       {!card || !output ? (
         <Card>
@@ -555,7 +674,7 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
                     : "この投稿からノウハウ・手順・マニュアルを自動生成します。"}
                 </p>
               </div>
-              <Button onClick={handleGenerate} loading={generating} loadingLabel="生成中..." className="w-full sm:w-auto">
+              <Button onClick={() => void handleGenerate()} loading={generating} loadingLabel="生成中..." className="w-full sm:w-auto">
                 <Sparkles className="mr-1.5 h-4 w-4" />
                 {error ? "再生成" : "学習する"}
               </Button>
@@ -564,50 +683,6 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
         </Card>
       ) : (
         <>
-          <div className="flex flex-col gap-3 sm:flex-row">
-            <Button
-              variant="secondary"
-              onClick={async () => {
-                setSelectedOutput("strict_learning");
-                setGeneratedOutput(null);
-                setOutputError(null);
-                // generate immediately for quick-path UX
-                if (!card) return;
-                setGeneratingOutput(true);
-                try {
-                  const res = await fetch(`/api/learning-cards/${card.id}/outputs`, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ outputType: "strict_learning" }),
-                  });
-                  const data = await res.json();
-                  if (!res.ok) throw new Error(data.error || "厳密学習の生成に失敗しました");
-                  setGeneratedOutput(data);
-                  if (data.warning) setOutputError(data.warning);
-                  await loadOutputHistory(card.id);
-                } catch (genErr) {
-                  setOutputError(genErr instanceof Error ? genErr.message : "厳密学習の生成に失敗しました");
-                } finally {
-                  setGeneratingOutput(false);
-                }
-              }}
-              loading={generatingOutput && selectedOutput === "strict_learning"}
-              loadingLabel="厳密学習で出力中..."
-              className="flex-1"
-            >
-              <Sparkles className="mr-1.5 h-4 w-4" />
-              厳密学習で出力
-            </Button>
-            <Button variant="secondary" onClick={() => setActiveTab("マニュアル")} className="flex-1">
-              <FileText className="mr-1.5 h-4 w-4" />
-              マニュアルを見る
-            </Button>
-            <Button onClick={handleSave} loading={saving} loadingLabel="保存中..." className="flex-1">
-              <CheckCircle2 className="mr-1.5 h-4 w-4" />
-              学習カードに保存
-            </Button>
-          </div>
-
           {(message || error) && (
             <div
               className={
@@ -620,6 +695,7 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
             </div>
           )}
 
+          {/* Tabs */}
           <div className="flex gap-2 overflow-x-auto border-b border-border pb-2">
             {tabs.map((tab) => (
               <button
@@ -711,6 +787,165 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
               </div>
             )}
 
+            {activeTab === "厳密学習" && (
+              <div>
+                <SectionHeader icon={BookOpen} title="厳密学習" />
+                {strictLearning ? (
+                  <div className="space-y-4">
+                    <div className="rounded-xl bg-accent-subtle px-4 py-3">
+                      <p className="mb-1 text-xs font-medium text-accent">一言でいうと</p>
+                      <p className="text-sm font-medium leading-relaxed text-text">{strictLearning.oneLiner}</p>
+                    </div>
+
+                    <div className="rounded-xl border border-border px-4 py-3">
+                      <p className="mb-1 text-xs font-medium text-text-muted">なぜ重要か</p>
+                      <p className="text-sm leading-relaxed text-text">{strictLearning.whyItMatters}</p>
+                    </div>
+
+                    <div className="rounded-xl border border-border px-4 py-3">
+                      <p className="mb-1 text-xs font-medium text-text-muted">前提知識</p>
+                      <p className="text-sm leading-relaxed text-text">{strictLearning.prerequisites}</p>
+                    </div>
+
+                    <div>
+                      <p className="mb-2 text-sm font-semibold text-text">主張の分解</p>
+                      <div className="space-y-2">
+                        {(
+                          [
+                            ["主張", strictLearning.claimBreakdown.claim],
+                            ["背景・文脈", strictLearning.claimBreakdown.background],
+                            ["暗黙の前提", strictLearning.claimBreakdown.assumption],
+                            ["根拠", strictLearning.claimBreakdown.evidence],
+                            ["反例", strictLearning.claimBreakdown.counterExample],
+                            ["限界・適用範囲", strictLearning.claimBreakdown.limit],
+                          ] as [string, string][]
+                        ).map(([label, value]) => (
+                          <div key={label} className="rounded-xl border border-border px-4 py-3">
+                            <p className="mb-0.5 text-xs font-medium text-text-muted">{label}</p>
+                            <p className="text-sm leading-relaxed text-text">{value}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div>
+                      <p className="mb-2 text-sm font-semibold text-text">厳密学習ビュー</p>
+                      <div className="space-y-3">
+                        <div className="rounded-xl border border-border px-4 py-3">
+                          <p className="mb-2 text-xs font-medium text-success">正例</p>
+                          <ul className="space-y-1.5">
+                            {strictLearning.strictLearningView.positiveExamples.map((ex, i) => (
+                              <li key={i} className="flex gap-2 text-sm text-text">
+                                <CheckCircle2 className="mt-0.5 h-4 w-4 flex-shrink-0 text-success" />
+                                {ex}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                        <div className="rounded-xl border border-border px-4 py-3">
+                          <p className="mb-2 text-xs font-medium text-danger">反例</p>
+                          <ul className="space-y-1.5">
+                            {strictLearning.strictLearningView.negativeExamples.map((ex, i) => (
+                              <li key={i} className="flex gap-2 text-sm text-text-secondary">
+                                <span className="mt-0.5 flex-shrink-0 text-danger font-bold">✗</span>
+                                {ex}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                        <div className="rounded-xl border border-border px-4 py-3">
+                          <p className="mb-2 text-xs font-medium text-warning">境界事例</p>
+                          <ul className="space-y-1.5">
+                            {strictLearning.strictLearningView.boundaryExamples.map((ex, i) => (
+                              <li key={i} className="flex gap-2 text-sm text-text-secondary">
+                                <span className="flex-shrink-0 text-warning">△</span>
+                                {ex}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                        <div className="grid gap-3 sm:grid-cols-2">
+                          <div className="rounded-xl border border-border px-4 py-3">
+                            <p className="mb-2 text-xs font-medium text-text-muted">必要条件</p>
+                            <ul className="space-y-1">
+                              {strictLearning.strictLearningView.necessaryConditions.map((c, i) => (
+                                <li key={i} className="text-sm text-text">・{c}</li>
+                              ))}
+                            </ul>
+                          </div>
+                          <div className="rounded-xl border border-border px-4 py-3">
+                            <p className="mb-2 text-xs font-medium text-text-muted">典型特徴</p>
+                            <ul className="space-y-1">
+                              {strictLearning.strictLearningView.typicalFeatures.map((f, i) => (
+                                <li key={i} className="text-sm text-text">・{f}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        </div>
+                        <div className="rounded-xl bg-border-light px-4 py-3">
+                          <p className="mb-1 text-xs font-medium text-text-muted">本質</p>
+                          <p className="text-sm leading-relaxed text-text">{strictLearning.strictLearningView.essence}</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="rounded-xl border border-border px-4 py-3">
+                      <p className="mb-1 text-xs font-medium text-text-muted">抽象化</p>
+                      <p className="text-sm leading-relaxed text-text">{strictLearning.abstraction}</p>
+                    </div>
+
+                    <div>
+                      <p className="mb-2 text-sm font-semibold text-text">他分野への転用</p>
+                      <div className="space-y-2">
+                        {strictLearning.transferToOtherFields.map((item, i) => (
+                          <div key={i} className="rounded-xl border border-border px-4 py-3">
+                            <p className="mb-0.5 text-xs font-medium text-accent">{item.field}</p>
+                            <p className="text-sm leading-relaxed text-text">{item.application}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="rounded-xl bg-accent-subtle px-4 py-3">
+                      <p className="mb-1 text-xs font-medium text-accent">自分に使うなら</p>
+                      <p className="text-sm leading-relaxed text-text">{strictLearning.applyToYourself}</p>
+                    </div>
+
+                    <div className="rounded-xl border border-border px-4 py-4">
+                      <p className="mb-3 flex items-center gap-1.5 text-sm font-semibold text-text">
+                        <Clock className="h-4 w-4 text-accent" />
+                        15分ワーク
+                      </p>
+                      <p className="mb-3 text-sm font-medium text-text">ゴール: {strictLearning.fifteenMinuteExercise.goal}</p>
+                      <div className="mb-3 space-y-1.5">
+                        {strictLearning.fifteenMinuteExercise.steps.map((step, i) => (
+                          <div key={i} className="flex gap-2 text-sm text-text">
+                            <span className="flex-shrink-0 font-medium text-accent">{i + 1}.</span>
+                            {step}
+                          </div>
+                        ))}
+                      </div>
+                      <div className="rounded-lg bg-success-light px-3 py-2">
+                        <p className="mb-0.5 text-xs font-medium text-success">15分後の成果物</p>
+                        <p className="text-sm text-text">{strictLearning.fifteenMinuteExercise.deliverable}</p>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center gap-4 py-8">
+                    <p className="text-center text-sm text-text-secondary">
+                      厳密学習はまだ生成されていません。<br />
+                      学習カードを再生成すると同時に生成されます。
+                    </p>
+                    <Button onClick={() => void handleGenerate()} loading={generating} loadingLabel="生成中...">
+                      <Sparkles className="mr-1.5 h-4 w-4" />
+                      学習カードを再生成
+                    </Button>
+                  </div>
+                )}
+              </div>
+            )}
+
             {activeTab === "応用アイデア" && (
               <div>
                 <SectionHeader icon={Lightbulb} title="応用アイデア" />
@@ -743,10 +978,10 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
               </div>
             )}
 
-            {activeTab === "図解構成" && (
+            {activeTab === "図解" && (
               <div>
                 <SectionHeader icon={ImageIcon} title="図解構成" />
-                <div className="space-y-3">
+                <div className="mb-6 space-y-3">
                   {output.diagramStructure.sections.map((section, index) => (
                     <div key={`${section.heading}-${index}`} className="rounded-xl border border-border px-4 py-3">
                       <p className="mb-1 text-sm font-semibold text-text">{section.heading}</p>
@@ -759,12 +994,7 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
                     </div>
                   ))}
                 </div>
-              </div>
-            )}
-
-            {activeTab === "画像生成プロンプト" && (
-              <div>
-                <SectionHeader icon={ImageIcon} title="画像生成プロンプト" />
+                <SectionHeader icon={Copy} title="画像生成プロンプト" />
                 <div className="mb-4 rounded-xl border border-border bg-border-light px-4 py-3">
                   <p className="whitespace-pre-wrap text-sm leading-relaxed text-text">{output.imageExplanationPrompt}</p>
                 </div>
@@ -787,7 +1017,7 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
                 <div className="mt-3 flex gap-2">
                   <Button onClick={handleSave} loading={saving} loadingLabel="保存中...">
                     <CheckCircle2 className="mr-1.5 h-4 w-4" />
-                    学習カードに保存
+                    メモを保存
                   </Button>
                   <Button variant="secondary" onClick={handleCopyMemo} disabled={!memo}>
                     <Copy className="mr-1.5 h-4 w-4" />
@@ -805,9 +1035,9 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
               <h3 className="text-base font-bold text-text">SNS発信コンテンツ</h3>
             </div>
             <p className="mb-4 text-sm text-text-secondary">
-              学習内容を発信用コンテンツや厳密学習カードに変換します。
+              学習内容を発信用コンテンツに変換します。
             </p>
-            <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+            <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
               {OUTPUT_TYPES.map((type) => (
                 <OutputTypeCard
                   key={type}
