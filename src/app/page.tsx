@@ -6,7 +6,7 @@ import { RecommendationModeSelect } from "@/components/posts/RecommendationModeS
 import { Sprout } from "lucide-react";
 
 export default function HomePage() {
-  const [mode, setMode] = useState("random");
+  const [mode, setMode] = useState("undigested");
   const [genre, setGenre] = useState("");
   const [savedType, setSavedType] = useState("");
   const [genres, setGenres] = useState<string[]>([]);
@@ -68,11 +68,11 @@ export default function HomePage() {
             <Sprout className="w-5 h-5 text-accent" />
           </div>
           <div>
-            <h1 className="text-xl font-bold text-text sm:text-2xl">今日の深掘り候補</h1>
+            <h1 className="text-xl font-bold text-text sm:text-2xl">今日のおすすめ</h1>
           </div>
         </div>
         <p className="mt-2 text-sm text-text-secondary sm:ml-[52px]">
-          保存した投稿の中から、今日深掘りするのにおすすめの3件を選びました。
+          まだ学んでいない投稿の中から、おすすめの3件を選びました。
         </p>
       </div>
 

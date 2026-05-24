@@ -118,7 +118,7 @@ export default function InsightsPage() {
             <TrendingUp className="w-5 h-5 text-rose-500" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-text">いいね傾向分析</h1>
+            <h1 className="text-2xl font-bold text-text">保存傾向</h1>
             <p className="text-sm text-text-secondary">
               {data
                 ? `${data.count}件のいいねを分析${data.cachedAt ? ` • 最終分析: ${formatCachedAt(data.cachedAt)}` : ""}`

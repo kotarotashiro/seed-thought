@@ -38,7 +38,7 @@ export function RecommendationModeSelect({
             { value: "latest", label: "最新から" },
             { value: "random", label: "完全ランダム" },
             { value: "genre", label: "ジャンル指定ランダム" },
-            { value: "undigested", label: "未消化から" },
+            { value: "undigested", label: "未学習から" },
           ]}
         />
       </div>

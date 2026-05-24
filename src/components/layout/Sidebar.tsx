@@ -21,12 +21,12 @@ import { clsx } from "clsx";
 
 const menuItems = [
   { href: "/", label: "ホーム", icon: Home },
-  { href: "/posts", label: "保存一覧", icon: Archive },
-  { href: "/knowhow", label: "学習カード一覧", icon: BookOpen },
+  { href: "/posts", label: "保存した投稿", icon: Archive },
+  { href: "/knowhow", label: "学びメモ", icon: BookOpen },
   { href: "/collections", label: "コレクション", icon: Layers },
-  { href: "/search", label: "ノウハウ検索", icon: Search },
-  { href: "/chat", label: "ナレッジチャット", icon: MessageSquare },
-  { href: "/insights", label: "いいね傾向分析", icon: TrendingUp },
+  { href: "/search", label: "メモを検索", icon: Search },
+  { href: "/chat", label: "メモに質問", icon: MessageSquare },
+  { href: "/insights", label: "保存傾向", icon: TrendingUp },
   { href: "/posts/new", label: "投稿を追加", icon: PenSquare },
   { href: "/settings/x", label: "X連携", icon: Link2 },
   { href: "/settings", label: "設定", icon: Settings },

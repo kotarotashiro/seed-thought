@@ -5,7 +5,7 @@ import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Select } from "@/components/ui/Select";
-import { AlertCircle, CheckCircle, Cpu, KeyRound, Settings, User, Save, RefreshCw } from "lucide-react";
+import { AlertCircle, CheckCircle, Cpu, Database, KeyRound, Loader2, RefreshCw, Save, Settings, User } from "lucide-react";
 
 type ProfileForm = {
   name: string;
@@ -99,6 +99,14 @@ export default function SettingsPage() {
     tone: "",
     knowledge: "",
   });
+  const [notionApiKey, setNotionApiKey] = useState("");
+  const [notionDatabaseId, setNotionDatabaseId] = useState("");
+  const [notionHasApiKey, setNotionHasApiKey] = useState(false);
+  const [savingNotion, setSavingNotion] = useState(false);
+  const [syncingNotion, setSyncingNotion] = useState(false);
+  const [notionMessage, setNotionMessage] = useState<string | null>(null);
+  const [notionError, setNotionError] = useState<string | null>(null);
+
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [savingAi, setSavingAi] = useState(false);
@@ -112,14 +120,16 @@ export default function SettingsPage() {
 
     async function loadSettings() {
       try {
-        const [statusRes, profileRes, aiRes] = await Promise.all([
+        const [statusRes, profileRes, aiRes, notionRes] = await Promise.all([
           fetch("/api/settings/status"),
           fetch("/api/settings/profile"),
           fetch("/api/settings/ai"),
+          fetch("/api/notion/settings"),
         ]);
         const statusData = await statusRes.json();
         const profileData = await profileRes.json();
         const aiData = await aiRes.json();
+        const notionData = await notionRes.json();
         if (cancelled) return;
 
         setAiProvider(statusData.aiProvider || "mock");
@@ -139,6 +149,8 @@ export default function SettingsPage() {
           tone: profileData.tone || "",
           knowledge: profileData.knowledge || "",
         });
+        setNotionHasApiKey(Boolean(notionData.hasApiKey));
+        setNotionDatabaseId(notionData.databaseId || "");
       } catch {
         if (!cancelled) setError("設定の読み込みに失敗しました");
       } finally {
@@ -284,6 +296,55 @@ export default function SettingsPage() {
       setError("AI接続テストに失敗しました");
     } finally {
       setTestingAi(false);
+    }
+  };
+
+  const handleSaveNotion = async () => {
+    setSavingNotion(true);
+    setNotionError(null);
+    setNotionMessage(null);
+    try {
+      const res = await fetch("/api/notion/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          apiKey: notionApiKey || undefined,
+          databaseId: notionDatabaseId,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setNotionError(data.error || "保存に失敗しました");
+        return;
+      }
+      setNotionHasApiKey(Boolean(data.hasApiKey));
+      setNotionApiKey("");
+      setNotionMessage("Notion設定を保存しました");
+    } catch {
+      setNotionError("Notion設定の保存に失敗しました");
+    } finally {
+      setSavingNotion(false);
+    }
+  };
+
+  const handleSyncNotion = async () => {
+    setSyncingNotion(true);
+    setNotionError(null);
+    setNotionMessage(null);
+    try {
+      const res = await fetch("/api/notion/sync", { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) {
+        setNotionError(data.error || "同期に失敗しました");
+        return;
+      }
+      setNotionMessage(
+        `同期完了: ${data.synced}件を新規追加、${data.skipped}件はスキップ${data.errors?.length ? `（${data.errors.length}件エラー）` : ""}`
+      );
+    } catch {
+      setNotionError("Notion同期に失敗しました");
+    } finally {
+      setSyncingNotion(false);
     }
   };
 
@@ -527,6 +588,90 @@ export default function SettingsPage() {
             </label>
           </div>
         )}
+      </Card>
+
+      {/* Notion Integration */}
+      <Card>
+        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-3">
+            <Database className="w-5 h-5 text-accent" />
+            <h3 className="text-base font-bold text-text">Notion連携</h3>
+          </div>
+          <Badge variant={notionHasApiKey ? "success" : "warning"}>
+            {notionHasApiKey ? "APIキー設定済み" : "未設定"}
+          </Badge>
+        </div>
+
+        {notionError && (
+          <div className="mb-4 rounded-xl border border-danger/20 bg-danger-light px-4 py-3 text-sm text-danger flex gap-2 items-start">
+            <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+            {notionError}
+          </div>
+        )}
+        {notionMessage && (
+          <div className="mb-4 rounded-xl border border-success/20 bg-success-light px-4 py-3 text-sm text-success flex gap-2 items-start">
+            <CheckCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+            {notionMessage}
+          </div>
+        )}
+
+        <div className="space-y-4">
+          <p className="text-xs text-text-secondary">
+            保存済みの学びメモをNotionデータベースに同期します。<br />
+            Notionでインテグレーションを作成し、データベースと共有してください。
+          </p>
+
+          <div className="space-y-1">
+            <label className="text-xs font-semibold text-text-secondary">
+              Notion APIキー（Internal Integration Token）
+            </label>
+            <div className="flex gap-2">
+              <input
+                type="password"
+                value={notionApiKey}
+                onChange={(e) => setNotionApiKey(e.target.value)}
+                placeholder={notionHasApiKey ? "（設定済み・変更する場合のみ入力）" : "secret_..."}
+                className="flex-1 rounded-xl border border-border bg-white px-4 py-2.5 text-sm text-text outline-none focus:border-accent"
+              />
+            </div>
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-xs font-semibold text-text-secondary">
+              データベースID
+            </label>
+            <input
+              type="text"
+              value={notionDatabaseId}
+              onChange={(e) => setNotionDatabaseId(e.target.value)}
+              placeholder="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+              className="w-full rounded-xl border border-border bg-white px-4 py-2.5 text-sm text-text outline-none focus:border-accent"
+            />
+            <p className="text-xs text-text-muted">
+              NotionのデータベースURLの末尾32文字
+            </p>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            <Button
+              onClick={handleSaveNotion}
+              disabled={savingNotion}
+              size="sm"
+            >
+              {savingNotion ? <Loader2 className="w-4 h-4 animate-spin mr-1.5" /> : <Save className="w-4 h-4 mr-1.5" />}
+              設定を保存
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={handleSyncNotion}
+              disabled={syncingNotion || !notionHasApiKey || !notionDatabaseId}
+              size="sm"
+            >
+              {syncingNotion ? <Loader2 className="w-4 h-4 animate-spin mr-1.5" /> : <RefreshCw className="w-4 h-4 mr-1.5" />}
+              Notionに同期
+            </Button>
+          </div>
+        </div>
       </Card>
     </div>
   );

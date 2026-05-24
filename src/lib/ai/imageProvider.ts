@@ -12,8 +12,11 @@ function getClient(): GoogleGenAI {
 }
 
 function getImageModel(): string {
-  return process.env.GEMINI_IMAGE_MODEL || "imagen-4.0-generate-001";
+  return process.env.GEMINI_IMAGE_MODEL || "imagen-3.0-generate-001";
 }
+
+const BW_STYLE_PREFIX =
+  "Minimalist black and white illustration, clean simple lines, flat design, white background, no color, no shading, easy to read at a glance. Subject: ";
 
 export async function generateImage(prompt: string): Promise<GeneratedImage> {
   const trimmed = prompt.trim();
@@ -21,9 +24,10 @@ export async function generateImage(prompt: string): Promise<GeneratedImage> {
     throw new Error("プロンプトが空です");
   }
   const client = getClient();
+  const styledPrompt = BW_STYLE_PREFIX + trimmed;
   const response = await client.models.generateImages({
     model: getImageModel(),
-    prompt: trimmed,
+    prompt: styledPrompt,
     config: {
       numberOfImages: 1,
     },

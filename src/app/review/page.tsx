@@ -129,7 +129,7 @@ export default function ReviewPage() {
           <Link href="/knowhow" className="mt-6 inline-block">
             <Button variant="secondary" size="sm">
               <BookOpen className="mr-2 h-4 w-4" />
-              学習カード一覧へ
+              学びメモ一覧へ
             </Button>
           </Link>
         </Card>
@@ -159,7 +159,7 @@ export default function ReviewPage() {
               <Button variant="secondary" size="sm">ホームへ</Button>
             </Link>
             <Link href="/knowhow">
-              <Button size="sm">学習カード一覧</Button>
+              <Button size="sm">学びメモ一覧</Button>
             </Link>
           </div>
         </Card>

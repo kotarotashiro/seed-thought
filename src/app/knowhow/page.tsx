@@ -168,8 +168,8 @@ export default function KnowhowPage() {
             <BookOpen className="w-5 h-5 text-blue-600" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-text">学習カード一覧</h1>
-            <p className="text-sm text-text-secondary">{cards.length}件の学習カード</p>
+            <h1 className="text-2xl font-bold text-text">学びメモ</h1>
+            <p className="text-sm text-text-secondary">{cards.length}件のメモ</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -261,17 +261,17 @@ export default function KnowhowPage() {
       ) : cards.length === 0 ? (
         <div className="text-center py-16 bg-white rounded-2xl border border-border">
           <BookOpen className="w-12 h-12 text-text-muted mx-auto mb-3" />
-          <h3 className="text-lg font-semibold text-text mb-2">学習カードがありません</h3>
+          <h3 className="text-lg font-semibold text-text mb-2">学びメモがありません</h3>
           <p className="text-sm text-text-secondary mb-4">
-            保存一覧の「学ぶ」から、投稿を学習カードに変換できます。
+            保存した投稿の「学ぶ」から、投稿をメモに変換できます。
           </p>
           <Link href="/posts">
-            <Button>保存一覧を見る</Button>
+            <Button>保存した投稿を見る</Button>
           </Link>
         </div>
       ) : filteredCards.length === 0 ? (
         <div className="text-center py-14 bg-white rounded-2xl border border-border">
-          <p className="text-sm text-text-secondary">該当する学習カードが見つかりませんでした</p>
+          <p className="text-sm text-text-secondary">該当するメモが見つかりませんでした</p>
         </div>
       ) : (
         <div className="grid gap-4 lg:grid-cols-2">

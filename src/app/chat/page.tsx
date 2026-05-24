@@ -98,9 +98,9 @@ export default function ChatPage() {
             <MessageSquare className="h-5 w-5 text-accent" />
           </div>
           <div>
-            <h1 className="text-xl font-bold text-text sm:text-2xl">ナレッジチャット</h1>
+            <h1 className="text-xl font-bold text-text sm:text-2xl">メモに質問</h1>
             <p className="mt-1 text-xs text-text-secondary">
-              保存した投稿を参照して、自分のナレッジに質問できます
+              学びメモをもとに質問できます
             </p>
           </div>
         </div>
@@ -123,7 +123,7 @@ export default function ChatPage() {
                 <Sparkles className="h-6 w-6 text-accent" />
               </div>
               <p className="text-sm font-semibold text-text">
-                あなたが保存したナレッジに質問してみましょう
+                学びメモに質問してみましょう
               </p>
               <p className="mt-1 max-w-md text-xs text-text-secondary">
                 直近30件の保存投稿を参考に、AIが回答します。出典の投稿番号付きで返ってきます。
@@ -187,7 +187,7 @@ export default function ChatPage() {
                 send(input);
               }
             }}
-            placeholder="保存ナレッジに質問する… (Ctrl/Cmd + Enter で送信)"
+            placeholder="学びメモに質問する… (Ctrl/Cmd + Enter で送信)"
             rows={2}
             className="flex-1 resize-none rounded-xl border border-border bg-white px-3 py-2 text-sm text-text placeholder:text-text-muted focus:border-accent focus:outline-none"
           />

@@ -95,8 +95,8 @@ export default function SearchPage() {
           <Search className="w-5 h-5 text-purple-600" />
         </div>
         <div>
-          <h1 className="text-2xl font-bold text-text">ノウハウ検索</h1>
-          <p className="text-sm text-text-secondary">悩みや目標を入力して関連ノウハウを探す</p>
+          <h1 className="text-2xl font-bold text-text">メモを検索</h1>
+          <p className="text-sm text-text-secondary">悩みや目標を入力して関連メモを探す</p>
         </div>
       </div>
 
@@ -161,14 +161,14 @@ export default function SearchPage() {
       {searched && results.length === 0 && (
         <div className="text-center py-12 bg-white rounded-2xl border border-border">
           <Search className="w-10 h-10 text-text-muted mx-auto mb-3" />
-          <p className="text-sm text-text-secondary">該当するノウハウが見つかりませんでした</p>
+          <p className="text-sm text-text-secondary">該当するメモが見つかりませんでした</p>
           <p className="text-xs text-text-muted mt-1">別のキーワードやフレーズで試してみてください</p>
         </div>
       )}
 
       {results.length > 0 && (
         <div className="space-y-3">
-          <p className="text-sm text-text-secondary">{results.length}件の関連ノウハウが見つかりました</p>
+          <p className="text-sm text-text-secondary">{results.length}件の関連メモが見つかりました</p>
           {results.map((item) => (
             <Card key={item.postId} hoverable className="flex flex-col gap-3">
               <div className="flex items-start justify-between gap-3">

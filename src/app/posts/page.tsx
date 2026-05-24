@@ -163,7 +163,7 @@ export default function PostsPage() {
             <Archive className="w-5 h-5 text-accent" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-text">保存一覧</h1>
+            <h1 className="text-2xl font-bold text-text">保存した投稿</h1>
             <p className="text-sm text-text-secondary">{posts.length}件の投稿</p>
           </div>
         </div>
