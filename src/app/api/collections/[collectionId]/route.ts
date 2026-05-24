@@ -46,6 +46,7 @@ export async function PUT(
     const body = (await request.json()) as {
       title?: string;
       description?: string;
+      idea?: string;
       learningCardIds?: string[];
     };
 
@@ -54,7 +55,7 @@ export async function PUT(
       return NextResponse.json({ error: "コレクションが見つかりません" }, { status: 404 });
     }
 
-    const updateData: { title?: string; description?: string | null } = {};
+    const updateData: { title?: string; description?: string | null; idea?: string | null } = {};
     if (body.title !== undefined) {
       const trimmed = body.title.trim();
       if (!trimmed) {
@@ -64,6 +65,9 @@ export async function PUT(
     }
     if (body.description !== undefined) {
       updateData.description = body.description.trim() || null;
+    }
+    if (body.idea !== undefined) {
+      updateData.idea = body.idea.trim() || null;
     }
 
     await prisma.collection.update({ where: { id: collectionId }, data: updateData });

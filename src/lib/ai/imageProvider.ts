@@ -12,7 +12,7 @@ function getClient(): GoogleGenAI {
 }
 
 function getImageModel(): string {
-  return process.env.GEMINI_IMAGE_MODEL || "imagen-3.0-generate-001";
+  return process.env.GEMINI_IMAGE_MODEL || "gemini-2.0-flash-preview-image-generation";
 }
 
 const BW_STYLE_PREFIX =
@@ -25,22 +25,26 @@ export async function generateImage(prompt: string): Promise<GeneratedImage> {
   }
   const client = getClient();
   const styledPrompt = BW_STYLE_PREFIX + trimmed;
-  const response = await client.models.generateImages({
+
+  const response = await client.models.generateContent({
     model: getImageModel(),
-    prompt: styledPrompt,
+    contents: styledPrompt,
     config: {
-      numberOfImages: 1,
+      responseModalities: ["IMAGE"],
     },
   });
 
-  const first = response.generatedImages?.[0]?.image;
-  const bytes = first?.imageBytes;
-  if (!bytes) {
+  const parts = response.candidates?.[0]?.content?.parts;
+  const imagePart = parts?.find(
+    (p: { inlineData?: { data?: string; mimeType?: string } }) => p.inlineData?.data
+  );
+
+  if (!imagePart?.inlineData?.data) {
     throw new Error("画像生成に失敗しました（出力が空）");
   }
 
   return {
-    mimeType: first?.mimeType || "image/png",
-    dataBase64: bytes,
+    mimeType: imagePart.inlineData.mimeType || "image/png",
+    dataBase64: imagePart.inlineData.data,
   };
 }

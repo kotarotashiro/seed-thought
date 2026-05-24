@@ -5,7 +5,19 @@ import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Select } from "@/components/ui/Select";
-import { AlertCircle, CheckCircle, Cpu, Database, KeyRound, Loader2, RefreshCw, Save, Settings, User } from "lucide-react";
+import {
+  AlertCircle,
+  CheckCircle,
+  ChevronDown,
+  Cpu,
+  Database,
+  KeyRound,
+  Loader2,
+  RefreshCw,
+  Save,
+  Settings,
+  User,
+} from "lucide-react";
 
 type ProfileForm = {
   name: string;
@@ -81,7 +93,46 @@ function getCurrentProviderOption(settings: AiSettingsForm): AiProviderOption | 
   return settings.providers.find((item) => item.value === settings.provider);
 }
 
+function SectionHeader({
+  open,
+  onToggle,
+  icon,
+  title,
+  badge,
+}: {
+  open: boolean;
+  onToggle: () => void;
+  icon: React.ReactNode;
+  title: string;
+  badge?: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      className="w-full flex items-center gap-3 text-left"
+    >
+      {icon}
+      <span className="flex-1 text-base font-bold text-text">{title}</span>
+      {badge}
+      <ChevronDown
+        className={`w-4 h-4 text-text-muted transition-transform duration-200 ${open ? "rotate-180" : ""}`}
+      />
+    </button>
+  );
+}
+
 export default function SettingsPage() {
+  const [openSections, setOpenSections] = useState<Record<string, boolean>>({
+    aiProvider: false,
+    notion: false,
+    profile: false,
+  });
+
+  const toggleSection = (key: string) => {
+    setOpenSections((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
+
   const [aiProvider, setAiProvider] = useState("loading");
   const [aiSettings, setAiSettings] = useState<AiSettingsForm>({
     provider: "gemini",
@@ -373,305 +424,320 @@ export default function SettingsPage() {
         </div>
       )}
 
+      {/* AI Provider */}
       <Card>
-        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-3">
-            <Cpu className="w-5 h-5 text-accent" />
-            <h3 className="text-base font-bold text-text">AI Provider</h3>
-          </div>
-          <Badge variant={aiSettings.hasApiKey ? "success" : "warning"}>
-            {aiSettings.hasApiKey
-              ? aiSettings.keySource === "ui"
-                ? "UIキー設定済み"
-                : "環境変数キー使用中"
-              : "APIキー未設定"}
-          </Badge>
-        </div>
-        <div className="space-y-4">
-          <div className="flex items-center justify-between bg-border-light rounded-xl px-4 py-3">
-            <span className="text-sm text-text">現在のProvider</span>
-            <Badge variant="success">{aiProvider}</Badge>
-          </div>
-          <div className="grid gap-4 md:grid-cols-2">
-            <Select
-              label="Provider"
-              value={aiSettings.provider}
-              onChange={(e) => handleAiProviderChange(e.target.value)}
-              options={aiSettings.providers.map((provider) => ({
-                value: provider.value,
-                label: provider.label,
-              }))}
-            />
-            <div>
+        <SectionHeader
+          open={openSections.aiProvider}
+          onToggle={() => toggleSection("aiProvider")}
+          icon={<Cpu className="w-5 h-5 text-accent flex-shrink-0" />}
+          title="AI Provider"
+          badge={
+            <Badge variant={aiSettings.hasApiKey ? "success" : "warning"}>
+              {aiSettings.hasApiKey
+                ? aiSettings.keySource === "ui"
+                  ? "UIキー設定済み"
+                  : "環境変数キー使用中"
+                : "APIキー未設定"}
+            </Badge>
+          }
+        />
+        {openSections.aiProvider && (
+          <div className="mt-4 space-y-4">
+            <div className="flex items-center justify-between bg-border-light rounded-xl px-4 py-3">
+              <span className="text-sm text-text">現在のProvider</span>
+              <Badge variant="success">{aiProvider}</Badge>
+            </div>
+            <div className="grid gap-4 md:grid-cols-2">
               <Select
-                label="モデル"
-                value={aiSettings.model}
-                onChange={(e) =>
-                  setAiSettings((current) => ({ ...current, model: e.target.value }))
-                }
-                options={getModelOptions(aiSettings)}
+                label="Provider"
+                value={aiSettings.provider}
+                onChange={(e) => handleAiProviderChange(e.target.value)}
+                options={aiSettings.providers.map((provider) => ({
+                  value: provider.value,
+                  label: provider.label,
+                }))}
               />
-              <div className="mt-1.5 flex items-center gap-2">
-                <p className="flex-1 text-xs text-text-muted">
-                  {getCurrentProviderOption(aiSettings)?.modelsSource === "live"
-                    ? "公式APIから取得した最新候補です。"
-                    : "公式APIで取得できない場合の推奨候補です。"}
-                </p>
-                <button
-                  type="button"
-                  onClick={handleRefreshModels}
-                  disabled={refreshingModels || savingAi}
-                  className="flex items-center gap-1 text-xs text-accent hover:text-accent-hover disabled:opacity-50 transition-colors"
-                >
-                  <RefreshCw className={`w-3 h-3 ${refreshingModels ? "animate-spin" : ""}`} />
-                  更新
-                </button>
-              </div>
-            </div>
-          </div>
-          <label className="block">
-            <span className="block text-sm font-medium text-text mb-1.5">APIキー</span>
-            <div className="relative">
-              <KeyRound className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted" />
-              <input
-                type="password"
-                value={aiSettings.apiKey}
-                placeholder={
-                  aiSettings.hasApiKey
-                    ? "変更する場合だけ新しいAPIキーを入力"
-                    : "APIキーを入力"
-                }
-                onChange={(e) =>
-                  setAiSettings((current) => ({ ...current, apiKey: e.target.value }))
-                }
-                className="w-full rounded-xl border border-border bg-white py-3 pl-10 pr-4 text-sm text-text outline-none focus:border-accent"
-              />
-            </div>
-          </label>
-          <div className="rounded-xl border border-warning/20 bg-warning-light px-4 py-3 text-sm text-text-secondary">
-            <div className="flex items-start gap-2">
-              <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0 text-warning" />
-              <p>
-                APIキーは暗号化してDBに保存し、ブラウザには再表示しません。
-                公開運用ではVercel Deployment Protectionを有効にしたまま使ってください。
-              </p>
-            </div>
-          </div>
-          <div className="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap">
-            <Button
-              onClick={() => handleSaveAi(false)}
-              disabled={savingAi || testingAi}
-              loading={savingAi}
-              loadingLabel="保存中..."
-              className="w-full sm:w-auto"
-            >
-              <Save className="w-4 h-4 mr-1" />
-              AI設定を保存
-            </Button>
-            <Button
-              variant="secondary"
-              onClick={handleTestAi}
-              disabled={savingAi || testingAi}
-              loading={testingAi}
-              loadingLabel="テスト中..."
-              className="w-full sm:w-auto"
-            >
-              <CheckCircle className="w-4 h-4 mr-1" />
-              接続テスト
-            </Button>
-            {aiSettings.keySource === "ui" && (
-              <Button
-                variant="ghost"
-                onClick={() => {
-                  if (confirm("保存済みAPIキーを削除しますか？この操作は元に戻せません。")) {
-                    void handleSaveAi(true);
+              <div>
+                <Select
+                  label="モデル"
+                  value={aiSettings.model}
+                  onChange={(e) =>
+                    setAiSettings((current) => ({ ...current, model: e.target.value }))
                   }
-                }}
-                disabled={savingAi}
-                className="w-full text-danger hover:text-danger sm:w-auto"
-              >
-                保存済みキーを削除
-              </Button>
-            )}
-          </div>
-          <p className="text-xs text-text-muted">
-            対応Provider: Gemini / OpenAI / Claude / Grok / Kimi。APIキーはサーバー側だけで使用します。
-          </p>
-        </div>
-      </Card>
-
-      <Card>
-        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-3">
-            <User className="w-5 h-5 text-accent" />
-            <h3 className="text-base font-bold text-text">プロフィール</h3>
-          </div>
-          <Button
-            size="sm"
-            onClick={handleSave}
-            disabled={loading || saving}
-            loading={saving}
-            loadingLabel="保存中..."
-            className="w-full sm:w-auto"
-          >
-            <Save className="w-4 h-4 mr-1" />
-            保存
-          </Button>
-        </div>
-
-        {loading ? (
-          <div className="space-y-3 animate-pulse">
-            <div className="h-12 bg-border-light rounded-xl" />
-            <div className="h-24 bg-border-light rounded-xl" />
-            <div className="h-12 bg-border-light rounded-xl" />
-          </div>
-        ) : (
-          <div className="space-y-4">
-            <label className="block">
-              <span className="block text-sm font-medium text-text mb-1">名前</span>
-              <input
-                value={profile.name}
-                onChange={(e) => setProfile((current) => ({ ...current, name: e.target.value }))}
-                className="w-full rounded-xl border border-border bg-white px-4 py-3 text-sm text-text outline-none focus:border-accent"
-              />
-            </label>
-            <Select
-              label="役割"
-              value={profile.role}
-              onChange={(e) => setProfile((current) => ({ ...current, role: e.target.value }))}
-              options={roleOptions.map((value) => ({ value, label: value }))}
-            />
-            <div>
-              <p className="mb-2 text-sm font-medium text-text">テーマ</p>
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                {themeOptions.map((theme) => (
-                  <label
-                    key={theme}
-                    className="flex items-center gap-2 rounded-xl border border-border bg-white px-3 py-2 text-sm text-text"
+                  options={getModelOptions(aiSettings)}
+                />
+                <div className="mt-1.5 flex items-center gap-2">
+                  <p className="flex-1 text-xs text-text-muted">
+                    {getCurrentProviderOption(aiSettings)?.modelsSource === "live"
+                      ? "公式APIから取得した最新候補です。"
+                      : "公式APIで取得できない場合の推奨候補です。"}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={handleRefreshModels}
+                    disabled={refreshingModels || savingAi}
+                    className="flex items-center gap-1 text-xs text-accent hover:text-accent-hover disabled:opacity-50 transition-colors"
                   >
-                    <input
-                      type="checkbox"
-                      checked={profile.themes.includes(theme)}
-                      onChange={() =>
-                        setProfile((current) => ({
-                          ...current,
-                          themes: toggleListValue(current.themes, theme),
-                        }))
-                      }
-                      className="h-4 w-4 accent-accent"
-                    />
-                    {theme}
-                  </label>
-                ))}
+                    <RefreshCw className={`w-3 h-3 ${refreshingModels ? "animate-spin" : ""}`} />
+                    更新
+                  </button>
+                </div>
               </div>
             </div>
-            <Select
-              label="トーン"
-              value={profile.tone}
-              onChange={(e) => setProfile((current) => ({ ...current, tone: e.target.value }))}
-              options={toneOptions.map((value) => ({ value, label: value }))}
-            />
             <label className="block">
-              <span className="block text-sm font-medium text-text mb-1">
-                ナレッジ・発信コンテキスト
-              </span>
-              <p className="mb-2 text-xs text-text-muted">
-                あなたの専門性・発信背景・ターゲット読者などをAIに伝えるテキストです。アウトプット生成やセミナー作成の精度が上がります。
-              </p>
-              <textarea
-                value={profile.knowledge}
-                onChange={(e) => setProfile((current) => ({ ...current, knowledge: e.target.value }))}
-                placeholder={"例）私はAI活用×Instagram集客を専門とする個人クリエイターです。\n主なターゲットは地方の女性起業家（30〜50代）で、難しい専門用語を使わず、すぐに行動できる実用的なノウハウを届けています。\nSNSの発信歴は3年で、フォロワーは約2,000人です。"}
-                rows={6}
-                className="w-full rounded-xl border border-border bg-white px-4 py-3 text-sm text-text outline-none focus:border-accent resize-none leading-relaxed"
-              />
+              <span className="block text-sm font-medium text-text mb-1.5">APIキー</span>
+              <div className="relative">
+                <KeyRound className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted" />
+                <input
+                  type="password"
+                  value={aiSettings.apiKey}
+                  placeholder={
+                    aiSettings.hasApiKey
+                      ? "変更する場合だけ新しいAPIキーを入力"
+                      : "APIキーを入力"
+                  }
+                  onChange={(e) =>
+                    setAiSettings((current) => ({ ...current, apiKey: e.target.value }))
+                  }
+                  className="w-full rounded-xl border border-border bg-white py-3 pl-10 pr-4 text-sm text-text outline-none focus:border-accent"
+                />
+              </div>
             </label>
+            <div className="rounded-xl border border-warning/20 bg-warning-light px-4 py-3 text-sm text-text-secondary">
+              <div className="flex items-start gap-2">
+                <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0 text-warning" />
+                <p>
+                  APIキーは暗号化してDBに保存し、ブラウザには再表示しません。
+                  公開運用ではVercel Deployment Protectionを有効にしたまま使ってください。
+                </p>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap">
+              <Button
+                onClick={() => handleSaveAi(false)}
+                disabled={savingAi || testingAi}
+                loading={savingAi}
+                loadingLabel="保存中..."
+                className="w-full sm:w-auto"
+              >
+                <Save className="w-4 h-4 mr-1" />
+                AI設定を保存
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={handleTestAi}
+                disabled={savingAi || testingAi}
+                loading={testingAi}
+                loadingLabel="テスト中..."
+                className="w-full sm:w-auto"
+              >
+                <CheckCircle className="w-4 h-4 mr-1" />
+                接続テスト
+              </Button>
+              {aiSettings.keySource === "ui" && (
+                <Button
+                  variant="ghost"
+                  onClick={() => {
+                    if (confirm("保存済みAPIキーを削除しますか？この操作は元に戻せません。")) {
+                      void handleSaveAi(true);
+                    }
+                  }}
+                  disabled={savingAi}
+                  className="w-full text-danger hover:text-danger sm:w-auto"
+                >
+                  保存済みキーを削除
+                </Button>
+              )}
+            </div>
+            <p className="text-xs text-text-muted">
+              対応Provider: Gemini / OpenAI / Claude / Grok / Kimi。APIキーはサーバー側だけで使用します。
+            </p>
           </div>
         )}
       </Card>
 
       {/* Notion Integration */}
       <Card>
-        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-3">
-            <Database className="w-5 h-5 text-accent" />
-            <h3 className="text-base font-bold text-text">Notion連携</h3>
-          </div>
-          <Badge variant={notionHasApiKey ? "success" : "warning"}>
-            {notionHasApiKey ? "APIキー設定済み" : "未設定"}
-          </Badge>
-        </div>
+        <SectionHeader
+          open={openSections.notion}
+          onToggle={() => toggleSection("notion")}
+          icon={<Database className="w-5 h-5 text-accent flex-shrink-0" />}
+          title="Notion連携"
+          badge={
+            <Badge variant={notionHasApiKey ? "success" : "warning"}>
+              {notionHasApiKey ? "APIキー設定済み" : "未設定"}
+            </Badge>
+          }
+        />
+        {openSections.notion && (
+          <div className="mt-4 space-y-4">
+            {notionError && (
+              <div className="rounded-xl border border-danger/20 bg-danger-light px-4 py-3 text-sm text-danger flex gap-2 items-start">
+                <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                {notionError}
+              </div>
+            )}
+            {notionMessage && (
+              <div className="rounded-xl border border-success/20 bg-success-light px-4 py-3 text-sm text-success flex gap-2 items-start">
+                <CheckCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                {notionMessage}
+              </div>
+            )}
 
-        {notionError && (
-          <div className="mb-4 rounded-xl border border-danger/20 bg-danger-light px-4 py-3 text-sm text-danger flex gap-2 items-start">
-            <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
-            {notionError}
-          </div>
-        )}
-        {notionMessage && (
-          <div className="mb-4 rounded-xl border border-success/20 bg-success-light px-4 py-3 text-sm text-success flex gap-2 items-start">
-            <CheckCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
-            {notionMessage}
-          </div>
-        )}
+            <p className="text-xs text-text-secondary">
+              保存済みの学びメモをNotionデータベースに同期します。<br />
+              Notionでインテグレーションを作成し、データベースと共有してください。
+            </p>
 
-        <div className="space-y-4">
-          <p className="text-xs text-text-secondary">
-            保存済みの学びメモをNotionデータベースに同期します。<br />
-            Notionでインテグレーションを作成し、データベースと共有してください。
-          </p>
+            <div className="space-y-1">
+              <label className="text-xs font-semibold text-text-secondary">
+                Notion APIキー（Internal Integration Token）
+              </label>
+              <div className="flex gap-2">
+                <input
+                  type="password"
+                  value={notionApiKey}
+                  onChange={(e) => setNotionApiKey(e.target.value)}
+                  placeholder={notionHasApiKey ? "（設定済み・変更する場合のみ入力）" : "secret_..."}
+                  className="flex-1 rounded-xl border border-border bg-white px-4 py-2.5 text-sm text-text outline-none focus:border-accent"
+                />
+              </div>
+            </div>
 
-          <div className="space-y-1">
-            <label className="text-xs font-semibold text-text-secondary">
-              Notion APIキー（Internal Integration Token）
-            </label>
-            <div className="flex gap-2">
+            <div className="space-y-1">
+              <label className="text-xs font-semibold text-text-secondary">
+                データベースID
+              </label>
               <input
-                type="password"
-                value={notionApiKey}
-                onChange={(e) => setNotionApiKey(e.target.value)}
-                placeholder={notionHasApiKey ? "（設定済み・変更する場合のみ入力）" : "secret_..."}
-                className="flex-1 rounded-xl border border-border bg-white px-4 py-2.5 text-sm text-text outline-none focus:border-accent"
+                type="text"
+                value={notionDatabaseId}
+                onChange={(e) => setNotionDatabaseId(e.target.value)}
+                placeholder="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                className="w-full rounded-xl border border-border bg-white px-4 py-2.5 text-sm text-text outline-none focus:border-accent"
               />
+              <p className="text-xs text-text-muted">
+                NotionのデータベースURLの末尾32文字
+              </p>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              <Button
+                onClick={handleSaveNotion}
+                disabled={savingNotion}
+                size="sm"
+              >
+                {savingNotion ? <Loader2 className="w-4 h-4 animate-spin mr-1.5" /> : <Save className="w-4 h-4 mr-1.5" />}
+                設定を保存
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={handleSyncNotion}
+                disabled={syncingNotion || !notionHasApiKey || !notionDatabaseId}
+                size="sm"
+              >
+                {syncingNotion ? <Loader2 className="w-4 h-4 animate-spin mr-1.5" /> : <RefreshCw className="w-4 h-4 mr-1.5" />}
+                Notionに同期
+              </Button>
             </div>
           </div>
+        )}
+      </Card>
 
-          <div className="space-y-1">
-            <label className="text-xs font-semibold text-text-secondary">
-              データベースID
-            </label>
-            <input
-              type="text"
-              value={notionDatabaseId}
-              onChange={(e) => setNotionDatabaseId(e.target.value)}
-              placeholder="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-              className="w-full rounded-xl border border-border bg-white px-4 py-2.5 text-sm text-text outline-none focus:border-accent"
-            />
-            <p className="text-xs text-text-muted">
-              NotionのデータベースURLの末尾32文字
-            </p>
-          </div>
+      {/* Profile */}
+      <Card>
+        <SectionHeader
+          open={openSections.profile}
+          onToggle={() => toggleSection("profile")}
+          icon={<User className="w-5 h-5 text-accent flex-shrink-0" />}
+          title="プロフィール"
+        />
+        {openSections.profile && (
+          <div className="mt-4">
+            <div className="mb-4 flex justify-end">
+              <Button
+                size="sm"
+                onClick={handleSave}
+                disabled={loading || saving}
+                loading={saving}
+                loadingLabel="保存中..."
+                className="w-full sm:w-auto"
+              >
+                <Save className="w-4 h-4 mr-1" />
+                保存
+              </Button>
+            </div>
 
-          <div className="flex flex-wrap gap-2">
-            <Button
-              onClick={handleSaveNotion}
-              disabled={savingNotion}
-              size="sm"
-            >
-              {savingNotion ? <Loader2 className="w-4 h-4 animate-spin mr-1.5" /> : <Save className="w-4 h-4 mr-1.5" />}
-              設定を保存
-            </Button>
-            <Button
-              variant="secondary"
-              onClick={handleSyncNotion}
-              disabled={syncingNotion || !notionHasApiKey || !notionDatabaseId}
-              size="sm"
-            >
-              {syncingNotion ? <Loader2 className="w-4 h-4 animate-spin mr-1.5" /> : <RefreshCw className="w-4 h-4 mr-1.5" />}
-              Notionに同期
-            </Button>
+            {loading ? (
+              <div className="space-y-3 animate-pulse">
+                <div className="h-12 bg-border-light rounded-xl" />
+                <div className="h-24 bg-border-light rounded-xl" />
+                <div className="h-12 bg-border-light rounded-xl" />
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <label className="block">
+                  <span className="block text-sm font-medium text-text mb-1">名前</span>
+                  <input
+                    value={profile.name}
+                    onChange={(e) => setProfile((current) => ({ ...current, name: e.target.value }))}
+                    className="w-full rounded-xl border border-border bg-white px-4 py-3 text-sm text-text outline-none focus:border-accent"
+                  />
+                </label>
+                <Select
+                  label="役割"
+                  value={profile.role}
+                  onChange={(e) => setProfile((current) => ({ ...current, role: e.target.value }))}
+                  options={roleOptions.map((value) => ({ value, label: value }))}
+                />
+                <div>
+                  <p className="mb-2 text-sm font-medium text-text">テーマ</p>
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    {themeOptions.map((theme) => (
+                      <label
+                        key={theme}
+                        className="flex items-center gap-2 rounded-xl border border-border bg-white px-3 py-2 text-sm text-text"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={profile.themes.includes(theme)}
+                          onChange={() =>
+                            setProfile((current) => ({
+                              ...current,
+                              themes: toggleListValue(current.themes, theme),
+                            }))
+                          }
+                          className="h-4 w-4 accent-accent"
+                        />
+                        {theme}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+                <Select
+                  label="トーン"
+                  value={profile.tone}
+                  onChange={(e) => setProfile((current) => ({ ...current, tone: e.target.value }))}
+                  options={toneOptions.map((value) => ({ value, label: value }))}
+                />
+                <label className="block">
+                  <span className="block text-sm font-medium text-text mb-1">
+                    ナレッジ・発信コンテキスト
+                  </span>
+                  <p className="mb-2 text-xs text-text-muted">
+                    あなたの専門性・発信背景・ターゲット読者などをAIに伝えるテキストです。アウトプット生成やセミナー作成の精度が上がります。
+                  </p>
+                  <textarea
+                    value={profile.knowledge}
+                    onChange={(e) => setProfile((current) => ({ ...current, knowledge: e.target.value }))}
+                    placeholder={"例）私はAI活用×Instagram集客を専門とする個人クリエイターです。\n主なターゲットは地方の女性起業家（30〜50代）で、難しい専門用語を使わず、すぐに行動できる実用的なノウハウを届けています。\nSNSの発信歴は3年で、フォロワーは約2,000人です。"}
+                    rows={6}
+                    className="w-full rounded-xl border border-border bg-white px-4 py-3 text-sm text-text outline-none focus:border-accent resize-none leading-relaxed"
+                  />
+                </label>
+              </div>
+            )}
           </div>
-        </div>
+        )}
       </Card>
     </div>
   );

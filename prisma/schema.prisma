@@ -83,6 +83,7 @@ model Collection {
   id          String   @id @default(cuid())
   title       String
   description String?
+  idea        String?  // user's own ideas/angles to blend with saved posts
   outputJson  String?  // last generated bundled output (e.g. seminar)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
