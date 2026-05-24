@@ -366,6 +366,13 @@ export default function XSettingsPage() {
               手動同期を実行
             </Button>
 
+            {syncing && (
+              <div className="bg-accent-light border border-accent/20 rounded-xl px-4 py-3 flex items-center gap-2">
+                <RefreshCw className="w-4 h-4 text-accent animate-spin flex-shrink-0" />
+                <p className="text-sm text-accent">同期はバックグラウンドで進行中です。他のページへ移動しても同期は続きます。</p>
+              </div>
+            )}
+
             {/* Sync Result */}
             {syncResult && (
               <div className="bg-success-light rounded-xl p-4">
