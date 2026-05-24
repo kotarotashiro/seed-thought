@@ -7,11 +7,14 @@ import {
   ArrowLeft,
   ArrowRight,
   BookOpen,
+  Check,
   Copy,
   Layers,
+  Pencil,
   Sparkles,
   Trash2,
   Wand2,
+  X as XIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -81,6 +84,10 @@ export default function CollectionDetailPage({
   const [generating, setGenerating] = useState(false);
   const [generated, setGenerated] = useState<GeneratedOutput | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [editing, setEditing] = useState(false);
+  const [editTitle, setEditTitle] = useState("");
+  const [editDescription, setEditDescription] = useState("");
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -136,6 +143,49 @@ export default function CollectionDetailPage({
     }
   };
 
+  const startEdit = () => {
+    if (!collection) return;
+    setEditTitle(collection.title);
+    setEditDescription(collection.description || "");
+    setEditing(true);
+  };
+
+  const cancelEdit = () => {
+    setEditing(false);
+    setEditTitle("");
+    setEditDescription("");
+  };
+
+  const saveEdit = async () => {
+    if (!editTitle.trim()) {
+      alert("タイトルを入力してください");
+      return;
+    }
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/collections/${collectionId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: editTitle.trim(),
+          description: editDescription.trim(),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "更新に失敗しました");
+      setCollection((prev) =>
+        prev
+          ? { ...prev, title: data.collection.title, description: data.collection.description }
+          : prev
+      );
+      setEditing(false);
+    } catch (e) {
+      alert((e as Error).message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const remove = async () => {
     if (!confirm("このコレクションを削除しますか？")) return;
     try {
@@ -178,19 +228,57 @@ export default function CollectionDetailPage({
           コレクション一覧
         </Link>
         <div className="mt-3 flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <h1 className="flex items-center gap-2 text-xl font-bold text-text sm:text-2xl">
-              <Layers className="h-5 w-5 text-accent" />
-              {collection.title}
-            </h1>
-            {collection.description && (
-              <p className="mt-1 text-sm text-text-secondary">{collection.description}</p>
-            )}
-          </div>
-          <Button variant="ghost" size="sm" onClick={remove}>
-            <Trash2 className="mr-1.5 h-4 w-4" />
-            削除
-          </Button>
+          {editing ? (
+            <div className="flex-1 space-y-2">
+              <input
+                type="text"
+                value={editTitle}
+                onChange={(e) => setEditTitle(e.target.value)}
+                className="w-full rounded-xl border border-border bg-white px-3 py-2 text-base font-bold text-text focus:border-accent focus:outline-none"
+                placeholder="タイトル"
+                autoFocus
+              />
+              <textarea
+                value={editDescription}
+                onChange={(e) => setEditDescription(e.target.value)}
+                className="w-full resize-y rounded-xl border border-border bg-white px-3 py-2 text-sm text-text-secondary focus:border-accent focus:outline-none"
+                placeholder="説明（任意）"
+                rows={2}
+              />
+              <div className="flex gap-2">
+                <Button size="sm" onClick={saveEdit} loading={saving} loadingLabel="保存中...">
+                  <Check className="mr-1.5 h-3.5 w-3.5" />
+                  保存
+                </Button>
+                <Button variant="ghost" size="sm" onClick={cancelEdit}>
+                  <XIcon className="mr-1.5 h-3.5 w-3.5" />
+                  キャンセル
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="min-w-0 flex-1">
+              <h1 className="flex items-center gap-2 text-xl font-bold text-text sm:text-2xl">
+                <Layers className="h-5 w-5 text-accent" />
+                {collection.title}
+              </h1>
+              {collection.description && (
+                <p className="mt-1 text-sm text-text-secondary">{collection.description}</p>
+              )}
+            </div>
+          )}
+          {!editing && (
+            <div className="flex items-center gap-1">
+              <Button variant="ghost" size="sm" onClick={startEdit}>
+                <Pencil className="mr-1.5 h-4 w-4" />
+                編集
+              </Button>
+              <Button variant="ghost" size="sm" onClick={remove}>
+                <Trash2 className="mr-1.5 h-4 w-4" />
+                削除
+              </Button>
+            </div>
+          )}
         </div>
       </div>
 

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   ArrowRight,
   BookOpen,
@@ -49,6 +50,7 @@ function formatDate(value: string) {
 }
 
 export default function KnowhowPage() {
+  const router = useRouter();
   const [cards, setCards] = useState<LearningCardItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState("");
@@ -122,6 +124,13 @@ export default function KnowhowPage() {
     } else {
       setSelectedIds(new Set(filteredCards.map((c) => c.id)));
     }
+  }
+
+  function handleCreateCollection() {
+    const ids = Array.from(selectedIds);
+    const params = new URLSearchParams();
+    ids.forEach((id) => params.append("cardId", id));
+    router.push(`/collections?${params.toString()}`);
   }
 
   async function handleDelete(ids: string[]) {
@@ -214,7 +223,16 @@ export default function KnowhowPage() {
             )}
             全選択
           </Button>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="secondary"
+              size="sm"
+              disabled={selectedIds.size === 0}
+              onClick={handleCreateCollection}
+            >
+              <Layers className="h-4 w-4 mr-1.5" />
+              コレクション作成 ({selectedIds.size})
+            </Button>
             <ExportButton ids={Array.from(selectedIds)} format="zip" />
             <ExportButton ids={Array.from(selectedIds)} format="bundle" />
             <Button

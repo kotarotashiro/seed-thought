@@ -14,7 +14,6 @@ import {
   BookOpen,
   Search,
   TrendingUp,
-  Flame,
   Layers,
   MessageSquare,
 } from "lucide-react";
@@ -22,7 +21,6 @@ import { clsx } from "clsx";
 
 const menuItems = [
   { href: "/", label: "ホーム", icon: Home },
-  { href: "/review", label: "今日の復習", icon: Flame },
   { href: "/posts", label: "保存一覧", icon: Archive },
   { href: "/knowhow", label: "学習カード一覧", icon: BookOpen },
   { href: "/collections", label: "コレクション", icon: Layers },
@@ -91,7 +89,7 @@ export function Sidebar() {
       )}
     >
       {/* Logo */}
-      <div className="flex items-center gap-3 px-5 py-5 border-b border-border-light">
+      <Link href="/" className="flex items-center gap-3 px-5 py-5 border-b border-border-light hover:bg-border-light/50 transition-colors">
         <div className="w-8 h-8 rounded-lg bg-accent flex items-center justify-center flex-shrink-0">
           <Sprout className="w-5 h-5 text-white" />
         </div>
@@ -100,7 +98,7 @@ export function Sidebar() {
             SeedThought
           </span>
         )}
-      </div>
+      </Link>
 
       {/* Navigation */}
       <nav className="flex-1 py-4 px-3 space-y-1 overflow-y-auto">

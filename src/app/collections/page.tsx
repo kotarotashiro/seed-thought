@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, Layers, Plus, Search, Sparkles } from "lucide-react";
+import { ArrowRight, ArrowUpDown, Layers, Plus, Search, Sparkles, Wand2 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
@@ -25,10 +25,20 @@ interface LearningCardOption {
   title: string;
   summary: string;
   status: string;
+  updatedAt: string;
   sourcePost?: {
     classification?: { primaryCategory: string } | null;
   };
 }
+
+type SortKey = "date_desc" | "date_asc" | "title_asc" | "category";
+
+const SORT_LABELS: Record<SortKey, string> = {
+  date_desc: "新しい順",
+  date_asc: "古い順",
+  title_asc: "タイトル順",
+  category: "カテゴリ順",
+};
 
 export default function CollectionsPage() {
   const [collections, setCollections] = useState<CollectionListItem[]>([]);
@@ -40,7 +50,10 @@ export default function CollectionsPage() {
   const [description, setDescription] = useState("");
   const [availableCards, setAvailableCards] = useState<LearningCardOption[]>([]);
   const [search, setSearch] = useState("");
+  const [sortBy, setSortBy] = useState<SortKey>("date_desc");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [autoGenerating, setAutoGenerating] = useState(false);
+  const [pendingAutoGenerate, setPendingAutoGenerate] = useState<string[]>([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -67,19 +80,79 @@ export default function CollectionsPage() {
     };
   }, []);
 
+  // Detect cardId URL params (set by knowhow page when creating a collection from selected cards)
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const cardIds = params.getAll("cardId");
+    if (cardIds.length > 0) {
+      setSelectedIds(cardIds);
+      setShowForm(true);
+      setPendingAutoGenerate(cardIds);
+    }
+  }, []);
+
+  // Auto-generate title/description once cards are loaded
+  useEffect(() => {
+    if (pendingAutoGenerate.length > 0 && !loading) {
+      generateMeta(pendingAutoGenerate);
+      setPendingAutoGenerate([]);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingAutoGenerate, loading]);
+
   const filteredCards = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return availableCards;
-    return availableCards.filter(
-      (c) =>
-        c.title.toLowerCase().includes(q) || c.summary.toLowerCase().includes(q)
-    );
-  }, [availableCards, search]);
+    const base = q
+      ? availableCards.filter(
+          (c) =>
+            c.title.toLowerCase().includes(q) || c.summary.toLowerCase().includes(q)
+        )
+      : availableCards;
+
+    return [...base].sort((a, b) => {
+      switch (sortBy) {
+        case "title_asc":
+          return a.title.localeCompare(b.title, "ja");
+        case "date_asc":
+          return new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime();
+        case "category": {
+          const catA = a.sourcePost?.classification?.primaryCategory ?? "￿";
+          const catB = b.sourcePost?.classification?.primaryCategory ?? "￿";
+          return catA.localeCompare(catB, "ja");
+        }
+        case "date_desc":
+        default:
+          return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+      }
+    });
+  }, [availableCards, search, sortBy]);
 
   const toggle = (id: string) => {
     setSelectedIds((prev) =>
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
     );
+  };
+
+  const generateMeta = async (ids: string[]) => {
+    if (ids.length === 0) return;
+    setAutoGenerating(true);
+    try {
+      const res = await fetch("/api/collections/generate-meta", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cardIds: ids }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        if (data.title) setTitle(data.title);
+        if (data.description) setDescription(data.description);
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setAutoGenerating(false);
+    }
   };
 
   const create = async () => {
@@ -138,10 +211,22 @@ export default function CollectionsPage() {
 
       {showForm && (
         <Card padding="lg" className="space-y-4">
+          {/* Title */}
           <div>
-            <label className="mb-1 block text-xs font-semibold text-text-secondary">
-              タイトル
-            </label>
+            <div className="mb-1 flex items-center justify-between">
+              <label className="text-xs font-semibold text-text-secondary">タイトル</label>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => generateMeta(selectedIds)}
+                loading={autoGenerating}
+                loadingLabel="生成中..."
+                disabled={selectedIds.length === 0}
+              >
+                <Wand2 className="mr-1 h-3.5 w-3.5" />
+                AI自動生成
+              </Button>
+            </div>
             <input
               type="text"
               value={title}
@@ -150,6 +235,8 @@ export default function CollectionsPage() {
               className="w-full rounded-xl border border-border bg-white px-3 py-2 text-sm focus:border-accent focus:outline-none"
             />
           </div>
+
+          {/* Description */}
           <div>
             <label className="mb-1 block text-xs font-semibold text-text-secondary">
               説明（任意）
@@ -162,20 +249,40 @@ export default function CollectionsPage() {
               className="w-full resize-y rounded-xl border border-border bg-white px-3 py-2 text-sm focus:border-accent focus:outline-none"
             />
           </div>
+
+          {/* Card selection */}
           <div>
-            <div className="mb-2 flex items-center justify-between">
+            <div className="mb-2 flex flex-wrap items-center gap-2">
               <label className="text-xs font-semibold text-text-secondary">
                 含める学習カード（{selectedIds.length}件選択中）
               </label>
-              <div className="relative">
-                <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-text-muted" />
-                <input
-                  type="text"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder="検索"
-                  className="rounded-lg border border-border bg-white py-1 pl-7 pr-2 text-xs focus:border-accent focus:outline-none"
-                />
+              <div className="ml-auto flex items-center gap-2">
+                {/* Sort */}
+                <div className="flex items-center gap-1 rounded-lg border border-border bg-white px-2 py-1">
+                  <ArrowUpDown className="h-3 w-3 text-text-muted" />
+                  <select
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value as SortKey)}
+                    className="bg-transparent text-xs text-text-secondary focus:outline-none"
+                  >
+                    {(Object.keys(SORT_LABELS) as SortKey[]).map((k) => (
+                      <option key={k} value={k}>
+                        {SORT_LABELS[k]}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                {/* Search */}
+                <div className="relative">
+                  <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-text-muted" />
+                  <input
+                    type="text"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    placeholder="検索"
+                    className="rounded-lg border border-border bg-white py-1 pl-7 pr-2 text-xs focus:border-accent focus:outline-none"
+                  />
+                </div>
               </div>
             </div>
             <div className="max-h-72 space-y-1 overflow-y-auto rounded-xl border border-border bg-white p-2">
@@ -196,7 +303,14 @@ export default function CollectionsPage() {
                       className="mt-1"
                     />
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium text-text">{card.title}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="truncate text-sm font-medium text-text">{card.title}</p>
+                        {card.sourcePost?.classification?.primaryCategory && (
+                          <span className="shrink-0 text-[10px] text-text-muted">
+                            {card.sourcePost.classification.primaryCategory}
+                          </span>
+                        )}
+                      </div>
                       <p className="line-clamp-2 text-xs text-text-secondary">{card.summary}</p>
                     </div>
                   </label>
@@ -204,6 +318,7 @@ export default function CollectionsPage() {
               )}
             </div>
           </div>
+
           <div className="flex justify-end gap-2">
             <Button variant="ghost" onClick={() => setShowForm(false)} size="sm">
               キャンセル
