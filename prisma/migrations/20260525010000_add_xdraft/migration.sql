@@ -1,5 +1,5 @@
--- Phase 6: XDraft table for X post draft approval pipeline
-CREATE TABLE "XDraft" (
+-- Phase 6: XDraft table for X post draft approval pipeline — idempotent
+CREATE TABLE IF NOT EXISTS "XDraft" (
     "id"             TEXT NOT NULL,
     "learningCardId" TEXT,
     "content"        TEXT NOT NULL,
@@ -12,16 +12,19 @@ CREATE TABLE "XDraft" (
     CONSTRAINT "XDraft_pkey" PRIMARY KEY ("id")
 );
 
--- Index for efficient status filtering
-CREATE INDEX "XDraft_learningCardId_idx" ON "XDraft"("learningCardId");
-CREATE INDEX "XDraft_status_idx" ON "XDraft"("status");
+-- Indexes (IF NOT EXISTS requires PG 9.5+, Neon supports it)
+CREATE INDEX IF NOT EXISTS "XDraft_learningCardId_idx" ON "XDraft"("learningCardId");
+CREATE INDEX IF NOT EXISTS "XDraft_status_idx" ON "XDraft"("status");
 
--- Foreign key to LearningCard (SET NULL on delete)
-ALTER TABLE "XDraft"
+-- Foreign key (skip if already exists)
+DO $$ BEGIN
+  ALTER TABLE "XDraft"
     ADD CONSTRAINT "XDraft_learningCardId_fkey"
     FOREIGN KEY ("learningCardId")
     REFERENCES "LearningCard"("id")
     ON DELETE SET NULL ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 -- Rollback:
 -- DROP TABLE IF EXISTS "XDraft";
