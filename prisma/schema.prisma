@@ -63,6 +63,7 @@ model LearningCard {
   outputs    LearningCardOutput[]
   images     LearningCardImage[]
   collectionItems CollectionItem[]
+  drafts     XDraft[]
 }
 
 model LearningCardImage {
@@ -198,6 +199,19 @@ model AppSetting {
   valueJson String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model XDraft {
+  id             String    @id @default(cuid())
+  learningCardId String?
+  content        String    // X post text (may be thread, separated by "---\n")
+  status         String    @default("pending") // "pending" | "approved" | "rejected" | "posted"
+  postedUrl      String?
+  postedAt       DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  learningCard LearningCard? @relation(fields: [learningCardId], references: [id], onDelete: SetNull)
 }
 
 // Single-row table for xAI OAuth tokens (populated in Phase 5/6 when OAuth is wired up).
