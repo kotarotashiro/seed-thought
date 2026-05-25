@@ -148,7 +148,7 @@ export default function ConfirmPage({ params }: { params: Promise<{ postId: stri
   }
 
   const threadPosts = post.threadPosts || [];
-  const canFetchThread = post.source === "x" && post.sourcePostId;
+  const canFetchThread = (post.source === "user_like" || post.source === "user_bookmark") && post.sourcePostId;
   const postMedia = parsePostMedia(post.mediaJson);
 
   return (

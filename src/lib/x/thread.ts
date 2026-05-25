@@ -18,7 +18,8 @@ export async function fetchAndSaveThread(postId: string): Promise<ThreadFetchRes
   });
 
   if (!post) throw new Error("投稿が見つかりません");
-  if (post.source !== "x" || !post.sourcePostId || !post.authorUsername) {
+  const isFromX = post.source === "user_like" || post.source === "user_bookmark";
+  if (!isFromX || !post.sourcePostId || !post.authorUsername) {
     throw new Error("X由来の投稿だけツリーを取得できます");
   }
 

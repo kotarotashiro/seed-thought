@@ -198,7 +198,7 @@ export async function POST(request: Request) {
     // Create the post
     const post = await prisma.post.create({
       data: {
-        source: isWeb ? "web" : "manual",
+        source: "user_manual",
         savedType: "manual",
         text: effectiveText,
         sourceUrl: isWeb ? sourceUrl ?? null : null,

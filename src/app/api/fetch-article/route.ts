@@ -1,11 +1,8 @@
 import { NextResponse } from "next/server";
+import { xaiChat } from "@/lib/xai/client";
 
-function getGrokApiKey(): string | null {
-  return process.env.GROK_API_KEY || process.env.XAI_API_KEY || null;
-}
-
-function getGrokModel(): string {
-  return process.env.GROK_MODEL || process.env.XAI_MODEL || "grok-3";
+function hasXaiKey(): boolean {
+  return Boolean(process.env.GROK_API_KEY ?? process.env.XAI_API_KEY);
 }
 
 interface ArticleResult {
@@ -22,16 +19,8 @@ function isUrlLike(s: string): boolean {
 }
 
 async function fetchWithGrok(url: string): Promise<ArticleResult> {
-  const apiKey = getGrokApiKey()!;
-  const model = getGrokModel();
-
   const isXArticle = X_ARTICLE_RE.test(url);
-
-  // X Articles: search X by article ID (Grok x_search can read X Article content)
-  // Regular URLs: ask Grok to browse/summarize via web search
-  const sources = isXArticle
-    ? [{ type: "x" }]
-    : [{ type: "web" }];
+  const sources = isXArticle ? [{ type: "x" as const }] : [{ type: "web" as const }];
 
   let prompt: string;
   if (isXArticle) {
@@ -41,70 +30,40 @@ async function fetchWithGrok(url: string): Promise<ArticleResult> {
     prompt = `以下のURLの記事を読んで内容を日本語でまとめてください。\n\n必ず次のJSON形式のみで返してください（説明文不要）:\n{"title":"記事タイトル","description":"150〜250文字の内容まとめ"}\n\nURL: ${url}`;
   }
 
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 25000);
+  const { content } = await xaiChat({
+    messages: [{ role: "user", content: prompt }],
+    searchParameters: { mode: "on", sources },
+  });
 
-  try {
-    const res = await fetch("https://api.x.ai/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model,
-        messages: [{ role: "user", content: prompt }],
-        search_parameters: { mode: "on", sources },
-      }),
-      signal: controller.signal,
-    });
+  console.log(`[fetch-article] Grok response for ${url}:`, content.slice(0, 500));
 
-    clearTimeout(timer);
-
-    if (!res.ok) {
-      const text = await res.text();
-      throw new Error(`Grok API ${res.status}: ${text.slice(0, 200)}`);
-    }
-
-    const data = await res.json() as {
-      choices?: Array<{ message?: { content?: string } }>;
-    };
-    const content = data.choices?.[0]?.message?.content || "";
-
-    console.log(`[fetch-article] Grok response for ${url}:`, content.slice(0, 500));
-
-    const jsonMatch = content.match(/\{[\s\S]*?\}/);
-    if (jsonMatch) {
-      try {
-        const parsed = JSON.parse(jsonMatch[0]) as { title?: string; description?: string };
-        const title = parsed.title && !isUrlLike(parsed.title) ? parsed.title : null;
-        const description = parsed.description && !isUrlLike(parsed.description) ? parsed.description : null;
-        if (title || description) {
-          return { finalUrl: url, title, description, image: null };
-        }
-      } catch {
-        // fall through
+  const jsonMatch = content.match(/\{[\s\S]*?\}/);
+  if (jsonMatch) {
+    try {
+      const parsed = JSON.parse(jsonMatch[0]) as { title?: string; description?: string };
+      const title = parsed.title && !isUrlLike(parsed.title) ? parsed.title : null;
+      const description = parsed.description && !isUrlLike(parsed.description) ? parsed.description : null;
+      if (title || description) {
+        return { finalUrl: url, title, description, image: null };
       }
+    } catch {
+      // fall through
     }
-
-    // Fallback: use raw content only if it has meaningful text (not just URL or JSON)
-    const fallback = content.trim().slice(0, 300);
-    const looksUseless =
-      !fallback ||
-      isUrlLike(fallback) ||
-      fallback.startsWith("{") ||
-      fallback.startsWith("[") ||
-      /^https?:\/\//.test(fallback); // starts with URL
-    return {
-      finalUrl: url,
-      title: null,
-      description: looksUseless ? null : fallback,
-      image: null,
-    };
-  } catch (err) {
-    clearTimeout(timer);
-    throw err;
   }
+
+  const fallback = content.trim().slice(0, 300);
+  const looksUseless =
+    !fallback ||
+    isUrlLike(fallback) ||
+    fallback.startsWith("{") ||
+    fallback.startsWith("[") ||
+    /^https?:\/\//.test(fallback);
+  return {
+    finalUrl: url,
+    title: null,
+    description: looksUseless ? null : fallback,
+    image: null,
+  };
 }
 
 function extractMeta(html: string, names: string[]): string | null {
@@ -228,10 +187,8 @@ export async function GET(request: Request) {
     });
   }
 
-  const grokKey = getGrokApiKey();
-
   try {
-    if (grokKey) {
+    if (hasXaiKey()) {
       const result = await fetchWithGrok(resolvedUrl);
       return NextResponse.json({ ...result, finalUrl: resolvedUrl });
     } else {
@@ -239,7 +196,7 @@ export async function GET(request: Request) {
       return NextResponse.json(result);
     }
   } catch (err) {
-    if (grokKey) {
+    if (hasXaiKey()) {
       try {
         const result = await fetchWithHtml(resolvedUrl);
         return NextResponse.json(result);

@@ -68,7 +68,7 @@ async function saveTweets(
 
     const post = await prisma.post.create({
       data: {
-        source: "x",
+        source: savedType === "like" ? "user_like" : "user_bookmark",
         sourcePostId: tweet.id,
         sourceUrl: tweet.sourceUrl,
         savedType,
