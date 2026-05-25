@@ -44,6 +44,9 @@ X_CLIENT_SECRET="..."
 X_REDIRECT_URI="http://localhost:3003/api/x/callback"
 X_SCOPES="tweet.read tweet.write users.read offline.access"
 TOKEN_ENCRYPTION_KEY="replace-with-a-long-random-string"
+XAI_CLIENT_ID="b1a00492-073a-47ea-816f-4c329264a828"
+XAI_REDIRECT_URI="http://127.0.0.1:56121/callback"
+XAI_ENCRYPTION_KEY="replace-with-a-long-random-string"
 ```
 
 Use a long random value for `TOKEN_ENCRYPTION_KEY` and never commit real secret
@@ -86,6 +89,51 @@ pnpm run db:seed
 
 The app does not include application-level login. Do not expose the production
 deployment without Vercel-side protection unless you add authentication first.
+
+## Local Always-On Operation
+
+This setup keeps the existing Vercel deployment working while a Windows PC runs
+SeedThought locally against the same Neon Postgres database.
+
+Initial setup:
+
+```powershell
+pnpm install
+Copy-Item .env.example .env
+pnpm run db:deploy
+winget install --id Cloudflare.cloudflared
+```
+
+Set local `.env` to the same `DATABASE_URL`, `DIRECT_URL`, and `CRON_SECRET`
+used by production. For Grok OAuth, keep `XAI_CLIENT_ID` from `.env.example`
+and set `XAI_ENCRYPTION_KEY` or `TOKEN_ENCRYPTION_KEY`.
+
+Start local production plus Cloudflare Quick Tunnel:
+
+```powershell
+.\scripts\start-local.ps1
+```
+
+The displayed `*.trycloudflare.com` URL is free and requires no custom domain,
+but it changes every time the tunnel starts. Bookmark the current URL after
+each restart.
+
+Grok OAuth uses the fixed loopback callback
+`http://127.0.0.1:56121/callback`, so it does not depend on the changing
+Cloudflare URL. X OAuth for syncing still uses the normal app callback URL; for
+local Quick Tunnel usage, continue using the Vercel callback URL, or consider a
+stable tunnel such as Tailscale Funnel if you want one permanent local callback.
+
+Windows Task Scheduler cron:
+
+```powershell
+$env:CRON_SECRET = "your-cron-secret"
+.\scripts\register-cron.ps1
+```
+
+Run PowerShell as administrator when registering the tasks. The registration
+creates `SeedThought-XSync` every 30 minutes and `SeedThought-Enrich` every
+hour, both calling `http://localhost:3000` with the bearer `CRON_SECRET`.
 
 ## X Developer Portal
 

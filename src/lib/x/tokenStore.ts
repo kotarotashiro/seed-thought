@@ -2,15 +2,16 @@ import crypto from "crypto";
 
 const ALGORITHM = "aes-256-gcm";
 
-function getEncryptionKey(): Buffer {
-  const key = process.env.TOKEN_ENCRYPTION_KEY;
-  if (!key) throw new Error("TOKEN_ENCRYPTION_KEY is not set");
+function getEncryptionKey(keyOverride?: string): Buffer {
+  const key =
+    keyOverride ?? process.env.TOKEN_ENCRYPTION_KEY ?? process.env.XAI_ENCRYPTION_KEY;
+  if (!key) throw new Error("TOKEN_ENCRYPTION_KEY or XAI_ENCRYPTION_KEY is not set");
   // Derive a 32-byte key from the provided string
   return crypto.createHash("sha256").update(key).digest();
 }
 
-export function encryptToken(plaintext: string): string {
-  const key = getEncryptionKey();
+export function encryptToken(plaintext: string, keyOverride?: string): string {
+  const key = getEncryptionKey(keyOverride);
   const iv = crypto.randomBytes(16);
   const cipher = crypto.createCipheriv(ALGORITHM, key, iv);
 
@@ -21,8 +22,8 @@ export function encryptToken(plaintext: string): string {
   return `${iv.toString("hex")}:${authTag}:${encrypted}`;
 }
 
-export function decryptToken(ciphertext: string): string {
-  const key = getEncryptionKey();
+export function decryptToken(ciphertext: string, keyOverride?: string): string {
+  const key = getEncryptionKey(keyOverride);
   const [ivHex, authTagHex, encrypted] = ciphertext.split(":");
 
   if (!ivHex || !authTagHex || !encrypted) {

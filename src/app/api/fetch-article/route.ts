@@ -1,9 +1,5 @@
 import { NextResponse } from "next/server";
-import { xaiChat } from "@/lib/xai/client";
-
-function hasXaiKey(): boolean {
-  return Boolean(process.env.GROK_API_KEY ?? process.env.XAI_API_KEY);
-}
+import { hasXaiAuthConfigured, xaiChat } from "@/lib/xai/client";
 
 interface ArticleResult {
   finalUrl: string;
@@ -188,7 +184,8 @@ export async function GET(request: Request) {
   }
 
   try {
-    if (hasXaiKey()) {
+    const hasXaiAuth = await hasXaiAuthConfigured();
+    if (hasXaiAuth) {
       const result = await fetchWithGrok(resolvedUrl);
       return NextResponse.json({ ...result, finalUrl: resolvedUrl });
     } else {
@@ -196,7 +193,7 @@ export async function GET(request: Request) {
       return NextResponse.json(result);
     }
   } catch (err) {
-    if (hasXaiKey()) {
+    if (await hasXaiAuthConfigured()) {
       try {
         const result = await fetchWithHtml(resolvedUrl);
         return NextResponse.json(result);

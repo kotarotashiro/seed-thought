@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db/prisma";
 import { decryptToken, encryptToken } from "@/lib/x/tokenStore";
+import { hasXaiAuthConfigured } from "@/lib/xai/client";
 
 export const AI_SETTING_KEY = "ai";
 
@@ -9,7 +10,7 @@ export interface AiSettingsPublic {
   provider: AiProviderName;
   model: string;
   hasApiKey: boolean;
-  keySource: "ui" | "env" | "none";
+  keySource: "ui" | "env" | "oauth" | "none";
 }
 
 export interface AiRuntimeSettings extends AiSettingsPublic {
@@ -242,13 +243,14 @@ export async function getAiRuntimeSettings(): Promise<AiRuntimeSettings> {
   const uiKey = stored.apiKeyEncrypted ? decryptToken(stored.apiKeyEncrypted) : null;
   const envKey = envKeys[provider] || null;
   const apiKey = uiKey || envKey;
+  const hasOAuth = provider === "grok" && !apiKey ? await hasXaiAuthConfigured() : false;
 
   return {
     provider,
     model,
     apiKey,
-    hasApiKey: Boolean(apiKey) || provider === "mock",
-    keySource: uiKey ? "ui" : envKey ? "env" : "none",
+    hasApiKey: Boolean(apiKey) || hasOAuth || provider === "mock",
+    keySource: uiKey ? "ui" : envKey ? "env" : hasOAuth ? "oauth" : "none",
   };
 }
 

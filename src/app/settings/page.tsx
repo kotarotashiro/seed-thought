@@ -436,6 +436,8 @@ export default function SettingsPage() {
               {aiSettings.hasApiKey
                 ? aiSettings.keySource === "ui"
                   ? "UIキー設定済み"
+                  : aiSettings.keySource === "oauth"
+                  ? "Grok OAuth連携済み"
                   : "環境変数キー使用中"
                 : "APIキー未設定"}
             </Badge>

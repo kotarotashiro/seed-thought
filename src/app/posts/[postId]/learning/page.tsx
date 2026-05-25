@@ -12,7 +12,7 @@ import { OutputPreview } from "@/components/outputs/OutputPreview";
 import { LinkifiedText } from "@/components/ui/LinkifiedText";
 import { OpenInXButton } from "@/components/ui/OpenInXButton";
 import type { LearningOutput, StrictLearningOutput } from "@/lib/ai/types";
-import { parseArticleContent } from "@/lib/posts/articleContent";
+import { parseArticleContent } from "@/lib/posts/articleParser";
 import {
   AlertCircle,
   ArrowLeft,
@@ -162,10 +162,7 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
   const article = useMemo(() => (post ? parseArticleContent(post.urlCardJson) : null), [post]);
 
   useEffect(() => {
-    if (!generating) {
-      setProgressStep(0);
-      return;
-    }
+    if (!generating) return;
     const interval = setInterval(() => {
       setProgressStep((prev) => Math.min(prev + 1, PROGRESS_STEPS.length - 1));
     }, 4000);
@@ -185,21 +182,16 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
 
   const output = useMemo(() => parseLearningOutput(card), [card]);
 
-  const loadLearning = async () => {
+  const loadOutputHistory = async (cardId: string) => {
+    setHistoryLoading(true);
     try {
-      const res = await fetch(`/api/posts/${postId}/learning`);
+      const res = await fetch(`/api/learning-cards/${cardId}/outputs`);
       const data = await res.json();
-      setPost(data.post || null);
-      setCard(data.learningCard || null);
-      setMemo(data.learningCard?.userMemo || "");
-      setLearningMode(data.learningCard?.learningMode === "format" ? "format" : "content");
-      setStrictLearning(data.strictLearning || null);
-      if (data.learningCard?.id) {
-        void loadOutputHistory(data.learningCard.id);
-      }
-    } catch (loadError) {
-      console.error("Failed to fetch learning card:", loadError);
-      setError("学習カードの取得に失敗しました");
+      setOutputHistory(data.outputs || []);
+    } catch {
+      // ignore
+    } finally {
+      setHistoryLoading(false);
     }
   };
 
@@ -236,6 +228,7 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
   const handleGenerate = async (mode?: "content" | "format") => {
     const activeMode = mode ?? learningMode;
     if (mode !== undefined) setLearningMode(mode);
+    setProgressStep(0);
     setGenerating(true);
     setError(null);
     setMessage(null);
@@ -354,19 +347,6 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
       setError(deleteError instanceof Error ? deleteError.message : "学習カードの削除に失敗しました");
     } finally {
       setDeleting(false);
-    }
-  };
-
-  const loadOutputHistory = async (cardId: string) => {
-    setHistoryLoading(true);
-    try {
-      const res = await fetch(`/api/learning-cards/${cardId}/outputs`);
-      const data = await res.json();
-      setOutputHistory(data.outputs || []);
-    } catch {
-      // ignore
-    } finally {
-      setHistoryLoading(false);
     }
   };
 

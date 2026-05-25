@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db/prisma";
-import { xaiSearchX } from "@/lib/xai/client";
+import { hasXaiAuthConfigured, xaiSearchX } from "@/lib/xai/client";
 import { getProfile } from "@/lib/profile/fixedProfile";
 import { createFallbackClassification } from "@/lib/ai/fallback";
 import { getAiProvider } from "@/lib/ai/provider";
@@ -17,7 +17,7 @@ async function getTopCategories(limit = 3): Promise<string[]> {
 }
 
 async function shouldRun(): Promise<boolean> {
-  if (!process.env.GROK_API_KEY && !process.env.XAI_API_KEY) return false;
+  if (!(await hasXaiAuthConfigured())) return false;
 
   const since = new Date(Date.now() - MIN_INTERVAL_HOURS * 60 * 60 * 1000);
   const recent = await prisma.post.findFirst({

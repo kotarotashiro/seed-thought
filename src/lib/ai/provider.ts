@@ -40,6 +40,7 @@ import {
 import { mergeClassificationFallback } from "./fallback";
 import { getAiRuntimeSettings, type AiProviderName, type AiRuntimeSettings } from "./settings";
 import { mockProvider } from "./mockProvider";
+import { getAuthHeader } from "@/lib/xai/client";
 
 async function callGemini(prompt: string, settings: AiRuntimeSettings): Promise<string> {
   if (!settings.apiKey) throw new Error("GEMINI_API_KEY is not set");
@@ -69,7 +70,12 @@ function getOpenAiBaseUrl(provider: AiProviderName): string | undefined {
 }
 
 async function callOpenAiCompatible(prompt: string, settings: AiRuntimeSettings): Promise<string> {
-  if (!settings.apiKey) {
+  let apiKey = settings.apiKey;
+  if (!apiKey && settings.provider === "grok") {
+    apiKey = (await getAuthHeader()).replace(/^Bearer\s+/i, "");
+  }
+
+  if (!apiKey) {
     if (settings.provider === "openai") throw new Error("OPENAI_API_KEY is not set");
     if (settings.provider === "grok") throw new Error("GROK_API_KEY is not set");
     if (settings.provider === "kimi") throw new Error("KIMI_API_KEY is not set");
@@ -77,7 +83,7 @@ async function callOpenAiCompatible(prompt: string, settings: AiRuntimeSettings)
   }
 
   const client = new OpenAI({
-    apiKey: settings.apiKey,
+    apiKey,
     baseURL: getOpenAiBaseUrl(settings.provider),
   });
 
@@ -92,10 +98,14 @@ async function callOpenAiCompatible(prompt: string, settings: AiRuntimeSettings)
 }
 
 async function callOpenAiCompatibleText(prompt: string, settings: AiRuntimeSettings): Promise<string> {
-  if (!settings.apiKey) throw new Error("AI API key is not set");
+  let apiKey = settings.apiKey;
+  if (!apiKey && settings.provider === "grok") {
+    apiKey = (await getAuthHeader()).replace(/^Bearer\s+/i, "");
+  }
+  if (!apiKey) throw new Error("AI API key is not set");
 
   const client = new OpenAI({
-    apiKey: settings.apiKey,
+    apiKey,
     baseURL: getOpenAiBaseUrl(settings.provider),
   });
 

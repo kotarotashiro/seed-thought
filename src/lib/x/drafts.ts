@@ -1,10 +1,10 @@
 import { prisma } from "@/lib/db/prisma";
-import { xaiChat } from "@/lib/xai/client";
+import { hasXaiAuthConfigured, xaiChat } from "@/lib/xai/client";
 import { GoogleGenAI } from "@google/genai";
 import { getProfile } from "@/lib/profile/fixedProfile";
 
 async function callAiText(prompt: string): Promise<string> {
-  if (process.env.GROK_API_KEY ?? process.env.XAI_API_KEY) {
+  if (await hasXaiAuthConfigured()) {
     const result = await xaiChat({ messages: [{ role: "user", content: prompt }] });
     return result.content;
   }
