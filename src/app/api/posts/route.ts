@@ -48,6 +48,7 @@ export async function GET(request: Request) {
   const genre = searchParams.get("genre") || "";
   const postType = searchParams.get("postType") || "";
   const savedType = searchParams.get("savedType") || "";
+  const source = searchParams.get("source") || "";
   const digestStatus = searchParams.get("digestStatus") || "";
   const author = searchParams.get("author") || "";
   const sort = searchParams.get("sort") || "savedAt_desc";
@@ -61,6 +62,9 @@ export async function GET(request: Request) {
     }
     if (savedType) {
       where.savedType = savedType;
+    }
+    if (source) {
+      where.source = source;
     }
     if (author) {
       where.authorUsername = author;

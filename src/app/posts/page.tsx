@@ -5,7 +5,7 @@ import Link from "next/link";
 import { PostFilters } from "@/components/posts/PostFilters";
 import { PostCard } from "@/components/posts/PostCard";
 import { Button } from "@/components/ui/Button";
-import { Archive, Trash2, CheckSquare } from "lucide-react";
+import { Archive, Trash2, CheckSquare, Sparkles } from "lucide-react";
 
 interface Author {
   username: string;
@@ -47,6 +47,7 @@ export default function PostsPage() {
   const [selectedSort, setSelectedSort] = useState("savedAt_desc");
   const [selectedAuthor, setSelectedAuthor] = useState("");
 
+  const [activeTab, setActiveTab] = useState<"saved" | "recommend">("saved");
   const [selectMode, setSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkDeleting, setBulkDeleting] = useState(false);
@@ -61,6 +62,7 @@ export default function PostsPage() {
       if (selectedSavedType) params.set("savedType", selectedSavedType);
       if (selectedDigestStatus) params.set("digestStatus", selectedDigestStatus);
       if (selectedAuthor) params.set("author", selectedAuthor);
+      if (activeTab === "recommend") params.set("source", "agent_recommend");
       params.set("sort", selectedSort);
 
       const res = await fetch(`/api/posts?${params}`);
@@ -87,6 +89,7 @@ export default function PostsPage() {
         if (selectedSavedType) params.set("savedType", selectedSavedType);
         if (selectedDigestStatus) params.set("digestStatus", selectedDigestStatus);
         if (selectedAuthor) params.set("author", selectedAuthor);
+        if (activeTab === "recommend") params.set("source", "agent_recommend");
         params.set("sort", selectedSort);
 
         const res = await fetch(`/api/posts?${params}`);
@@ -106,7 +109,7 @@ export default function PostsPage() {
     return () => {
       cancelled = true;
     };
-  }, [searchQuery, selectedGenre, selectedPostType, selectedSavedType, selectedDigestStatus, selectedSort, selectedAuthor]);
+  }, [searchQuery, selectedGenre, selectedPostType, selectedSavedType, selectedDigestStatus, selectedSort, selectedAuthor, activeTab]);
 
   const handleDelete = async (postId: string) => {
     if (!confirm("この投稿を削除しますか？")) return;
@@ -202,6 +205,34 @@ export default function PostsPage() {
         </div>
       </div>
 
+      {/* Source tabs */}
+      <div className="flex rounded-full border border-border bg-border-light p-1 w-fit">
+        <button
+          type="button"
+          onClick={() => setActiveTab("saved")}
+          className={`flex items-center gap-1.5 rounded-full px-4 py-1.5 text-sm font-medium transition-all ${
+            activeTab === "saved"
+              ? "bg-white text-text shadow-sm"
+              : "text-text-secondary hover:text-text"
+          }`}
+        >
+          <Archive className="h-3.5 w-3.5" />
+          保存済み
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab("recommend")}
+          className={`flex items-center gap-1.5 rounded-full px-4 py-1.5 text-sm font-medium transition-all ${
+            activeTab === "recommend"
+              ? "bg-white text-accent shadow-sm"
+              : "text-text-secondary hover:text-text"
+          }`}
+        >
+          <Sparkles className="h-3.5 w-3.5" />
+          おすすめ
+        </button>
+      </div>
+
       <PostFilters
         genres={genres}
         authors={authors}
@@ -232,14 +263,26 @@ export default function PostsPage() {
         </div>
       ) : posts.length === 0 ? (
         <div className="text-center py-16 bg-white rounded-2xl border border-border">
-          <Archive className="w-12 h-12 text-text-muted mx-auto mb-3" />
-          <h3 className="text-lg font-semibold text-text mb-2">投稿がありません</h3>
-          <p className="text-sm text-text-secondary mb-4">
-            手動で追加するか、X連携で投稿を取り込みましょう。
-          </p>
-          <Link href="/posts/new">
-            <Button>最初の投稿を追加</Button>
-          </Link>
+          {activeTab === "recommend" ? (
+            <>
+              <Sparkles className="w-12 h-12 text-text-muted mx-auto mb-3" />
+              <h3 className="text-lg font-semibold text-text mb-2">おすすめはまだありません</h3>
+              <p className="text-sm text-text-secondary mb-4">
+                GROK_API_KEYを設定すると、X自動同期のたびにAIがあなたの興味に合った投稿をおすすめします。
+              </p>
+            </>
+          ) : (
+            <>
+              <Archive className="w-12 h-12 text-text-muted mx-auto mb-3" />
+              <h3 className="text-lg font-semibold text-text mb-2">投稿がありません</h3>
+              <p className="text-sm text-text-secondary mb-4">
+                手動で追加するか、X連携で投稿を取り込みましょう。
+              </p>
+              <Link href="/posts/new">
+                <Button>最初の投稿を追加</Button>
+              </Link>
+            </>
+          )}
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 xl:gap-5">
