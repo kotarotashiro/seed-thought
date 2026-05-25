@@ -1,4 +1,12 @@
 import { GoogleGenAI } from "@google/genai";
+import {
+  GEMINI_IMAGE_MODELS,
+  DEFAULT_GEMINI_IMAGE_MODEL,
+  type GeminiImageModel,
+} from "./imageModels";
+
+export type { GeminiImageModel };
+export { GEMINI_IMAGE_MODELS, DEFAULT_GEMINI_IMAGE_MODEL };
 
 export interface GeneratedImage {
   mimeType: string;
@@ -11,14 +19,20 @@ function getClient(): GoogleGenAI {
   return new GoogleGenAI({ apiKey });
 }
 
-function getImageModel(): string {
-  return process.env.GEMINI_IMAGE_MODEL || "gemini-2.0-flash-preview-image-generation";
+function resolveModel(requested?: GeminiImageModel | null): string {
+  if (requested) return requested;
+  const env = process.env.GEMINI_IMAGE_MODEL;
+  if (env && (GEMINI_IMAGE_MODELS as readonly string[]).includes(env)) return env;
+  return DEFAULT_GEMINI_IMAGE_MODEL;
 }
 
 const BW_STYLE_PREFIX =
   "Minimalist black and white illustration, clean simple lines, flat design, white background, no color, no shading, easy to read at a glance. Subject: ";
 
-export async function generateImage(prompt: string): Promise<GeneratedImage> {
+export async function generateImage(
+  prompt: string,
+  model?: GeminiImageModel | null
+): Promise<GeneratedImage> {
   const trimmed = prompt.trim();
   if (!trimmed) {
     throw new Error("プロンプトが空です");
@@ -27,7 +41,7 @@ export async function generateImage(prompt: string): Promise<GeneratedImage> {
   const styledPrompt = BW_STYLE_PREFIX + trimmed;
 
   const response = await client.models.generateContent({
-    model: getImageModel(),
+    model: resolveModel(model),
     contents: styledPrompt,
     config: {
       responseModalities: ["IMAGE"],

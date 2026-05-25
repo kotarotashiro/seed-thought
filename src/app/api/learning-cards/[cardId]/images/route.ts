@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
-import { generateImage } from "@/lib/ai/imageProvider";
+import {
+  generateImage,
+  GEMINI_IMAGE_MODELS,
+  type GeminiImageModel,
+} from "@/lib/ai/imageProvider";
 
 const VALID_KINDS = new Set(["explanation", "diagram", "custom"]);
 
@@ -38,8 +42,21 @@ export async function POST(
 ) {
   const { cardId } = await params;
   try {
-    const body = (await request.json()) as { kind?: string; prompt?: string };
+    const body = (await request.json()) as {
+      kind?: string;
+      prompt?: string;
+      model?: string;
+    };
     const kind = body.kind && VALID_KINDS.has(body.kind) ? body.kind : "explanation";
+
+    const requestedModel = body.model ?? null;
+    if (
+      requestedModel !== null &&
+      !(GEMINI_IMAGE_MODELS as readonly string[]).includes(requestedModel)
+    ) {
+      return NextResponse.json({ error: "Invalid model" }, { status: 400 });
+    }
+    const model = requestedModel as GeminiImageModel | null;
 
     const card = await prisma.learningCard.findUnique({ where: { id: cardId } });
     if (!card) {
@@ -62,7 +79,7 @@ export async function POST(
       );
     }
 
-    const generated = await generateImage(prompt);
+    const generated = await generateImage(prompt, model);
 
     const saved = await prisma.learningCardImage.create({
       data: {
