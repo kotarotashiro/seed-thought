@@ -66,6 +66,7 @@ async function saveTweets(
       }
     }
 
+    const hasUrl = Boolean(tweet.urlCard?.expandedUrl);
     const post = await prisma.post.create({
       data: {
         source: savedType === "like" ? "user_like" : "user_bookmark",
@@ -82,6 +83,7 @@ async function saveTweets(
         postedAt: tweet.createdAt ? new Date(tweet.createdAt) : null,
         savedAt: new Date(),
         rawJson: JSON.stringify(tweet),
+        enrichmentStatus: hasUrl ? "pending" : "done",
       },
     });
 

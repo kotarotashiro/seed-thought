@@ -27,6 +27,7 @@ model Post {
   postedAt             DateTime?
   savedAt         DateTime @default(now())
   rawJson         String?
+  enrichmentStatus String  @default("done") // "pending" | "processing" | "done" | "failed"
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 

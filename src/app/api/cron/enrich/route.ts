@@ -1,10 +1,8 @@
-import { after } from "next/server";
 import { NextResponse } from "next/server";
-import { syncXPosts } from "@/lib/x/sync";
 import { enrichPendingPosts } from "@/lib/posts/enrich";
 
-// Vercel Cron: runs every 30 minutes via GET.
-// Manual test: curl /api/cron/x-sync -H "Authorization: Bearer $CRON_SECRET"
+// Vercel Cron: retry failed/pending URL enrichments every hour.
+// Manual test: curl /api/cron/enrich -H "Authorization: Bearer $CRON_SECRET"
 export const maxDuration = 60;
 
 function isAuthorized(request: Request): boolean {
@@ -20,12 +18,11 @@ export async function GET(request: Request) {
   }
 
   try {
-    const result = await syncXPosts("both", 25);
-    after(() => enrichPendingPosts(10));
-    return NextResponse.json({ ok: true, ...result });
+    await enrichPendingPosts(20);
+    return NextResponse.json({ ok: true });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "sync failed";
-    console.error("[cron/x-sync]", message);
+    const message = error instanceof Error ? error.message : "enrich failed";
+    console.error("[cron/enrich]", message);
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

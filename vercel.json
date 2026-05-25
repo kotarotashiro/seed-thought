@@ -5,6 +5,10 @@
     {
       "path": "/api/cron/x-sync",
       "schedule": "*/30 * * * *"
+    },
+    {
+      "path": "/api/cron/enrich",
+      "schedule": "0 * * * *"
     }
   ]
 }
