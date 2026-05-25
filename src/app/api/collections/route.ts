@@ -36,6 +36,7 @@ export async function POST(request: Request) {
     const body = (await request.json()) as {
       title?: string;
       description?: string;
+      idea?: string;
       learningCardIds?: string[];
     };
     const title = (body.title || "").trim();
@@ -49,6 +50,7 @@ export async function POST(request: Request) {
       data: {
         title,
         description: body.description?.trim() || null,
+        idea: body.idea?.trim() || null,
         items: {
           create: cardIds.map((cardId, idx) => ({
             learningCardId: cardId,

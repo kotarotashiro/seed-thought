@@ -116,6 +116,7 @@ export async function POST(
     const prompt = await buildCollectionPrompt({
       collectionTitle: collection.title,
       collectionDescription: collection.description,
+      collectionIdea: collection.idea,
       outputKind,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       cards: collection.items.map((item: any) => ({

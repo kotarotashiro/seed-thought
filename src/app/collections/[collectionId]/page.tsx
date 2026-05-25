@@ -33,6 +33,7 @@ interface CollectionDetail {
   id: string;
   title: string;
   description: string | null;
+  idea: string | null;
   outputJson: string | null;
   items: Array<{
     id: string;
@@ -87,6 +88,7 @@ export default function CollectionDetailPage({
   const [editing, setEditing] = useState(false);
   const [editTitle, setEditTitle] = useState("");
   const [editDescription, setEditDescription] = useState("");
+  const [editIdea, setEditIdea] = useState("");
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -147,6 +149,7 @@ export default function CollectionDetailPage({
     if (!collection) return;
     setEditTitle(collection.title);
     setEditDescription(collection.description || "");
+    setEditIdea(collection.idea || "");
     setEditing(true);
   };
 
@@ -154,6 +157,7 @@ export default function CollectionDetailPage({
     setEditing(false);
     setEditTitle("");
     setEditDescription("");
+    setEditIdea("");
   };
 
   const saveEdit = async () => {
@@ -169,13 +173,19 @@ export default function CollectionDetailPage({
         body: JSON.stringify({
           title: editTitle.trim(),
           description: editDescription.trim(),
+          idea: editIdea.trim(),
         }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "更新に失敗しました");
       setCollection((prev) =>
         prev
-          ? { ...prev, title: data.collection.title, description: data.collection.description }
+          ? {
+              ...prev,
+              title: data.collection.title,
+              description: data.collection.description,
+              idea: data.collection.idea,
+            }
           : prev
       );
       setEditing(false);
@@ -245,6 +255,13 @@ export default function CollectionDetailPage({
                 placeholder="説明（任意）"
                 rows={2}
               />
+              <textarea
+                value={editIdea}
+                onChange={(e) => setEditIdea(e.target.value)}
+                className="w-full resize-y rounded-xl border border-border bg-white px-3 py-2 text-sm text-text-secondary focus:border-accent focus:outline-none"
+                placeholder="自分のアイディア・視点（任意）"
+                rows={3}
+              />
               <div className="flex gap-2">
                 <Button size="sm" onClick={saveEdit} loading={saving} loadingLabel="保存中...">
                   <Check className="mr-1.5 h-3.5 w-3.5" />
@@ -264,6 +281,12 @@ export default function CollectionDetailPage({
               </h1>
               {collection.description && (
                 <p className="mt-1 text-sm text-text-secondary">{collection.description}</p>
+              )}
+              {collection.idea && (
+                <p className="mt-1.5 rounded-lg bg-accent-light/30 px-2.5 py-1.5 text-xs text-text-secondary">
+                  <span className="font-semibold text-accent">自分のアイディア: </span>
+                  {collection.idea}
+                </p>
               )}
             </div>
           )}

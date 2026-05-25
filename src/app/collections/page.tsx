@@ -48,6 +48,7 @@ export default function CollectionsPage() {
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [idea, setIdea] = useState("");
   const [availableCards, setAvailableCards] = useState<LearningCardOption[]>([]);
   const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState<SortKey>("date_desc");
@@ -172,6 +173,7 @@ export default function CollectionsPage() {
         body: JSON.stringify({
           title: title.trim(),
           description: description.trim(),
+          idea: idea.trim(),
           learningCardIds: selectedIds,
         }),
       });
@@ -180,6 +182,7 @@ export default function CollectionsPage() {
       setCollections((prev) => [data.collection, ...prev]);
       setTitle("");
       setDescription("");
+      setIdea("");
       setSelectedIds([]);
       setShowForm(false);
     } catch (e) {
@@ -246,6 +249,23 @@ export default function CollectionsPage() {
               onChange={(e) => setDescription(e.target.value)}
               placeholder="このコレクションの狙い・対象者など"
               rows={2}
+              className="w-full resize-y rounded-xl border border-border bg-white px-3 py-2 text-sm focus:border-accent focus:outline-none"
+            />
+          </div>
+
+          {/* Idea */}
+          <div>
+            <label className="mb-1 block text-xs font-semibold text-text-secondary">
+              自分のアイディア・視点（任意）
+            </label>
+            <p className="mb-1.5 text-[11px] text-text-muted">
+              保存した投稿の知見と組み合わせたい自分なりの考え・事例・問いかけを書くと、生成コンテンツに独自性が加わります。
+            </p>
+            <textarea
+              value={idea}
+              onChange={(e) => setIdea(e.target.value)}
+              placeholder={"例）AIツールを使いこなす前提として「問いを立てる力」が必要だと感じている。\n自分の経験では〇〇の壁にぶつかる受講者が多い。そこを軸にしたい。"}
+              rows={3}
               className="w-full resize-y rounded-xl border border-border bg-white px-3 py-2 text-sm focus:border-accent focus:outline-none"
             />
           </div>
