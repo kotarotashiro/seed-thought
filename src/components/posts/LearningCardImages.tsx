@@ -15,8 +15,8 @@ import {
 import { Button } from "@/components/ui/Button";
 import {
   IMAGE_PROVIDER_OPTIONS,
-  DEFAULT_GEMINI_IMAGE_MODEL,
-  type GeminiImageModel,
+  DEFAULT_IMAGE_MODEL,
+  type ImageModel,
 } from "@/lib/ai/imageModels";
 
 interface CardImage {
@@ -42,8 +42,8 @@ export function LearningCardImages({
   const [generating, setGenerating] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [customPrompt, setCustomPrompt] = useState("");
-  const [selectedModel, setSelectedModel] = useState<GeminiImageModel>(
-    DEFAULT_GEMINI_IMAGE_MODEL
+  const [selectedModel, setSelectedModel] = useState<ImageModel>(
+    DEFAULT_IMAGE_MODEL
   );
   const [lightboxImage, setLightboxImage] = useState<CardImage | null>(null);
 

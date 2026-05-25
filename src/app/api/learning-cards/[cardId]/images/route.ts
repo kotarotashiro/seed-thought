@@ -2,8 +2,8 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import {
   generateImage,
-  GEMINI_IMAGE_MODELS,
-  type GeminiImageModel,
+  ALL_IMAGE_MODELS,
+  type ImageModel,
 } from "@/lib/ai/imageProvider";
 
 const VALID_KINDS = new Set(["explanation", "diagram", "custom"]);
@@ -52,11 +52,11 @@ export async function POST(
     const requestedModel = body.model ?? null;
     if (
       requestedModel !== null &&
-      !(GEMINI_IMAGE_MODELS as readonly string[]).includes(requestedModel)
+      !(ALL_IMAGE_MODELS as readonly string[]).includes(requestedModel)
     ) {
       return NextResponse.json({ error: "Invalid model" }, { status: 400 });
     }
-    const model = requestedModel as GeminiImageModel | null;
+    const model = requestedModel as ImageModel | null;
 
     const card = await prisma.learningCard.findUnique({ where: { id: cardId } });
     if (!card) {
