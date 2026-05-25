@@ -1,12 +1,11 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/db/prisma";
-import { XAI_OAUTH_ID } from "@/lib/xai/oauth";
+import { deleteXaiAuth } from "@/lib/xai/authStore";
 
 export const dynamic = "force-dynamic";
 
 export async function DELETE() {
   try {
-    await prisma.xAuth.deleteMany({ where: { id: XAI_OAUTH_ID } });
+    await deleteXaiAuth();
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("[grok/disconnect]", error);

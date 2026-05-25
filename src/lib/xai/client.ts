@@ -1,11 +1,10 @@
 // xAI client — OAuth bearer preferred, API key fallback.
 
-import { prisma } from "@/lib/db/prisma";
 import { decryptToken, encryptToken } from "@/lib/x/tokenStore";
+import { findXaiAuth, upsertXaiAuth } from "@/lib/xai/authStore";
 import {
   getXaiTokenEncryptionKey,
   refreshXaiToken,
-  XAI_OAUTH_ID,
 } from "@/lib/xai/oauth";
 
 const XAI_API_BASE = "https://api.x.ai/v1";
@@ -39,7 +38,7 @@ export interface XaiImagineResult {
 
 export async function getAuthHeader(): Promise<string> {
   if (process.env.XAI_CLIENT_ID) {
-    const oauth = await prisma.xAuth.findUnique({ where: { id: XAI_OAUTH_ID } });
+    const oauth = await findXaiAuth();
 
     if (oauth?.accessToken) {
       const encryptionKey = getXaiTokenEncryptionKey();
@@ -50,16 +49,13 @@ export async function getAuthHeader(): Promise<string> {
 
       if (shouldRefresh && oauth.refreshToken) {
         const refreshed = await refreshXaiToken(decryptToken(oauth.refreshToken, encryptionKey));
-        await prisma.xAuth.update({
-          where: { id: oauth.id },
-          data: {
-            accessToken: encryptToken(refreshed.accessToken, encryptionKey),
-            refreshToken: refreshed.refreshToken
-              ? encryptToken(refreshed.refreshToken, encryptionKey)
-              : undefined,
-            expiresAt: refreshed.expiresAt,
-            scope: refreshed.scope,
-          },
+        await upsertXaiAuth({
+          accessToken: encryptToken(refreshed.accessToken, encryptionKey),
+          refreshToken: refreshed.refreshToken
+            ? encryptToken(refreshed.refreshToken, encryptionKey)
+            : oauth.refreshToken,
+          expiresAt: refreshed.expiresAt,
+          scope: refreshed.scope,
         });
         return `Bearer ${refreshed.accessToken}`;
       }
@@ -77,11 +73,7 @@ export async function hasXaiAuthConfigured(): Promise<boolean> {
   if (process.env.GROK_API_KEY ?? process.env.XAI_API_KEY) return true;
   if (!process.env.XAI_CLIENT_ID) return false;
 
-  const oauth = await prisma.xAuth.findUnique({
-    where: { id: XAI_OAUTH_ID },
-    select: { id: true },
-  });
-  return Boolean(oauth);
+  return Boolean(await findXaiAuth());
 }
 
 function getDefaultModel(): string {

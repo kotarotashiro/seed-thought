@@ -1,15 +1,12 @@
 import http from "http";
 import { NextResponse } from "next/server";
 import { getUserFacingError } from "@/lib/api/errors";
-import { prisma } from "@/lib/db/prisma";
+import { saveXaiOAuthSession, saveXaiTokens } from "@/lib/xai/authStore";
 import {
   buildXaiAuthorizeUrl,
   createXaiPkceSession,
   exchangeXaiCodeForTokens,
-  getXaiTokenEncryptionKey,
-  XAI_OAUTH_ID,
 } from "@/lib/xai/oauth";
-import { encryptToken } from "@/lib/x/tokenStore";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -34,25 +31,7 @@ function htmlRedirect(location: string, message: string): string {
 async function storeTokens(
   tokens: Awaited<ReturnType<typeof exchangeXaiCodeForTokens>>
 ) {
-  const encryptionKey = getXaiTokenEncryptionKey();
-  if (!encryptionKey) throw new Error("XAI_ENCRYPTION_KEY is not set");
-
-  await prisma.xAuth.upsert({
-    where: { id: XAI_OAUTH_ID },
-    create: {
-      id: XAI_OAUTH_ID,
-      accessToken: encryptToken(tokens.accessToken, encryptionKey),
-      refreshToken: tokens.refreshToken ? encryptToken(tokens.refreshToken, encryptionKey) : null,
-      expiresAt: tokens.expiresAt,
-      scope: tokens.scope,
-    },
-    update: {
-      accessToken: encryptToken(tokens.accessToken, encryptionKey),
-      refreshToken: tokens.refreshToken ? encryptToken(tokens.refreshToken, encryptionKey) : undefined,
-      expiresAt: tokens.expiresAt,
-      scope: tokens.scope,
-    },
-  });
+  await saveXaiTokens(tokens);
 }
 
 async function startLoopbackServer(options: {
@@ -135,6 +114,7 @@ export async function GET(request: Request) {
     const session = createXaiPkceSession();
     const settingsUrl = new URL("/settings/x", request.url).toString();
 
+    await saveXaiOAuthSession(session);
     await startLoopbackServer({ ...session, settingsUrl });
     const authorizeUrl = await buildXaiAuthorizeUrl(session);
     return NextResponse.redirect(authorizeUrl);

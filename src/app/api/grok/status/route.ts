@@ -1,24 +1,22 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/db/prisma";
-import { XAI_OAUTH_ID } from "@/lib/xai/oauth";
+import { findXaiAuth } from "@/lib/xai/authStore";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
-    const auth = await prisma.xAuth.findUnique({
-      where: { id: XAI_OAUTH_ID },
-      select: {
-        id: true,
-        expiresAt: true,
-        scope: true,
-        updatedAt: true,
-      },
-    });
+    const auth = await findXaiAuth();
 
     return NextResponse.json({
       connected: Boolean(auth),
-      auth,
+      auth: auth
+        ? {
+            id: auth.id,
+            expiresAt: auth.expiresAt,
+            scope: auth.scope,
+            updatedAt: auth.updatedAt,
+          }
+        : null,
       config: {
         clientIdConfigured: Boolean(process.env.XAI_CLIENT_ID),
         tokenEncryptionConfigured: Boolean(
