@@ -12,7 +12,7 @@ datasource db {
 
 model Post {
   id              String   @id @default(cuid())
-  source          String   // "x" | "manual"
+  source          String   @default("user_like") // "user_like" | "user_bookmark" | "user_manual" | "agent_recommend"
   sourcePostId    String?
   sourceUrl       String?
   savedType       String   // "like" | "bookmark" | "manual"
@@ -27,6 +27,7 @@ model Post {
   postedAt             DateTime?
   savedAt         DateTime @default(now())
   rawJson         String?
+  enrichmentStatus String  @default("done") // "pending" | "processing" | "done" | "failed"
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
@@ -62,6 +63,7 @@ model LearningCard {
   outputs    LearningCardOutput[]
   images     LearningCardImage[]
   collectionItems CollectionItem[]
+  drafts     XDraft[]
 }
 
 model LearningCardImage {
@@ -197,4 +199,29 @@ model AppSetting {
   valueJson String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model XDraft {
+  id             String    @id @default(cuid())
+  learningCardId String?
+  content        String    // X post text (may be thread, separated by "---\n")
+  status         String    @default("pending") // "pending" | "approved" | "rejected" | "posted"
+  postedUrl      String?
+  postedAt       DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  learningCard LearningCard? @relation(fields: [learningCardId], references: [id], onDelete: SetNull)
+}
+
+// Single-row table for xAI OAuth tokens (populated in Phase 5/6 when OAuth is wired up).
+// Tokens are stored encrypted with AES-256-GCM using XAI_ENCRYPTION_KEY.
+model XAuth {
+  id             String    @id @default(cuid())
+  accessToken    String    // encrypted
+  refreshToken   String?   // encrypted
+  expiresAt      DateTime?
+  scope          String    @default("")
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 }

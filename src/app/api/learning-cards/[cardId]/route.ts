@@ -1,6 +1,8 @@
+import { after } from "next/server";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { initialDueDate } from "@/lib/srs/schedule";
+import { generateDraftForCard } from "@/lib/x/drafts";
 
 function mergeUserMemo(outputJson: string, userMemo: string | null | undefined): string {
   try {
@@ -71,6 +73,10 @@ export async function PUT(
         ...(shouldScheduleFirstReview ? { nextDueAt: initialDueDate() } : {}),
       },
     });
+
+    if (shouldScheduleFirstReview) {
+      after(() => generateDraftForCard(cardId));
+    }
 
     return NextResponse.json(learningCard);
   } catch (error) {
