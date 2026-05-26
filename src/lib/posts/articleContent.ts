@@ -1,6 +1,6 @@
 import { fetchArticlePreview } from "@/lib/fetchArticle";
+import { X_ARTICLE_RE } from "@/lib/x/article";
 
-const X_ARTICLE_RE = /(?:x|twitter)\.com\/i\/article\//i;
 const URL_ONLY_RE = /^https?:\/\/\S+$/;
 
 export interface ArticleContent {
