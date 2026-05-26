@@ -13,6 +13,7 @@ import {
   AlertCircle,
   Unplug,
   AlertTriangle,
+  FileText,
 } from "lucide-react";
 
 function parseAccountScopes(account: { scopesJson?: string | null } | null | undefined): string[] {
@@ -96,6 +97,7 @@ export default function XSettingsPage() {
     return new URLSearchParams(window.location.search).get("error");
   });
   const [loading, setLoading] = useState(true);
+  const [articlePendingCount, setArticlePendingCount] = useState<number | null>(null);
   const accountScopes = parseAccountScopes(xStatus?.account);
   const missingSyncScopes = getMissingSyncScopes(syncType, accountScopes);
 
@@ -133,6 +135,13 @@ export default function XSettingsPage() {
     return () => {
       cancelled = true;
     };
+  }, []);
+
+  useEffect(() => {
+    fetch("/api/x/article-body/count")
+      .then((r) => r.json())
+      .then((d: { count: number }) => setArticlePendingCount(d.count))
+      .catch(() => {});
   }, []);
 
   const handleConnect = async () => {
@@ -295,6 +304,17 @@ export default function XSettingsPage() {
           </div>
         )}
       </Card>
+
+      {/* X Article pending */}
+      {articlePendingCount !== null && articlePendingCount > 0 && (
+        <div className="rounded-xl border border-accent/20 bg-accent-light px-4 py-3 flex items-start gap-3">
+          <FileText className="w-5 h-5 text-accent flex-shrink-0 mt-0.5" />
+          <p className="text-sm text-text">
+            <span className="font-medium">X Article 取得待ち {articlePendingCount} 件</span>
+            {" — Chrome 拡張を起動すると順次取得されます"}
+          </p>
+        </div>
+      )}
 
       {/* Sync Settings */}
       {xStatus?.connected && (
