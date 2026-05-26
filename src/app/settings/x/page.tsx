@@ -13,6 +13,7 @@ import {
   AlertCircle,
   Unplug,
   AlertTriangle,
+  Sparkles,
 } from "lucide-react";
 
 function parseAccountScopes(account: { scopesJson?: string | null } | null | undefined): string[] {
@@ -84,6 +85,19 @@ export default function XSettingsPage() {
       tokenEncryptionConfigured: boolean;
     };
   } | null>(null);
+  const [grokStatus, setGrokStatus] = useState<{
+    connected: boolean;
+    auth: {
+      expiresAt?: string | null;
+      scope?: string | null;
+      updatedAt?: string | null;
+    } | null;
+    config?: {
+      clientIdConfigured: boolean;
+      tokenEncryptionConfigured: boolean;
+      apiKeyFallbackConfigured: boolean;
+    };
+  } | null>(null);
 
   const [syncType, setSyncType] = useState("likes");
   const [limit, setLimit] = useState("25");
@@ -102,11 +116,14 @@ export default function XSettingsPage() {
   const loadStatus = async (showLoading = false) => {
     if (showLoading) setLoading(true);
     try {
-      const res = await fetch("/api/x/status");
-      const data = await res.json();
-      setXStatus(data);
+      const [xRes, grokRes] = await Promise.all([
+        fetch("/api/x/status"),
+        fetch("/api/grok/status"),
+      ]);
+      setXStatus(await xRes.json());
+      setGrokStatus(await grokRes.json());
     } catch (err) {
-      console.error("Failed to fetch X status:", err);
+      console.error("Failed to fetch connection status:", err);
     } finally {
       setLoading(false);
     }
@@ -117,12 +134,15 @@ export default function XSettingsPage() {
 
     async function fetchInitialStatus() {
       try {
-        const res = await fetch("/api/x/status");
-        const data = await res.json();
+        const [xRes, grokRes] = await Promise.all([
+          fetch("/api/x/status"),
+          fetch("/api/grok/status"),
+        ]);
         if (cancelled) return;
-        setXStatus(data);
+        setXStatus(await xRes.json());
+        setGrokStatus(await grokRes.json());
       } catch (err) {
-        console.error("Failed to fetch X status:", err);
+        console.error("Failed to fetch connection status:", err);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -158,6 +178,21 @@ export default function XSettingsPage() {
       loadStatus();
     } catch {
       setError("接続解除に失敗しました");
+    }
+  };
+
+  const handleGrokConnect = () => {
+    setError(null);
+    window.open("/api/grok/auth", "_blank", "noopener,noreferrer");
+  };
+
+  const handleGrokDisconnect = async () => {
+    if (!confirm("Grok OAuthの接続を解除しますか？")) return;
+    try {
+      await fetch("/api/grok/disconnect", { method: "DELETE" });
+      loadStatus();
+    } catch {
+      setError("Grok OAuth接続解除に失敗しました");
     }
   };
 
@@ -289,6 +324,71 @@ export default function XSettingsPage() {
                 </p>
                 <p className="text-xs text-text-muted break-all">
                   Scopes: {xStatus.config.scopes}
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+      </Card>
+
+      {/* Grok OAuth Status */}
+      <Card>
+        <h3 className="text-base font-bold text-text mb-4">Grok OAuth連携</h3>
+        {grokStatus?.connected ? (
+          <div className="space-y-4">
+            <div className="flex items-center gap-3">
+              <CheckCircle className="w-5 h-5 text-success" />
+              <div>
+                <p className="text-sm font-medium text-text">Grok OAuth接続済み</p>
+                <p className="text-xs text-text-muted">
+                  期限:{" "}
+                  {grokStatus.auth?.expiresAt
+                    ? new Date(grokStatus.auth.expiresAt).toLocaleString("ja-JP")
+                    : "不明"}
+                </p>
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="secondary" size="sm" onClick={() => loadStatus(true)}>
+                <RefreshCw className="w-4 h-4 mr-1" />
+                更新
+              </Button>
+              <Button variant="secondary" size="sm" onClick={handleGrokDisconnect}>
+                <Unplug className="w-4 h-4 mr-1" />
+                切断
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="flex items-center gap-3">
+              <XCircle className="w-5 h-5 text-text-muted" />
+              <p className="text-sm text-text-secondary">Grok OAuth未接続</p>
+            </div>
+            <Button
+              onClick={handleGrokConnect}
+              disabled={
+                grokStatus?.config
+                  ? !grokStatus.config.clientIdConfigured ||
+                    !grokStatus.config.tokenEncryptionConfigured
+                  : false
+              }
+            >
+              <Sparkles className="w-4 h-4 mr-2" />
+              Grok OAuthで接続
+            </Button>
+            {grokStatus?.config && (
+              <div className="bg-border-light rounded-xl p-3 space-y-1">
+                <p className="text-xs text-text-secondary">
+                  Client ID: {grokStatus.config.clientIdConfigured ? "設定済み" : "未設定"}
+                </p>
+                <p className="text-xs text-text-secondary">
+                  Token暗号化キー:{" "}
+                  {grokStatus.config.tokenEncryptionConfigured ? "設定済み" : "未設定"}
+                </p>
+                <p className="text-xs text-text-secondary">
+                  APIキーフォールバック:{" "}
+                  {grokStatus.config.apiKeyFallbackConfigured ? "設定済み" : "未設定"}
                 </p>
               </div>
             )}

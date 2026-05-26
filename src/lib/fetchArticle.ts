@@ -1,15 +1,9 @@
+import { hasXaiAuthConfigured, xaiChat, type XaiSource } from "@/lib/xai/client";
+
 export interface ArticlePreview {
   title: string | null;
   description: string | null;
   imageUrl: string | null;
-}
-
-function getGrokApiKey(): string | null {
-  return process.env.GROK_API_KEY || process.env.XAI_API_KEY || null;
-}
-
-function getGrokModel(): string {
-  return process.env.GROK_MODEL || process.env.XAI_MODEL || "grok-3";
 }
 
 const X_ARTICLE_RE = /(?:x|twitter)\.com\/i\/article\//i;
@@ -19,13 +13,8 @@ function isUrlLike(s: string): boolean {
 }
 
 async function fetchWithGrok(url: string): Promise<ArticlePreview> {
-  const apiKey = getGrokApiKey()!;
-  const model = getGrokModel();
-
   const isXArticle = X_ARTICLE_RE.test(url);
-  const sources = isXArticle
-    ? [{ type: "x" }]
-    : [{ type: "web" }];
+  const sources: XaiSource[] = isXArticle ? [{ type: "x" }] : [{ type: "web" }];
 
   let prompt: string;
   if (isXArticle) {
@@ -35,27 +24,11 @@ async function fetchWithGrok(url: string): Promise<ArticlePreview> {
     prompt = `以下のURLの記事を読んで内容を日本語でまとめてください。\n\n必ず次のJSON形式のみで返してください（説明文不要）:\n{"title":"記事タイトル","description":"150〜250文字の内容まとめ"}\n\nURL: ${url}`;
   }
 
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 25000);
-
   try {
-    const res = await fetch("https://api.x.ai/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model,
-        messages: [{ role: "user", content: prompt }],
-        search_parameters: { mode: "on", sources },
-      }),
-      signal: controller.signal,
+    const { content } = await xaiChat({
+      messages: [{ role: "user", content: prompt }],
+      searchParameters: { mode: "on", sources },
     });
-    clearTimeout(timer);
-    if (!res.ok) throw new Error(`Grok API ${res.status}`);
-    const data = await res.json() as { choices?: Array<{ message?: { content?: string } }> };
-    const content = data.choices?.[0]?.message?.content || "";
     const jsonMatch = content.match(/\{[\s\S]*?\}/);
     if (jsonMatch) {
       try {
@@ -70,7 +43,6 @@ async function fetchWithGrok(url: string): Promise<ArticlePreview> {
     const fallback = content.trim().slice(0, 300);
     return { title: null, description: fallback && !isUrlLike(fallback) ? fallback : null, imageUrl: null };
   } catch {
-    clearTimeout(timer);
     throw new Error("Grok fetch failed");
   }
 }
@@ -142,15 +114,15 @@ async function fetchWithHtml(url: string): Promise<ArticlePreview> {
  * Returns null fields on failure (never throws).
  */
 export async function fetchArticlePreview(url: string): Promise<ArticlePreview> {
-  const grokKey = getGrokApiKey();
+  const grokConfigured = await hasXaiAuthConfigured();
 
   try {
-    if (grokKey) {
+    if (grokConfigured) {
       return await fetchWithGrok(url);
     }
     return await fetchWithHtml(url);
   } catch {
-    if (grokKey) {
+    if (grokConfigured) {
       try {
         return await fetchWithHtml(url);
       } catch {

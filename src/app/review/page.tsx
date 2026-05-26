@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   ArrowRight,
@@ -10,7 +10,9 @@ import {
   ChevronUp,
   Clock,
   Flame,
+  Loader2,
   Sparkles,
+  Volume2,
   X as XIcon,
 } from "lucide-react";
 import { Card } from "@/components/ui/Card";
@@ -56,6 +58,27 @@ export default function ReviewPage() {
   const [reviewedCount, setReviewedCount] = useState(0);
   const [upcomingCount, setUpcomingCount] = useState(0);
   const [showManual, setShowManual] = useState(false);
+  const [audioPlaying, setAudioPlaying] = useState(false);
+
+  const playCardAudio = (card: { title: string; summary: string; coreInsight: string }) => {
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) {
+      alert("このブラウザは音声合成に対応していません");
+      return;
+    }
+    if (audioPlaying) {
+      window.speechSynthesis.cancel();
+      setAudioPlaying(false);
+      return;
+    }
+    const text = `${card.title}。${card.summary}。核心: ${card.coreInsight}`;
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = "ja-JP";
+    utterance.rate = 1.0;
+    utterance.onend = () => setAudioPlaying(false);
+    utterance.onerror = () => setAudioPlaying(false);
+    setAudioPlaying(true);
+    window.speechSynthesis.speak(utterance);
+  };
 
   const current = cards[index];
 
@@ -198,7 +221,17 @@ export default function ReviewPage() {
           </span>
         </div>
 
-        <h1 className="text-lg font-bold text-text sm:text-xl">{current.title}</h1>
+        <div className="flex items-start justify-between gap-3">
+          <h1 className="text-lg font-bold text-text sm:text-xl">{current.title}</h1>
+          <button
+            type="button"
+            title="音声で聞く"
+            onClick={() => playCardAudio(current)}
+            className={`flex-shrink-0 rounded-lg p-2 transition-colors ${audioPlaying ? "bg-accent text-white" : "bg-border-light text-text-secondary hover:text-accent"}`}
+          >
+            {audioPlaying ? <Loader2 className="h-4 w-4 animate-spin" /> : <Volume2 className="h-4 w-4" />}
+          </button>
+        </div>
 
         {/* Question side: summary */}
         <div className="rounded-2xl border border-border bg-white p-4">

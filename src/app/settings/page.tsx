@@ -436,6 +436,8 @@ export default function SettingsPage() {
               {aiSettings.hasApiKey
                 ? aiSettings.keySource === "ui"
                   ? "UIキー設定済み"
+                  : aiSettings.keySource === "oauth"
+                  ? "Grok OAuth連携済み"
                   : "環境変数キー使用中"
                 : "APIキー未設定"}
             </Badge>
@@ -550,7 +552,7 @@ export default function SettingsPage() {
               )}
             </div>
             <p className="text-xs text-text-muted">
-              対応Provider: Gemini / OpenAI / Claude / Grok / Kimi。APIキーはサーバー側だけで使用します。
+              Grok (xAI) を使用します。X Premium+ / SuperGrok 連携済みの場合はAPIキー不要です。
             </p>
           </div>
         )}

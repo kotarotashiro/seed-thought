@@ -26,7 +26,7 @@ const mobileItems = [
   { href: "/posts", label: "投稿", icon: Archive },
   { href: "/knowhow", label: "メモ", icon: BookOpen },
   { href: "/chat", label: "質問", icon: MessageSquare },
-  { href: "/settings/x", label: "X連携", icon: Link2 },
+  { href: "/posts/new", label: "追加", icon: PenSquare },
 ];
 
 const drawerItems = [
@@ -36,7 +36,7 @@ const drawerItems = [
   { href: "/collections", label: "コレクション", icon: Layers },
   { href: "/search", label: "メモを検索", icon: Search },
   { href: "/chat", label: "メモに質問", icon: MessageSquare },
-  { href: "/insights", label: "いいね傾向分析", icon: TrendingUp },
+  { href: "/insights", label: "保存傾向", icon: TrendingUp },
   { href: "/drafts", label: "X下書き", icon: FileText },
   { href: "/posts/new", label: "投稿を追加", icon: PenSquare },
   { href: "/settings/x", label: "X連携", icon: Link2 },

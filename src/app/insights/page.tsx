@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Heart, TrendingUp, Lightbulb, Star, ArrowRight, RefreshCw } from "lucide-react";
+import { Heart, TrendingUp, Lightbulb, Star, ArrowRight, RefreshCw, Globe } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { MarkdownText } from "@/components/ui/MarkdownText";
 
 interface TrendInsight {
   topCategories: string[];
@@ -76,11 +77,42 @@ function formatCachedAt(dateStr: string): string {
   return `${diffD}日前`;
 }
 
+interface TrendDigest {
+  generatedAt: string;
+  categories: string[];
+  content: string;
+}
+
 export default function InsightsPage() {
   const [data, setData] = useState<InsightData | null>(null);
   const [loading, setLoading] = useState(true);
   const [reanalyzing, setReanalyzing] = useState(false);
   const [error, setError] = useState("");
+  const [trend, setTrend] = useState<TrendDigest | null>(null);
+  const [trendLoading, setTrendLoading] = useState(false);
+
+  const loadTrend = async (force = false) => {
+    try {
+      if (force) {
+        setTrendLoading(true);
+        const res = await fetch("/api/trend-digest", { method: "POST" });
+        if (res.ok) {
+          const d = await res.json();
+          if (d?.content) setTrend(d);
+        }
+      } else {
+        const res = await fetch("/api/trend-digest");
+        if (res.ok) {
+          const d = await res.json();
+          if (d?.content) setTrend(d);
+        }
+      }
+    } catch {
+      // ignore
+    } finally {
+      setTrendLoading(false);
+    }
+  };
 
   const load = async (force = false) => {
     if (force) setReanalyzing(true);
@@ -106,6 +138,7 @@ export default function InsightsPage() {
   useEffect(() => {
     const timer = window.setTimeout(() => {
       void load();
+      void loadTrend();
     }, 0);
     return () => window.clearTimeout(timer);
   }, []);
@@ -200,6 +233,33 @@ export default function InsightsPage() {
                 </li>
               ))}
             </ol>
+          </div>
+
+          <div className="bg-white rounded-2xl border border-border p-5">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <Globe className="h-5 w-5 text-sky-500" />
+                <h3 className="text-sm font-semibold text-text">X 最新トレンド（あなたのカテゴリ）</h3>
+              </div>
+              <Button variant="ghost" size="sm" onClick={() => loadTrend(true)} disabled={trendLoading}>
+                <RefreshCw className={`mr-1.5 h-4 w-4 ${trendLoading ? "animate-spin" : ""}`} />
+                {trendLoading ? "取得中..." : trend ? "更新" : "取得"}
+              </Button>
+            </div>
+            {trend ? (
+              <div className="space-y-2">
+                <p className="text-xs text-text-muted">
+                  対象: {trend.categories.join("、")} • {formatCachedAt(trend.generatedAt)}
+                </p>
+                <div className="prose prose-sm max-w-none text-sm leading-relaxed text-text">
+                  <MarkdownText content={trend.content} />
+                </div>
+              </div>
+            ) : (
+              <p className="text-sm text-text-secondary">
+                xAI のリアルタイム X 検索であなたの関心カテゴリの最新動向を取得します。「取得」を押すと生成されます。
+              </p>
+            )}
           </div>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">

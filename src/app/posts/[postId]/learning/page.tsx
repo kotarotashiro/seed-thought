@@ -7,12 +7,13 @@ import { Card } from "@/components/ui/Card";
 import { Badge, LearningStatusBadge } from "@/components/ui/Badge";
 import { PostMediaGrid, parsePostMedia } from "@/components/posts/PostMediaGrid";
 import { LearningCardImages } from "@/components/posts/LearningCardImages";
+import { LearningCardVideos } from "@/components/posts/LearningCardVideos";
 import { OutputTypeCard } from "@/components/outputs/OutputTypeCard";
 import { OutputPreview } from "@/components/outputs/OutputPreview";
 import { LinkifiedText } from "@/components/ui/LinkifiedText";
 import { OpenInXButton } from "@/components/ui/OpenInXButton";
 import type { LearningOutput, StrictLearningOutput } from "@/lib/ai/types";
-import { parseArticleContent } from "@/lib/posts/articleContent";
+import { parseArticleContent } from "@/lib/posts/articleParser";
 import {
   AlertCircle,
   ArrowLeft,
@@ -24,6 +25,7 @@ import {
   Copy,
   ExternalLink,
   FileText,
+  Film,
   GitBranch,
   Image as ImageIcon,
   Languages,
@@ -162,10 +164,7 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
   const article = useMemo(() => (post ? parseArticleContent(post.urlCardJson) : null), [post]);
 
   useEffect(() => {
-    if (!generating) {
-      setProgressStep(0);
-      return;
-    }
+    if (!generating) return;
     const interval = setInterval(() => {
       setProgressStep((prev) => Math.min(prev + 1, PROGRESS_STEPS.length - 1));
     }, 4000);
@@ -185,21 +184,16 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
 
   const output = useMemo(() => parseLearningOutput(card), [card]);
 
-  const loadLearning = async () => {
+  const loadOutputHistory = async (cardId: string) => {
+    setHistoryLoading(true);
     try {
-      const res = await fetch(`/api/posts/${postId}/learning`);
+      const res = await fetch(`/api/learning-cards/${cardId}/outputs`);
       const data = await res.json();
-      setPost(data.post || null);
-      setCard(data.learningCard || null);
-      setMemo(data.learningCard?.userMemo || "");
-      setLearningMode(data.learningCard?.learningMode === "format" ? "format" : "content");
-      setStrictLearning(data.strictLearning || null);
-      if (data.learningCard?.id) {
-        void loadOutputHistory(data.learningCard.id);
-      }
-    } catch (loadError) {
-      console.error("Failed to fetch learning card:", loadError);
-      setError("学習カードの取得に失敗しました");
+      setOutputHistory(data.outputs || []);
+    } catch {
+      // ignore
+    } finally {
+      setHistoryLoading(false);
     }
   };
 
@@ -236,6 +230,7 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
   const handleGenerate = async (mode?: "content" | "format") => {
     const activeMode = mode ?? learningMode;
     if (mode !== undefined) setLearningMode(mode);
+    setProgressStep(0);
     setGenerating(true);
     setError(null);
     setMessage(null);
@@ -357,19 +352,6 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
     }
   };
 
-  const loadOutputHistory = async (cardId: string) => {
-    setHistoryLoading(true);
-    try {
-      const res = await fetch(`/api/learning-cards/${cardId}/outputs`);
-      const data = await res.json();
-      setOutputHistory(data.outputs || []);
-    } catch {
-      // ignore
-    } finally {
-      setHistoryLoading(false);
-    }
-  };
-
   const handleGenerateOutput = async () => {
     if (!card || !selectedOutput) return;
     setGeneratingOutput(true);
@@ -426,7 +408,7 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
         <div>
           <div className="mb-2 flex items-center gap-2">
             <BookOpen className="h-6 w-6 text-accent" />
-            <h1 className="text-xl font-bold text-text sm:text-2xl">学ぶ：知識資産化</h1>
+            <h1 className="text-xl font-bold text-text sm:text-2xl">学習カード</h1>
           </div>
           <p className="text-sm text-text-secondary">
             保存済み投稿を、実践マニュアルと応用メモに変換します。
@@ -1006,6 +988,13 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
                       explanationPrompt={output.imageExplanationPrompt || card.imagePrompt}
                       diagramPrompt={card.diagramPrompt}
                     />
+                  </div>
+                )}
+
+                {card?.id && (
+                  <div className="mt-8">
+                    <SectionHeader icon={Film} title="生成動画" />
+                    <LearningCardVideos cardId={card.id} />
                   </div>
                 )}
               </div>

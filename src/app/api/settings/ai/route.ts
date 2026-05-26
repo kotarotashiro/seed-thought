@@ -9,12 +9,7 @@ import {
 import { getAiProvider } from "@/lib/ai/provider";
 import { getUserFacingError } from "@/lib/api/errors";
 
-const providers: AiProviderName[] = ["gemini", "openai", "claude", "grok", "kimi"];
-
-function normalizeProvider(value: unknown): AiProviderName | null {
-  const provider = String(value || "");
-  return providers.includes(provider as AiProviderName) ? (provider as AiProviderName) : null;
-}
+const providers: AiProviderName[] = ["grok"];
 
 export async function GET() {
   try {
@@ -23,25 +18,12 @@ export async function GET() {
       providers.map(async (provider) => {
         const apiKey = provider === settings.provider ? settings.apiKey : getEnvApiKey(provider);
         const options = await getProviderModelOptions(provider, apiKey);
-
         return {
           value: provider,
-          label:
-            provider === "gemini"
-              ? "Gemini"
-              : provider === "openai"
-              ? "OpenAI"
-              : provider === "claude"
-              ? "Claude"
-              : provider === "grok"
-              ? "Grok"
-              : "Kimi",
+          label: "Grok (xAI)",
           defaultModel: options.defaultModel,
           modelsSource: options.source,
-          models: options.models.map((model) => ({
-            value: model,
-            label: model,
-          })),
+          models: options.models.map((model) => ({ value: model, label: model })),
         };
       })
     );
@@ -65,18 +47,13 @@ export async function GET() {
 export async function PUT(request: Request) {
   try {
     const body = await request.json();
-    const provider = normalizeProvider(body.provider);
-    if (!provider) {
-      return NextResponse.json({ error: "AI Providerを選択してください" }, { status: 400 });
-    }
-
+    // Always use grok — only model and apiKey are variable
     const settings = await saveAiSettings({
-      provider,
+      provider: "grok",
       model: typeof body.model === "string" ? body.model : undefined,
       apiKey: typeof body.apiKey === "string" ? body.apiKey : undefined,
       clearApiKey: Boolean(body.clearApiKey),
     });
-
     return NextResponse.json(settings);
   } catch (error) {
     console.error("Failed to save AI settings:", error);
