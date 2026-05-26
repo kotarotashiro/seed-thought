@@ -8,8 +8,8 @@ import { getAuthHeader } from "@/lib/xai/client";
 
 const XAI_API_BASE = "https://api.x.ai/v1";
 
-const BW_STYLE_PREFIX =
-  "Minimalist black and white illustration, clean simple lines, flat design, white background, no color, no shading, easy to read at a glance. Subject: ";
+const STYLE_PREFIX =
+  "Create an infographic illustration. ALL visible text labels, captions, and headings MUST be written in Japanese (日本語: ひらがな・カタカナ・漢字). Do NOT use English text anywhere in the image. Use a clean modern flat design with a readable layout. Subject: ";
 
 function getApiModel(): string {
   return process.env.GROK_IMAGE_MODEL ?? "grok-imagine-image-quality";
@@ -27,7 +27,7 @@ export async function generateImageWithGrok(prompt: string): Promise<GeneratedIm
   const trimmed = prompt.trim();
   if (!trimmed) throw new Error("プロンプトが空です");
 
-  const styledPrompt = BW_STYLE_PREFIX + trimmed;
+  const styledPrompt = STYLE_PREFIX + trimmed;
   const authHeader = await getAuthHeader();
 
   const res = await fetch(`${XAI_API_BASE}/images/generations`, {
