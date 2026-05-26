@@ -19,20 +19,11 @@ function isUrlLike(s: string): boolean {
 }
 
 async function fetchWithGrok(url: string): Promise<ArticleResult> {
-  const isXArticle = X_ARTICLE_RE.test(url);
-  const sources = isXArticle ? [{ type: "x" as const }] : [{ type: "web" as const }];
-
-  let prompt: string;
-  if (isXArticle) {
-    const articleId = url.match(/\/article\/(\d+)/)?.[1] ?? url;
-    prompt = `X上のArticle ID「${articleId}」の長文記事を検索して、内容を日本語でまとめてください。\n\n必ず次のJSON形式のみで返してください（説明文不要）:\n{"title":"記事タイトル","description":"150〜250文字の内容まとめ"}`;
-  } else {
-    prompt = `以下のURLの記事を読んで内容を日本語でまとめてください。\n\n必ず次のJSON形式のみで返してください（説明文不要）:\n{"title":"記事タイトル","description":"150〜250文字の内容まとめ"}\n\nURL: ${url}`;
-  }
+  const prompt = `以下のURLの記事を読んで内容を日本語でまとめてください。\n\n必ず次のJSON形式のみで返してください（説明文不要）:\n{"title":"記事タイトル","description":"150〜250文字の内容まとめ"}\n\nURL: ${url}`;
 
   const { content } = await xaiChat({
     messages: [{ role: "user", content: prompt }],
-    searchParameters: { mode: "on", sources },
+    tools: [{ type: "web_search" }],
   });
 
   console.log(`[fetch-article] Grok response for ${url}:`, content.slice(0, 500));

@@ -9,37 +9,39 @@ function getGrokApiKey(): string | null {
 }
 
 function getGrokModel(): string {
-  return process.env.GROK_MODEL || process.env.XAI_MODEL || "grok-3";
+  return process.env.GROK_MODEL || process.env.XAI_MODEL || "grok-4.3";
 }
-
-const X_ARTICLE_RE = /(?:x|twitter)\.com\/i\/article\//i;
 
 function isUrlLike(s: string): boolean {
   return /^https?:\/\/\S+$/.test(s.trim());
+}
+
+function extractContent(data: unknown): string {
+  const d = data as {
+    output_text?: string;
+    output?: Array<{ content?: Array<{ text?: string }> }>;
+  };
+  if (d.output_text) return d.output_text;
+  if (Array.isArray(d.output)) {
+    return d.output
+      .flatMap((block) => block.content ?? [])
+      .map((c) => c.text ?? "")
+      .join("");
+  }
+  return "";
 }
 
 async function fetchWithGrok(url: string): Promise<ArticlePreview> {
   const apiKey = getGrokApiKey()!;
   const model = getGrokModel();
 
-  const isXArticle = X_ARTICLE_RE.test(url);
-  const sources = isXArticle
-    ? [{ type: "x" }]
-    : [{ type: "web" }];
-
-  let prompt: string;
-  if (isXArticle) {
-    const articleId = url.match(/\/article\/(\d+)/)?.[1] ?? url;
-    prompt = `X上のArticle ID「${articleId}」の長文記事を検索して、内容を日本語でまとめてください。\n\n必ず次のJSON形式のみで返してください（説明文不要）:\n{"title":"記事タイトル","description":"150〜250文字の内容まとめ"}`;
-  } else {
-    prompt = `以下のURLの記事を読んで内容を日本語でまとめてください。\n\n必ず次のJSON形式のみで返してください（説明文不要）:\n{"title":"記事タイトル","description":"150〜250文字の内容まとめ"}\n\nURL: ${url}`;
-  }
+  const prompt = `以下のURLの記事を読んで内容を日本語でまとめてください。\n\n必ず次のJSON形式のみで返してください（説明文不要）:\n{"title":"記事タイトル","description":"150〜250文字の内容まとめ"}\n\nURL: ${url}`;
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 25000);
 
   try {
-    const res = await fetch("https://api.x.ai/v1/chat/completions", {
+    const res = await fetch("https://api.x.ai/v1/responses", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -47,15 +49,15 @@ async function fetchWithGrok(url: string): Promise<ArticlePreview> {
       },
       body: JSON.stringify({
         model,
-        messages: [{ role: "user", content: prompt }],
-        search_parameters: { mode: "on", sources },
+        input: [{ role: "user", content: prompt }],
+        tools: [{ type: "web_search" }],
       }),
       signal: controller.signal,
     });
     clearTimeout(timer);
     if (!res.ok) throw new Error(`Grok API ${res.status}`);
-    const data = await res.json() as { choices?: Array<{ message?: { content?: string } }> };
-    const content = data.choices?.[0]?.message?.content || "";
+    const data = await res.json();
+    const content = extractContent(data);
     const jsonMatch = content.match(/\{[\s\S]*?\}/);
     if (jsonMatch) {
       try {
