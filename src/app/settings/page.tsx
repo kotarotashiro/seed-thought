@@ -9,9 +9,7 @@ import {
   AlertCircle,
   CheckCircle,
   ChevronDown,
-  Cpu,
   Database,
-  KeyRound,
   Loader2,
   RefreshCw,
   Save,
@@ -26,23 +24,6 @@ type ProfileForm = {
   outputChannels: string[];
   tone: string;
   knowledge: string;
-};
-
-type AiProviderOption = {
-  value: string;
-  label: string;
-  defaultModel: string;
-  modelsSource?: "live" | "fallback";
-  models: { value: string; label: string }[];
-};
-
-type AiSettingsForm = {
-  provider: string;
-  model: string;
-  apiKey: string;
-  hasApiKey: boolean;
-  keySource: string;
-  providers: AiProviderOption[];
 };
 
 const roleOptions = [
@@ -80,19 +61,6 @@ function toggleListValue(values: string[], value: string): string[] {
     : [...values, value];
 }
 
-function getModelOptions(settings: AiSettingsForm): { value: string; label: string }[] {
-  const provider = settings.providers.find((item) => item.value === settings.provider);
-  const options = provider?.models || [];
-  if (settings.model && !options.some((option) => option.value === settings.model)) {
-    return [{ value: settings.model, label: settings.model }, ...options];
-  }
-  return options;
-}
-
-function getCurrentProviderOption(settings: AiSettingsForm): AiProviderOption | undefined {
-  return settings.providers.find((item) => item.value === settings.provider);
-}
-
 function SectionHeader({
   open,
   onToggle,
@@ -124,7 +92,6 @@ function SectionHeader({
 
 export default function SettingsPage() {
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
-    aiProvider: false,
     notion: false,
     profile: false,
   });
@@ -133,15 +100,6 @@ export default function SettingsPage() {
     setOpenSections((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
-  const [aiProvider, setAiProvider] = useState("loading");
-  const [aiSettings, setAiSettings] = useState<AiSettingsForm>({
-    provider: "gemini",
-    model: "gemini-2.0-flash",
-    apiKey: "",
-    hasApiKey: false,
-    keySource: "none",
-    providers: [],
-  });
   const [profile, setProfile] = useState<ProfileForm>({
     name: "",
     role: "",
@@ -160,9 +118,6 @@ export default function SettingsPage() {
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [savingAi, setSavingAi] = useState(false);
-  const [testingAi, setTestingAi] = useState(false);
-  const [refreshingModels, setRefreshingModels] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -171,27 +126,14 @@ export default function SettingsPage() {
 
     async function loadSettings() {
       try {
-        const [statusRes, profileRes, aiRes, notionRes] = await Promise.all([
-          fetch("/api/settings/status"),
+        const [profileRes, notionRes] = await Promise.all([
           fetch("/api/settings/profile"),
-          fetch("/api/settings/ai"),
           fetch("/api/notion/settings"),
         ]);
-        const statusData = await statusRes.json();
         const profileData = await profileRes.json();
-        const aiData = await aiRes.json();
         const notionData = await notionRes.json();
         if (cancelled) return;
 
-        setAiProvider(statusData.aiProvider || "mock");
-        setAiSettings({
-          provider: aiData.provider || "gemini",
-          model: aiData.model || "gemini-2.0-flash",
-          apiKey: "",
-          hasApiKey: Boolean(aiData.hasApiKey),
-          keySource: aiData.keySource || "none",
-          providers: aiData.providers || [],
-        });
         setProfile({
           name: profileData.name || "",
           role: profileData.role || "",
@@ -254,99 +196,6 @@ export default function SettingsPage() {
       setError("保存に失敗しました");
     } finally {
       setSaving(false);
-    }
-  };
-
-  const handleAiProviderChange = (provider: string) => {
-    const option = aiSettings.providers.find((item) => item.value === provider);
-    setAiSettings((current) => ({
-      ...current,
-      provider,
-      model: option?.defaultModel || current.model,
-    }));
-  };
-
-  const handleSaveAi = async (clearApiKey = false) => {
-    setSavingAi(true);
-    setError(null);
-    setMessage(null);
-
-    try {
-      const res = await fetch("/api/settings/ai", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          provider: aiSettings.provider,
-          model: aiSettings.model,
-          apiKey: clearApiKey ? "" : aiSettings.apiKey,
-          clearApiKey,
-        }),
-      });
-      const data = await res.json();
-
-      if (!res.ok || data.error) {
-        setError(data.error || "AI設定の保存に失敗しました");
-        return;
-      }
-
-      setAiProvider(data.provider);
-      setAiSettings((current) => ({
-        ...current,
-        provider: data.provider,
-        model: data.model,
-        apiKey: "",
-        hasApiKey: Boolean(data.hasApiKey),
-        keySource: data.keySource || "none",
-      }));
-      setMessage(clearApiKey ? "保存済みAPIキーを削除しました。" : "AI設定を保存しました。");
-    } catch {
-      setError("AI設定の保存に失敗しました");
-    } finally {
-      setSavingAi(false);
-    }
-  };
-
-  const handleRefreshModels = async () => {
-    setRefreshingModels(true);
-    setError(null);
-    setMessage(null);
-
-    try {
-      const res = await fetch("/api/settings/ai");
-      const data = await res.json();
-      if (!res.ok || data.error) {
-        setError(data.error || "モデルの取得に失敗しました");
-        return;
-      }
-      setAiSettings((current) => ({
-        ...current,
-        providers: data.providers || [],
-      }));
-      setMessage("利用可能なモデルを最新情報に更新しました。");
-    } catch {
-      setError("モデルの取得に失敗しました");
-    } finally {
-      setRefreshingModels(false);
-    }
-  };
-
-  const handleTestAi = async () => {
-    setTestingAi(true);
-    setError(null);
-    setMessage(null);
-
-    try {
-      const res = await fetch("/api/settings/ai", { method: "POST" });
-      const data = await res.json();
-      if (!res.ok || data.error) {
-        setError(data.error || "AI接続テストに失敗しました");
-        return;
-      }
-      setMessage(`AI接続テストに成功しました。カテゴリ: ${data.category}`);
-    } catch {
-      setError("AI接続テストに失敗しました");
-    } finally {
-      setTestingAi(false);
     }
   };
 
@@ -423,140 +272,6 @@ export default function SettingsPage() {
           {message}
         </div>
       )}
-
-      {/* AI Provider */}
-      <Card>
-        <SectionHeader
-          open={openSections.aiProvider}
-          onToggle={() => toggleSection("aiProvider")}
-          icon={<Cpu className="w-5 h-5 text-accent flex-shrink-0" />}
-          title="AI Provider"
-          badge={
-            <Badge variant={aiSettings.hasApiKey ? "success" : "warning"}>
-              {aiSettings.hasApiKey
-                ? aiSettings.keySource === "ui"
-                  ? "UIキー設定済み"
-                  : aiSettings.keySource === "oauth"
-                  ? "Grok OAuth連携済み"
-                  : "環境変数キー使用中"
-                : "APIキー未設定"}
-            </Badge>
-          }
-        />
-        {openSections.aiProvider && (
-          <div className="mt-4 space-y-4">
-            <div className="flex items-center justify-between bg-border-light rounded-xl px-4 py-3">
-              <span className="text-sm text-text">現在のProvider</span>
-              <Badge variant="success">{aiProvider}</Badge>
-            </div>
-            <div className="grid gap-4 md:grid-cols-2">
-              <Select
-                label="Provider"
-                value={aiSettings.provider}
-                onChange={(e) => handleAiProviderChange(e.target.value)}
-                options={aiSettings.providers.map((provider) => ({
-                  value: provider.value,
-                  label: provider.label,
-                }))}
-              />
-              <div>
-                <Select
-                  label="モデル"
-                  value={aiSettings.model}
-                  onChange={(e) =>
-                    setAiSettings((current) => ({ ...current, model: e.target.value }))
-                  }
-                  options={getModelOptions(aiSettings)}
-                />
-                <div className="mt-1.5 flex items-center gap-2">
-                  <p className="flex-1 text-xs text-text-muted">
-                    {getCurrentProviderOption(aiSettings)?.modelsSource === "live"
-                      ? "公式APIから取得した最新候補です。"
-                      : "公式APIで取得できない場合の推奨候補です。"}
-                  </p>
-                  <button
-                    type="button"
-                    onClick={handleRefreshModels}
-                    disabled={refreshingModels || savingAi}
-                    className="flex items-center gap-1 text-xs text-accent hover:text-accent-hover disabled:opacity-50 transition-colors"
-                  >
-                    <RefreshCw className={`w-3 h-3 ${refreshingModels ? "animate-spin" : ""}`} />
-                    更新
-                  </button>
-                </div>
-              </div>
-            </div>
-            <label className="block">
-              <span className="block text-sm font-medium text-text mb-1.5">APIキー</span>
-              <div className="relative">
-                <KeyRound className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted" />
-                <input
-                  type="password"
-                  value={aiSettings.apiKey}
-                  placeholder={
-                    aiSettings.hasApiKey
-                      ? "変更する場合だけ新しいAPIキーを入力"
-                      : "APIキーを入力"
-                  }
-                  onChange={(e) =>
-                    setAiSettings((current) => ({ ...current, apiKey: e.target.value }))
-                  }
-                  className="w-full rounded-xl border border-border bg-white py-3 pl-10 pr-4 text-sm text-text outline-none focus:border-accent"
-                />
-              </div>
-            </label>
-            <div className="rounded-xl border border-warning/20 bg-warning-light px-4 py-3 text-sm text-text-secondary">
-              <div className="flex items-start gap-2">
-                <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0 text-warning" />
-                <p>
-                  APIキーは暗号化してDBに保存し、ブラウザには再表示しません。
-                  公開運用ではVercel Deployment Protectionを有効にしたまま使ってください。
-                </p>
-              </div>
-            </div>
-            <div className="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap">
-              <Button
-                onClick={() => handleSaveAi(false)}
-                disabled={savingAi || testingAi}
-                loading={savingAi}
-                loadingLabel="保存中..."
-                className="w-full sm:w-auto"
-              >
-                <Save className="w-4 h-4 mr-1" />
-                AI設定を保存
-              </Button>
-              <Button
-                variant="secondary"
-                onClick={handleTestAi}
-                disabled={savingAi || testingAi}
-                loading={testingAi}
-                loadingLabel="テスト中..."
-                className="w-full sm:w-auto"
-              >
-                <CheckCircle className="w-4 h-4 mr-1" />
-                接続テスト
-              </Button>
-              {aiSettings.keySource === "ui" && (
-                <Button
-                  variant="ghost"
-                  onClick={() => {
-                    if (confirm("保存済みAPIキーを削除しますか？この操作は元に戻せません。")) {
-                      void handleSaveAi(true);
-                    }
-                  }}
-                  disabled={savingAi}
-                  className="w-full text-danger hover:text-danger sm:w-auto"
-                >
-                  保存済みキーを削除
-                </Button>
-              )}
-            </div>
-            <p className="text-xs text-text-muted">
-              Grok (xAI) を使用します。X Premium+ / SuperGrok 連携済みの場合はAPIキー不要です。
-            </p>
-          </div>
-        )}
-      </Card>
 
       {/* Notion Integration */}
       <Card>
