@@ -61,6 +61,31 @@ export async function POST(
   }
 }
 
+// DELETE /api/learning-cards/[cardId]/videos?videoId=xxx — delete a video record
+export async function DELETE(
+  request: Request,
+  { params }: { params: Promise<{ cardId: string }> }
+) {
+  const { cardId } = await params;
+  const { searchParams } = new URL(request.url);
+  const videoDbId = searchParams.get("videoId");
+
+  if (!videoDbId) {
+    return NextResponse.json({ error: "videoId が必要です" }, { status: 400 });
+  }
+
+  const record = await prisma.learningCardVideo.findFirst({
+    where: { id: videoDbId, learningCardId: cardId },
+  });
+
+  if (!record) {
+    return NextResponse.json({ error: "動画が見つかりません" }, { status: 404 });
+  }
+
+  await prisma.learningCardVideo.delete({ where: { id: videoDbId } });
+  return NextResponse.json({ ok: true });
+}
+
 // PATCH /api/learning-cards/[cardId]/videos?videoId=xxx — poll job status
 export async function PATCH(
   request: Request,

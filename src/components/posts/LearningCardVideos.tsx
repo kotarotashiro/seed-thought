@@ -29,6 +29,7 @@ export function LearningCardVideos({ cardId }: { cardId: string }) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [customPrompt, setCustomPrompt] = useState("");
+  const [deleting, setDeleting] = useState<string | null>(null);
   const pollRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -88,6 +89,27 @@ export function LearningCardVideos({ cardId }: { cardId: string }) {
       }
     };
   }, [videos, cardId]);
+
+  const deleteVideo = async (videoId: string) => {
+    if (!window.confirm("この動画を削除しますか？")) return;
+    setDeleting(videoId);
+    try {
+      const res = await fetch(
+        `/api/learning-cards/${cardId}/videos?videoId=${videoId}`,
+        { method: "DELETE" }
+      );
+      if (res.ok) {
+        setVideos((prev) => prev.filter((v) => v.id !== videoId));
+      } else {
+        const data = await res.json();
+        setError(data.error || "削除に失敗しました");
+      }
+    } catch {
+      setError("削除に失敗しました");
+    } finally {
+      setDeleting(null);
+    }
+  };
 
   const submit = async (prompt?: string) => {
     setSubmitting(true);
@@ -195,7 +217,22 @@ export function LearningCardVideos({ cardId }: { cardId: string }) {
                   <span className="rounded-full bg-border-light px-2 py-0.5">
                     {STATUS_LABEL[v.status]}
                   </span>
-                  <span>{new Date(v.createdAt).toLocaleString("ja-JP")}</span>
+                  <div className="flex items-center gap-2">
+                    <span>{new Date(v.createdAt).toLocaleString("ja-JP")}</span>
+                    <button
+                      type="button"
+                      onClick={() => deleteVideo(v.id)}
+                      disabled={deleting === v.id}
+                      aria-label="動画を削除"
+                      className="rounded p-0.5 text-text-muted hover:text-danger hover:bg-danger/10 disabled:opacity-40 transition-colors"
+                    >
+                      {deleting === v.id ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Trash2 className="h-3.5 w-3.5" />
+                      )}
+                    </button>
+                  </div>
                 </div>
                 <p className="line-clamp-3 text-xs text-text-secondary">{v.prompt}</p>
               </div>
