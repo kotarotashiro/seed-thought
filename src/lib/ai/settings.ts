@@ -72,12 +72,12 @@ const envModels: Record<AiProviderName, string | undefined> = {
 };
 
 function normalizeProvider(value: unknown): AiProviderName {
-  const provider = String(value || process.env.AI_PROVIDER || "gemini");
+  const provider = String(value || process.env.AI_PROVIDER || "grok");
   if (["gemini", "openai", "claude", "grok", "kimi", "mock"].includes(provider)) {
-    if (process.env.NODE_ENV === "production" && provider === "mock") return "gemini";
+    if (process.env.NODE_ENV === "production" && provider === "mock") return "grok";
     return provider as AiProviderName;
   }
-  return "gemini";
+  return "grok";
 }
 
 function readStoredSettings(valueJson: string | null | undefined): StoredAiSettings {

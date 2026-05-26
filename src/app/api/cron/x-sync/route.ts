@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { syncXPosts } from "@/lib/x/sync";
 import { enrichPendingPosts } from "@/lib/posts/enrich";
 import { generateRecommendations } from "@/lib/x/recommend";
+import { generateTrendDigest } from "@/lib/x/trendDigest";
 
 // Vercel Cron: runs every 30 minutes via GET.
 // Manual test: curl /api/cron/x-sync -H "Authorization: Bearer $CRON_SECRET"
@@ -24,6 +25,7 @@ export async function GET(request: Request) {
     const result = await syncXPosts("both", 25);
     after(() => enrichPendingPosts(10));
     after(() => generateRecommendations());
+    after(() => generateTrendDigest());
     return NextResponse.json({ ok: true, ...result });
   } catch (error) {
     const message = error instanceof Error ? error.message : "sync failed";

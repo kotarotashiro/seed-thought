@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   ArrowRight,
@@ -10,7 +10,9 @@ import {
   ChevronUp,
   Clock,
   Flame,
+  Loader2,
   Sparkles,
+  Volume2,
   X as XIcon,
 } from "lucide-react";
 import { Card } from "@/components/ui/Card";
@@ -56,6 +58,27 @@ export default function ReviewPage() {
   const [reviewedCount, setReviewedCount] = useState(0);
   const [upcomingCount, setUpcomingCount] = useState(0);
   const [showManual, setShowManual] = useState(false);
+  const [audioPlaying, setAudioPlaying] = useState(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  const playCardAudio = async (cardId: string) => {
+    if (audioPlaying) {
+      audioRef.current?.pause();
+      setAudioPlaying(false);
+      return;
+    }
+    setAudioPlaying(true);
+    try {
+      const url = `/api/learning-cards/${cardId}/audio`;
+      const audio = new Audio(url);
+      audioRef.current = audio;
+      audio.onended = () => setAudioPlaying(false);
+      audio.onerror = () => setAudioPlaying(false);
+      await audio.play();
+    } catch {
+      setAudioPlaying(false);
+    }
+  };
 
   const current = cards[index];
 
@@ -198,7 +221,17 @@ export default function ReviewPage() {
           </span>
         </div>
 
-        <h1 className="text-lg font-bold text-text sm:text-xl">{current.title}</h1>
+        <div className="flex items-start justify-between gap-3">
+          <h1 className="text-lg font-bold text-text sm:text-xl">{current.title}</h1>
+          <button
+            type="button"
+            title="音声で聞く"
+            onClick={() => playCardAudio(current.id)}
+            className={`flex-shrink-0 rounded-lg p-2 transition-colors ${audioPlaying ? "bg-accent text-white" : "bg-border-light text-text-secondary hover:text-accent"}`}
+          >
+            {audioPlaying ? <Loader2 className="h-4 w-4 animate-spin" /> : <Volume2 className="h-4 w-4" />}
+          </button>
+        </div>
 
         {/* Question side: summary */}
         <div className="rounded-2xl border border-border bg-white p-4">

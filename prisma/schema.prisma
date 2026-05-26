@@ -62,6 +62,7 @@ model LearningCard {
   sourcePost Post @relation(fields: [sourcePostId], references: [id], onDelete: Cascade)
   outputs    LearningCardOutput[]
   images     LearningCardImage[]
+  videos     LearningCardVideo[]
   collectionItems CollectionItem[]
   drafts     XDraft[]
 }
@@ -75,6 +76,23 @@ model LearningCardImage {
   mimeType       String   @default("image/png")
   dataBase64     String
   createdAt      DateTime @default(now())
+
+  learningCard LearningCard @relation(fields: [learningCardId], references: [id], onDelete: Cascade)
+
+  @@index([learningCardId])
+}
+
+model LearningCardVideo {
+  id             String   @id @default(cuid())
+  learningCardId String
+  prompt         String
+  status         String   @default("pending") // "pending" | "processing" | "done" | "failed"
+  videoId        String?  // xAI job id
+  videoUrl       String?
+  thumbnailUrl   String?
+  errorMessage   String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   learningCard LearningCard @relation(fields: [learningCardId], references: [id], onDelete: Cascade)
 
