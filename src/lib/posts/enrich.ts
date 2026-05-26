@@ -1,8 +1,8 @@
 import { prisma } from "@/lib/db/prisma";
 import { fetchArticlePreview } from "@/lib/fetchArticle";
 import { parseArticleContent } from "./articleContent";
+import { X_ARTICLE_RE } from "@/lib/x/article";
 
-const X_ARTICLE_RE = /(?:x|twitter)\.com\/i\/article\//i;
 const URL_ONLY_RE = /^https?:\/\/\S+$/;
 
 // Returns true if this post has a fetchable external URL (not X Article, not already enriched).
@@ -11,7 +11,7 @@ function needsEnrichment(post: {
   text: string;
   enrichmentStatus: string;
 }): boolean {
-  if (post.enrichmentStatus === "done" || post.enrichmentStatus === "processing") return false;
+  if (post.enrichmentStatus === "done" || post.enrichmentStatus === "processing" || post.enrichmentStatus === "x_article_pending") return false;
 
   const card = parseArticleContent(post.urlCardJson);
   if (card.pastedContent) return false; // already has content

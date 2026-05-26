@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { hasXaiAuthConfigured, xaiChat } from "@/lib/xai/client";
+import { prisma } from "@/lib/db/prisma";
+import { X_ARTICLE_RE } from "@/lib/x/article";
 
 interface ArticleResult {
   finalUrl: string;
@@ -8,27 +10,16 @@ interface ArticleResult {
   image: string | null;
 }
 
-const X_ARTICLE_RE = /(?:x|twitter)\.com\/i\/article\//i;
-
 function isUrlLike(s: string): boolean {
   return /^https?:\/\/\S+$/.test(s.trim());
 }
 
 async function fetchWithGrok(url: string): Promise<ArticleResult> {
-  const isXArticle = X_ARTICLE_RE.test(url);
-  const sources = isXArticle ? [{ type: "x" as const }] : [{ type: "web" as const }];
-
-  let prompt: string;
-  if (isXArticle) {
-    const articleId = url.match(/\/article\/(\d+)/)?.[1] ?? url;
-    prompt = `X上のArticle ID「${articleId}」の長文記事を検索して、内容を日本語でまとめてください。\n\n必ず次のJSON形式のみで返してください（説明文不要）:\n{"title":"記事タイトル","description":"150〜250文字の内容まとめ"}`;
-  } else {
-    prompt = `以下のURLの記事を読んで内容を日本語でまとめてください。\n\n必ず次のJSON形式のみで返してください（説明文不要）:\n{"title":"記事タイトル","description":"150〜250文字の内容まとめ"}\n\nURL: ${url}`;
-  }
+  const prompt = `以下のURLの記事を読んで内容を日本語でまとめてください。\n\n必ず次のJSON形式のみで返してください（説明文不要）:\n{"title":"記事タイトル","description":"150〜250文字の内容まとめ"}\n\nURL: ${url}`;
 
   const { content } = await xaiChat({
     messages: [{ role: "user", content: prompt }],
-    searchParameters: { mode: "on", sources },
+    tools: [{ type: "web_search" }],
   });
 
   console.log(`[fetch-article] Grok response for ${url}:`, content.slice(0, 500));
@@ -171,15 +162,38 @@ export async function GET(request: Request) {
   const resolvedUrl = await resolveRedirect(rawUrl);
 
   // For X Articles, Grok cannot fetch body content via live search.
-  // Skip Grok and return early with the resolved URL so client shows
-  // an "open in X" affordance instead of looping on failed fetches.
+  // Try DB cache first; if a completed Post exists, return its text as description.
   if (X_ARTICLE_RE.test(resolvedUrl)) {
+    const cachedPost = await prisma.post.findFirst({
+      where: {
+        enrichmentStatus: "done",
+        OR: [
+          { urlCardJson: { contains: resolvedUrl } },
+          { text: { contains: resolvedUrl } },
+        ],
+      },
+      select: { text: true },
+      orderBy: { createdAt: "desc" },
+    });
+
+    if (cachedPost && cachedPost.text.length > 100) {
+      return NextResponse.json({
+        finalUrl: resolvedUrl,
+        title: null,
+        description: cachedPost.text.slice(0, 500),
+        image: null,
+        isXArticle: true,
+        fromCache: true,
+      });
+    }
+
     return NextResponse.json({
       finalUrl: resolvedUrl,
       title: null,
       description: null,
       image: null,
       isXArticle: true,
+      fromCache: false,
     });
   }
 

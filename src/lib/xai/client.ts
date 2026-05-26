@@ -9,18 +9,15 @@ import {
 
 const XAI_API_BASE = "https://api.x.ai/v1";
 
-export type XaiSource = { type: "web" } | { type: "x" };
+export type XaiTool = { type: "web_search" | "x_search" | "code_interpreter" };
 
 export interface XaiChatOptions {
   model?: string;
   messages: Array<{ role: "user" | "assistant" | "system"; content: string }>;
-  searchParameters?: {
-    mode?: "on" | "off" | "auto";
-    sources?: XaiSource[];
-  };
-  /** Request JSON output (response_format: json_object) */
-  jsonMode?: boolean;
+  tools?: XaiTool[];
   temperature?: number;
+  /** Hint to return JSON. Handled via prompting — Responses API doesn't have a json_object mode. */
+  jsonMode?: boolean;
 }
 
 export interface XaiChatResult {
@@ -33,7 +30,6 @@ export interface XaiImagineOptions {
 }
 
 export interface XaiImagineResult {
-  // Phase 5: populated when OAuth and grok-imagine-image-quality are wired up
   imageUrl?: string;
   dataBase64?: string;
   mimeType?: string;
@@ -83,80 +79,65 @@ function getDefaultModel(): string {
   return process.env.GROK_MODEL ?? process.env.XAI_MODEL ?? "grok-4.3";
 }
 
-export async function xaiChat(options: XaiChatOptions): Promise<XaiChatResult> {
-  const authHeader = await getAuthHeader();
-  const res = await fetch(`${XAI_API_BASE}/chat/completions`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: authHeader,
-    },
-    body: JSON.stringify({
-      model: options.model ?? getDefaultModel(),
-      messages: options.messages,
-      ...(options.temperature !== undefined ? { temperature: options.temperature } : {}),
-      ...(options.jsonMode ? { response_format: { type: "json_object" } } : {}),
-      ...(options.searchParameters
-        ? { search_parameters: options.searchParameters }
-        : {}),
-    }),
-  });
-
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`xAI API ${res.status}: ${text.slice(0, 200)}`);
-  }
-
-  const data = (await res.json()) as {
-    choices?: Array<{ message?: { content?: string } }>;
+function extractContent(data: unknown): string {
+  const d = data as {
+    output_text?: string;
+    output?: Array<{ content?: Array<{ text?: string }> }>;
   };
-  return { content: data.choices?.[0]?.message?.content ?? "" };
+  if (d.output_text) return d.output_text;
+  if (Array.isArray(d.output)) {
+    return d.output
+      .flatMap((block) => block.content ?? [])
+      .map((c) => c.text ?? "")
+      .join("");
+  }
+  return "";
 }
 
-// xAI Live Search is deprecated. Use Agent Tools API instead.
-// https://docs.x.ai/docs/guides/tools/overview
-async function xaiChatWithTools(
-  query: string,
-  toolType: "x_search" | "web_search"
-): Promise<XaiChatResult> {
-  const authHeader = await getAuthHeader();
-  const res = await fetch(`${XAI_API_BASE}/chat/completions`, {
+export async function xaiChat(options: XaiChatOptions): Promise<XaiChatResult> {
+  const body: Record<string, unknown> = {
+    model: options.model ?? getDefaultModel(),
+    input: options.messages,
+  };
+  if (options.tools && options.tools.length > 0) {
+    body.tools = options.tools;
+  }
+  if (options.temperature !== undefined) {
+    body.temperature = options.temperature;
+  }
+
+  const res = await fetch(`${XAI_API_BASE}/responses`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: authHeader,
+      Authorization: await getAuthHeader(),
     },
-    body: JSON.stringify({
-      model: getDefaultModel(),
-      messages: [{ role: "user", content: query }],
-      tools: [{ type: toolType }],
-    }),
+    body: JSON.stringify(body),
   });
 
   if (!res.ok) {
     const text = await res.text();
-    // Fallback: if Agent Tools API also fails, drop tools and use Grok's own knowledge
-    if (res.status === 400 || res.status === 410 || res.status === 422) {
-      return xaiChat({ messages: [{ role: "user", content: query }] });
-    }
     throw new Error(`xAI API ${res.status}: ${text.slice(0, 200)}`);
   }
 
-  const data = (await res.json()) as {
-    choices?: Array<{ message?: { content?: string } }>;
-  };
-  return { content: data.choices?.[0]?.message?.content ?? "" };
+  const data = await res.json();
+  return { content: extractContent(data) };
 }
 
 export async function xaiSearchX(query: string): Promise<XaiChatResult> {
-  return xaiChatWithTools(query, "x_search");
+  return xaiChat({
+    messages: [{ role: "user", content: query }],
+    tools: [{ type: "x_search" }],
+  });
 }
 
 export async function xaiSearchWeb(query: string): Promise<XaiChatResult> {
-  return xaiChatWithTools(query, "web_search");
+  return xaiChat({
+    messages: [{ role: "user", content: query }],
+    tools: [{ type: "web_search" }],
+  });
 }
 
-export async function xaiImagine(options: XaiImagineOptions): Promise<XaiImagineResult> {
-  void options;
-  throw new Error("xaiImagine not yet implemented");
+export async function xaiImagine(_options: XaiImagineOptions): Promise<XaiImagineResult> {
+  throw new Error("xaiImagine not yet implemented — implement in Phase 5 with OAuth");
 }
