@@ -17,7 +17,6 @@ import {
   Layers,
   MessageSquare,
   FileText,
-  Flame,
 } from "lucide-react";
 import { clsx } from "clsx";
 
@@ -25,7 +24,6 @@ const menuItems = [
   { href: "/", label: "ホーム", icon: Home },
   { href: "/posts", label: "保存した投稿", icon: Archive },
   { href: "/knowhow", label: "学びメモ", icon: BookOpen },
-  { href: "/review", label: "今日の復習", icon: Flame },
   { href: "/collections", label: "コレクション", icon: Layers },
   { href: "/search", label: "メモを検索", icon: Search },
   { href: "/chat", label: "メモに質問", icon: MessageSquare },

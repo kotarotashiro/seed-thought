@@ -45,9 +45,27 @@ export async function submitVideoGeneration(prompt: string): Promise<{ jobId: st
     throw new Error(`Grok Video API ${res.status}: ${text.slice(0, 200)}`);
   }
 
-  const data = (await res.json()) as { id?: string; job_id?: string };
-  const jobId = data.id ?? data.job_id;
-  if (!jobId) throw new Error("Grok Video: ジョブ ID が返されませんでした");
+  const rawText = await res.text();
+  console.log("[grokVideo] submit raw response:", rawText.slice(0, 800));
+
+  let data: Record<string, unknown> = {};
+  try {
+    data = JSON.parse(rawText);
+  } catch {
+    throw new Error(`Grok Video: JSONパース失敗 — raw: ${rawText.slice(0, 200)}`);
+  }
+
+  const jobId =
+    (typeof data.id === "string" && data.id) ||
+    (typeof data.job_id === "string" && data.job_id) ||
+    (typeof data.task_id === "string" && data.task_id) ||
+    (typeof data.request_id === "string" && data.request_id);
+
+  if (!jobId) {
+    throw new Error(
+      `Grok Video: ジョブIDが見つかりません — keys: [${Object.keys(data).join(", ")}] / sample: ${rawText.slice(0, 300)}`
+    );
+  }
 
   return { jobId };
 }
@@ -55,7 +73,7 @@ export async function submitVideoGeneration(prompt: string): Promise<{ jobId: st
 export async function pollVideoGeneration(jobId: string): Promise<VideoGenerationJob> {
   const authHeader = await getAuthHeader();
 
-  const res = await fetch(`${XAI_API_BASE}/videos/generations/${jobId}`, {
+  const res = await fetch(`${XAI_API_BASE}/videos/${jobId}`, {
     headers: { Authorization: authHeader },
   });
 
@@ -65,8 +83,8 @@ export async function pollVideoGeneration(jobId: string): Promise<VideoGeneratio
   }
 
   const data = (await res.json()) as {
-    id?: string;
     status?: string;
+    video?: { url?: string; thumbnail_url?: string; duration?: number };
     video_url?: string;
     url?: string;
     thumbnail_url?: string;
@@ -86,8 +104,8 @@ export async function pollVideoGeneration(jobId: string): Promise<VideoGeneratio
   return {
     jobId,
     status,
-    videoUrl: data.video_url ?? data.url,
-    thumbnailUrl: data.thumbnail_url,
+    videoUrl: data.video?.url ?? data.video_url ?? data.url,
+    thumbnailUrl: data.video?.thumbnail_url ?? data.thumbnail_url,
     errorMessage: data.error,
   };
 }

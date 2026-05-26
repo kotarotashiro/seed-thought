@@ -408,7 +408,7 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
         <div>
           <div className="mb-2 flex items-center gap-2">
             <BookOpen className="h-6 w-6 text-accent" />
-            <h1 className="text-xl font-bold text-text sm:text-2xl">学ぶ：知識資産化</h1>
+            <h1 className="text-xl font-bold text-text sm:text-2xl">学習カード</h1>
           </div>
           <p className="text-sm text-text-secondary">
             保存済み投稿を、実践マニュアルと応用メモに変換します。

@@ -7,7 +7,6 @@ import {
   Archive,
   BookOpen,
   FileText,
-  Flame,
   Home,
   Layers,
   Link2,
@@ -24,7 +23,7 @@ import { clsx } from "clsx";
 
 const mobileItems = [
   { href: "/", label: "ホーム", icon: Home },
-  { href: "/review", label: "復習", icon: Flame },
+  { href: "/posts", label: "投稿", icon: Archive },
   { href: "/knowhow", label: "メモ", icon: BookOpen },
   { href: "/chat", label: "質問", icon: MessageSquare },
   { href: "/posts/new", label: "追加", icon: PenSquare },
@@ -34,7 +33,6 @@ const drawerItems = [
   { href: "/", label: "ホーム", icon: Home },
   { href: "/posts", label: "保存した投稿", icon: Archive },
   { href: "/knowhow", label: "学びメモ", icon: BookOpen },
-  { href: "/review", label: "今日の復習", icon: Flame },
   { href: "/collections", label: "コレクション", icon: Layers },
   { href: "/search", label: "メモを検索", icon: Search },
   { href: "/chat", label: "メモに質問", icon: MessageSquare },
