@@ -6,6 +6,9 @@ export interface XaiChatOptions {
   model?: string;
   messages: Array<{ role: "user" | "assistant" | "system"; content: string }>;
   tools?: XaiTool[];
+  temperature?: number;
+  /** Hint to return JSON. Handled via prompting — Responses API doesn't have a json_object mode. */
+  jsonMode?: boolean;
 }
 
 export interface XaiChatResult {
@@ -27,6 +30,10 @@ function getAuthHeader(): string {
   const apiKey = process.env.GROK_API_KEY ?? process.env.XAI_API_KEY;
   if (!apiKey) throw new Error("GROK_API_KEY is not set");
   return `Bearer ${apiKey}`;
+}
+
+export async function hasXaiAuthConfigured(): Promise<boolean> {
+  return Boolean(process.env.GROK_API_KEY ?? process.env.XAI_API_KEY);
 }
 
 function getDefaultModel(): string {
@@ -55,6 +62,9 @@ export async function xaiChat(options: XaiChatOptions): Promise<XaiChatResult> {
   };
   if (options.tools && options.tools.length > 0) {
     body.tools = options.tools;
+  }
+  if (options.temperature !== undefined) {
+    body.temperature = options.temperature;
   }
 
   const res = await fetch(`${XAI_API_BASE}/responses`, {
