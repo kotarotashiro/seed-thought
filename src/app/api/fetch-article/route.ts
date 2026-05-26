@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { hasXaiAuthConfigured, xaiChat } from "@/lib/xai/client";
+import { prisma } from "@/lib/db/prisma";
+import { X_ARTICLE_RE } from "@/lib/x/article";
 
 interface ArticleResult {
   finalUrl: string;
@@ -7,8 +9,6 @@ interface ArticleResult {
   description: string | null;
   image: string | null;
 }
-
-const X_ARTICLE_RE = /(?:x|twitter)\.com\/i\/article\//i;
 
 function isUrlLike(s: string): boolean {
   return /^https?:\/\/\S+$/.test(s.trim());
@@ -171,15 +171,38 @@ export async function GET(request: Request) {
   const resolvedUrl = await resolveRedirect(rawUrl);
 
   // For X Articles, Grok cannot fetch body content via live search.
-  // Skip Grok and return early with the resolved URL so client shows
-  // an "open in X" affordance instead of looping on failed fetches.
+  // Try DB cache first; if a completed Post exists, return its text as description.
   if (X_ARTICLE_RE.test(resolvedUrl)) {
+    const cachedPost = await prisma.post.findFirst({
+      where: {
+        enrichmentStatus: "done",
+        OR: [
+          { urlCardJson: { contains: resolvedUrl } },
+          { text: { contains: resolvedUrl } },
+        ],
+      },
+      select: { text: true },
+      orderBy: { createdAt: "desc" },
+    });
+
+    if (cachedPost && cachedPost.text.length > 100) {
+      return NextResponse.json({
+        finalUrl: resolvedUrl,
+        title: null,
+        description: cachedPost.text.slice(0, 500),
+        image: null,
+        isXArticle: true,
+        fromCache: true,
+      });
+    }
+
     return NextResponse.json({
       finalUrl: resolvedUrl,
       title: null,
       description: null,
       image: null,
       isXArticle: true,
+      fromCache: false,
     });
   }
 

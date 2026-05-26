@@ -5,6 +5,7 @@ import { decryptToken, encryptToken } from "./tokenStore";
 import { getAiProvider } from "@/lib/ai/provider";
 import { createFallbackClassification } from "@/lib/ai/fallback";
 import { needsJapaneseTranslation } from "@/lib/text/language";
+import { extractXArticleUrl } from "./article";
 
 interface SyncResult {
   fetchedCount: number;
@@ -66,6 +67,7 @@ async function saveTweets(
       }
     }
 
+    const xArticleUrl = extractXArticleUrl(tweet);
     const hasUrl = Boolean(tweet.urlCard?.expandedUrl);
     const post = await prisma.post.create({
       data: {
@@ -83,7 +85,7 @@ async function saveTweets(
         postedAt: tweet.createdAt ? new Date(tweet.createdAt) : null,
         savedAt: new Date(),
         rawJson: JSON.stringify(tweet),
-        enrichmentStatus: hasUrl ? "pending" : "done",
+        enrichmentStatus: xArticleUrl ? "x_article_pending" : (hasUrl ? "pending" : "done"),
       },
     });
 
