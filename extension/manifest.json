@@ -3,7 +3,7 @@
   "name": "SeedThought Clipper",
   "version": "0.1.0",
   "description": "右クリックや拡張アイコンで、見ているページをSeedThoughtに保存します。",
-  "permissions": ["contextMenus", "activeTab", "scripting", "storage", "notifications"],
+  "permissions": ["contextMenus", "activeTab", "scripting", "storage", "notifications", "alarms"],
   "host_permissions": ["<all_urls>"],
   "background": {
     "service_worker": "background.js"

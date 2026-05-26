@@ -1,4 +1,5 @@
 const sendBtn = document.getElementById("send");
+const fetchArticlesBtn = document.getElementById("fetch-articles");
 const statusEl = document.getElementById("status");
 const endpointEl = document.getElementById("endpoint-display");
 const optionsLink = document.getElementById("open-options");
@@ -31,6 +32,24 @@ sendBtn.addEventListener("click", () => {
       statusEl.className = "status err";
       statusEl.textContent =
         "送信に失敗: " + ((response && response.error) || "不明なエラー");
+    }
+  });
+});
+
+fetchArticlesBtn.addEventListener("click", () => {
+  statusEl.className = "status";
+  statusEl.textContent = "X Article 取得中…";
+  fetchArticlesBtn.disabled = true;
+
+  chrome.runtime.sendMessage({ type: "fetch-x-articles" }, (response) => {
+    fetchArticlesBtn.disabled = false;
+    if (response && response.ok) {
+      statusEl.className = "status ok";
+      statusEl.textContent = "X Article 取得完了 ✓";
+    } else {
+      statusEl.className = "status err";
+      statusEl.textContent =
+        "取得に失敗: " + ((response && response.error) || "不明なエラー");
     }
   });
 });
