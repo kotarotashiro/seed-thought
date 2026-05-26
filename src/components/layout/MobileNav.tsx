@@ -18,6 +18,7 @@ import {
   Sprout,
   TrendingUp,
   X as XIcon,
+  Bookmark,
 } from "lucide-react";
 import { clsx } from "clsx";
 
@@ -40,6 +41,7 @@ const drawerItems = [
   { href: "/drafts", label: "X下書き", icon: FileText },
   { href: "/posts/new", label: "投稿を追加", icon: PenSquare },
   { href: "/settings/x", label: "X連携", icon: Link2 },
+  { href: "/settings/bookmarklet", label: "ブックマークレット", icon: Bookmark },
   { href: "/settings", label: "設定", icon: Settings },
 ];
 
