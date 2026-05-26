@@ -26,7 +26,7 @@ export async function POST(request: Request) {
         Authorization: authHeader,
       },
       body: JSON.stringify({
-        model: process.env.GROK_MODEL ?? "grok-2-vision-1212",
+        model: process.env.GROK_MODEL ?? "grok-4.3",
         messages: [
           {
             role: "user",

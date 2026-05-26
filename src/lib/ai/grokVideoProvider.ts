@@ -10,7 +10,7 @@ const VIDEO_STYLE_PREFIX =
   "短い説明動画（15秒以内）。日本語のテキストオーバーレイ付き。シンプルで読みやすいデザイン。内容: ";
 
 function getVideoModel(): string {
-  return process.env.GROK_VIDEO_MODEL ?? "grok-video";
+  return process.env.GROK_VIDEO_MODEL ?? "grok-imagine-video";
 }
 
 export interface VideoGenerationJob {

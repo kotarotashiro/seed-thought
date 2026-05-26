@@ -59,25 +59,25 @@ export default function ReviewPage() {
   const [upcomingCount, setUpcomingCount] = useState(0);
   const [showManual, setShowManual] = useState(false);
   const [audioPlaying, setAudioPlaying] = useState(false);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
 
-  const playCardAudio = async (cardId: string) => {
+  const playCardAudio = (card: { title: string; summary: string; coreInsight: string }) => {
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) {
+      alert("このブラウザは音声合成に対応していません");
+      return;
+    }
     if (audioPlaying) {
-      audioRef.current?.pause();
+      window.speechSynthesis.cancel();
       setAudioPlaying(false);
       return;
     }
+    const text = `${card.title}。${card.summary}。核心: ${card.coreInsight}`;
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = "ja-JP";
+    utterance.rate = 1.0;
+    utterance.onend = () => setAudioPlaying(false);
+    utterance.onerror = () => setAudioPlaying(false);
     setAudioPlaying(true);
-    try {
-      const url = `/api/learning-cards/${cardId}/audio`;
-      const audio = new Audio(url);
-      audioRef.current = audio;
-      audio.onended = () => setAudioPlaying(false);
-      audio.onerror = () => setAudioPlaying(false);
-      await audio.play();
-    } catch {
-      setAudioPlaying(false);
-    }
+    window.speechSynthesis.speak(utterance);
   };
 
   const current = cards[index];
@@ -226,7 +226,7 @@ export default function ReviewPage() {
           <button
             type="button"
             title="音声で聞く"
-            onClick={() => playCardAudio(current.id)}
+            onClick={() => playCardAudio(current)}
             className={`flex-shrink-0 rounded-lg p-2 transition-colors ${audioPlaying ? "bg-accent text-white" : "bg-border-light text-text-secondary hover:text-accent"}`}
           >
             {audioPlaying ? <Loader2 className="h-4 w-4 animate-spin" /> : <Volume2 className="h-4 w-4" />}

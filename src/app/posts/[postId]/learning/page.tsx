@@ -7,6 +7,7 @@ import { Card } from "@/components/ui/Card";
 import { Badge, LearningStatusBadge } from "@/components/ui/Badge";
 import { PostMediaGrid, parsePostMedia } from "@/components/posts/PostMediaGrid";
 import { LearningCardImages } from "@/components/posts/LearningCardImages";
+import { LearningCardVideos } from "@/components/posts/LearningCardVideos";
 import { OutputTypeCard } from "@/components/outputs/OutputTypeCard";
 import { OutputPreview } from "@/components/outputs/OutputPreview";
 import { LinkifiedText } from "@/components/ui/LinkifiedText";
@@ -24,6 +25,7 @@ import {
   Copy,
   ExternalLink,
   FileText,
+  Film,
   GitBranch,
   Image as ImageIcon,
   Languages,
@@ -986,6 +988,13 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
                       explanationPrompt={output.imageExplanationPrompt || card.imagePrompt}
                       diagramPrompt={card.diagramPrompt}
                     />
+                  </div>
+                )}
+
+                {card?.id && (
+                  <div className="mt-8">
+                    <SectionHeader icon={Film} title="生成動画" />
+                    <LearningCardVideos cardId={card.id} />
                   </div>
                 )}
               </div>

@@ -77,7 +77,7 @@ export async function hasXaiAuthConfigured(): Promise<boolean> {
 }
 
 function getDefaultModel(): string {
-  return process.env.GROK_MODEL ?? process.env.XAI_MODEL ?? "grok-3";
+  return process.env.GROK_MODEL ?? process.env.XAI_MODEL ?? "grok-4.3";
 }
 
 export async function xaiChat(options: XaiChatOptions): Promise<XaiChatResult> {
@@ -108,18 +108,47 @@ export async function xaiChat(options: XaiChatOptions): Promise<XaiChatResult> {
   return { content: data.choices?.[0]?.message?.content ?? "" };
 }
 
-export async function xaiSearchX(query: string): Promise<XaiChatResult> {
-  return xaiChat({
-    messages: [{ role: "user", content: query }],
-    searchParameters: { mode: "on", sources: [{ type: "x" }] },
+// xAI Live Search is deprecated. Use Agent Tools API instead.
+// https://docs.x.ai/docs/guides/tools/overview
+async function xaiChatWithTools(
+  query: string,
+  toolType: "x_search" | "web_search"
+): Promise<XaiChatResult> {
+  const authHeader = await getAuthHeader();
+  const res = await fetch(`${XAI_API_BASE}/chat/completions`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: authHeader,
+    },
+    body: JSON.stringify({
+      model: getDefaultModel(),
+      messages: [{ role: "user", content: query }],
+      tools: [{ type: toolType }],
+    }),
   });
+
+  if (!res.ok) {
+    const text = await res.text();
+    // Fallback: if Agent Tools API also fails, drop tools and use Grok's own knowledge
+    if (res.status === 400 || res.status === 410 || res.status === 422) {
+      return xaiChat({ messages: [{ role: "user", content: query }] });
+    }
+    throw new Error(`xAI API ${res.status}: ${text.slice(0, 200)}`);
+  }
+
+  const data = (await res.json()) as {
+    choices?: Array<{ message?: { content?: string } }>;
+  };
+  return { content: data.choices?.[0]?.message?.content ?? "" };
+}
+
+export async function xaiSearchX(query: string): Promise<XaiChatResult> {
+  return xaiChatWithTools(query, "x_search");
 }
 
 export async function xaiSearchWeb(query: string): Promise<XaiChatResult> {
-  return xaiChat({
-    messages: [{ role: "user", content: query }],
-    searchParameters: { mode: "on", sources: [{ type: "web" }] },
-  });
+  return xaiChatWithTools(query, "web_search");
 }
 
 // Phase 5: implement when xAI OAuth is wired up for zero-cost image generation.

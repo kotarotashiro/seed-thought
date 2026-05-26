@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { Textarea } from "@/components/ui/Textarea";
@@ -9,6 +9,38 @@ import { Card } from "@/components/ui/Card";
 import { Image as ImageIcon, Mic, PenSquare, Square, Upload } from "lucide-react";
 
 type Tab = "text" | "voice" | "image";
+
+interface SpeechRecognitionResultLike {
+  isFinal: boolean;
+  0: { transcript: string };
+}
+
+interface SpeechRecognitionEventLike extends Event {
+  resultIndex: number;
+  results: ArrayLike<SpeechRecognitionResultLike>;
+}
+
+interface SpeechRecognitionLike {
+  lang: string;
+  interimResults: boolean;
+  continuous: boolean;
+  onresult: ((event: SpeechRecognitionEventLike) => void) | null;
+  onerror: ((event: Event) => void) | null;
+  onend: (() => void) | null;
+  start: () => void;
+  stop: () => void;
+}
+
+type SpeechRecognitionCtor = new () => SpeechRecognitionLike;
+
+function getSpeechRecognitionCtor(): SpeechRecognitionCtor | null {
+  if (typeof window === "undefined") return null;
+  const w = window as typeof window & {
+    SpeechRecognition?: SpeechRecognitionCtor;
+    webkitSpeechRecognition?: SpeechRecognitionCtor;
+  };
+  return w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null;
+}
 
 export default function NewPostPage() {
   const router = useRouter();
@@ -19,13 +51,17 @@ export default function NewPostPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
-  // Voice tab
+  // Voice tab — Web Speech API (browser native, no API call)
   const [recording, setRecording] = useState(false);
-  const [transcribing, setTranscribing] = useState(false);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const chunksRef = useRef<BlobPart[]>([]);
+  const [voiceSupported, setVoiceSupported] = useState(true);
+  const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
+  const interimRef = useRef("");
 
-  // Image tab
+  useEffect(() => {
+    setVoiceSupported(getSpeechRecognitionCtor() !== null);
+  }, []);
+
+  // Image tab — Grok Vision (server-side)
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -70,55 +106,53 @@ export default function NewPostPage() {
     }
   };
 
-  const startRecording = async () => {
+  const startRecording = () => {
     setError("");
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
-        ? "audio/webm;codecs=opus"
-        : "audio/webm";
-      const recorder = new MediaRecorder(stream, { mimeType });
-      chunksRef.current = [];
-      recorder.ondataavailable = (e) => {
-        if (e.data.size > 0) chunksRef.current.push(e.data);
-      };
-      recorder.onstop = async () => {
-        stream.getTracks().forEach((t) => t.stop());
-        const blob = new Blob(chunksRef.current, { type: mimeType });
-        await transcribeAudio(blob);
-      };
-      recorder.start();
-      mediaRecorderRef.current = recorder;
-      setRecording(true);
-    } catch {
-      setError("マイクのアクセスが許可されていません");
+    const Ctor = getSpeechRecognitionCtor();
+    if (!Ctor) {
+      setError("このブラウザは音声認識に対応していません（Chrome 推奨）");
+      return;
     }
+    const recognition = new Ctor();
+    recognition.lang = "ja-JP";
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    interimRef.current = text;
+
+    recognition.onresult = (event) => {
+      let finalChunk = "";
+      let interim = "";
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const res = event.results[i];
+        if (res.isFinal) finalChunk += res[0].transcript;
+        else interim += res[0].transcript;
+      }
+      if (finalChunk) {
+        interimRef.current = `${interimRef.current}${finalChunk}`;
+        setText(interimRef.current);
+      } else if (interim) {
+        setText(`${interimRef.current}${interim}`);
+      }
+    };
+
+    recognition.onerror = () => {
+      setError("音声認識中にエラーが発生しました");
+      setRecording(false);
+    };
+
+    recognition.onend = () => {
+      setRecording(false);
+    };
+
+    recognition.start();
+    recognitionRef.current = recognition;
+    setRecording(true);
   };
 
   const stopRecording = () => {
-    mediaRecorderRef.current?.stop();
+    recognitionRef.current?.stop();
     setRecording(false);
-  };
-
-  const transcribeAudio = async (blob: Blob) => {
-    setTranscribing(true);
-    try {
-      const form = new FormData();
-      form.append("audio", blob, "audio.webm");
-      const res = await fetch("/api/posts/from-audio", { method: "POST", body: form });
-      if (!res.ok) {
-        const d = await res.json();
-        setError(d.error || "音声認識に失敗しました");
-        return;
-      }
-      const { text: transcript } = await res.json();
-      setText(transcript);
-      setTab("text");
-    } catch {
-      setError("音声認識に失敗しました");
-    } finally {
-      setTranscribing(false);
-    }
+    setTab("text");
   };
 
   const analyzeImage = async (file: File) => {
@@ -168,7 +202,6 @@ export default function NewPostPage() {
         </div>
       </div>
 
-      {/* Tab bar */}
       <div className="flex gap-1 rounded-xl bg-border-light p-1">
         {TABS.map(({ id, label, icon }) => (
           <button
@@ -176,9 +209,7 @@ export default function NewPostPage() {
             type="button"
             onClick={() => setTab(id)}
             className={`flex flex-1 items-center justify-center gap-2 rounded-lg py-2 text-sm font-medium transition-all ${
-              tab === id
-                ? "bg-white text-text shadow-sm"
-                : "text-text-secondary hover:text-text"
+              tab === id ? "bg-white text-text shadow-sm" : "text-text-secondary hover:text-text"
             }`}
           >
             {icon}
@@ -253,8 +284,13 @@ export default function NewPostPage() {
           <div className="space-y-5 text-center">
             <p className="text-sm text-text-secondary">
               録音ボタンを押してメモを話しかけてください。<br />
-              Grok で文字起こしして投稿本文に転写します。
+              ブラウザの音声認識（無料・ローカル）で文字起こしします。
             </p>
+            {!voiceSupported && (
+              <p className="text-sm text-danger">
+                このブラウザは音声認識に対応していません。Chrome / Edge / Safari でお試しください。
+              </p>
+            )}
             {error && <p className="text-sm text-danger">{error}</p>}
             <div className="flex justify-center">
               {recording ? (
@@ -270,16 +306,20 @@ export default function NewPostPage() {
                 <button
                   type="button"
                   onClick={startRecording}
-                  disabled={transcribing}
+                  disabled={!voiceSupported}
                   className="flex h-20 w-20 flex-col items-center justify-center gap-1 rounded-full bg-accent text-white shadow-lg transition-all hover:bg-accent/90 active:scale-95 disabled:opacity-50"
                 >
                   <Mic className="h-6 w-6" />
-                  <span className="text-xs">{transcribing ? "変換中..." : "録音"}</span>
+                  <span className="text-xs">録音</span>
                 </button>
               )}
             </div>
-            {recording && (
-              <p className="animate-pulse text-sm text-danger">● 録音中...</p>
+            {recording && <p className="animate-pulse text-sm text-danger">● 録音中... 話し終わったら停止</p>}
+            {text && (
+              <div className="rounded-xl border border-border bg-white p-4 text-left">
+                <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-text-muted">認識中の文字起こし</p>
+                <p className="whitespace-pre-wrap text-sm text-text">{text}</p>
+              </div>
             )}
           </div>
         )}
@@ -288,7 +328,7 @@ export default function NewPostPage() {
           <div className="space-y-5">
             <p className="text-sm text-text-secondary">
               スクリーンショットや資料の写真をアップロードすると、<br />
-              Grok Vision が内容を解析して投稿本文に転写します。
+              Grok 4.3 Vision が内容を解析して投稿本文に転写します。
             </p>
             {error && <p className="text-sm text-danger">{error}</p>}
             <input
@@ -309,9 +349,7 @@ export default function NewPostPage() {
               <p className="text-sm font-medium text-text-secondary">
                 {imageFile ? imageFile.name : "クリックして画像を選択"}
               </p>
-              {analyzing && (
-                <p className="animate-pulse text-sm text-accent">解析中...</p>
-              )}
+              {analyzing && <p className="animate-pulse text-sm text-accent">解析中...</p>}
             </div>
           </div>
         )}
