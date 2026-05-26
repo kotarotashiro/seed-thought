@@ -1,22 +1,6 @@
 import { prisma } from "@/lib/db/prisma";
-import { hasXaiAuthConfigured, xaiChat } from "@/lib/xai/client";
-import { GoogleGenAI } from "@google/genai";
+import { xaiChat } from "@/lib/xai/client";
 import { getProfile } from "@/lib/profile/fixedProfile";
-
-async function callAiText(prompt: string): Promise<string> {
-  if (await hasXaiAuthConfigured()) {
-    const result = await xaiChat({ messages: [{ role: "user", content: prompt }] });
-    return result.content;
-  }
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) throw new Error("AI APIキーが設定されていません");
-  const client = new GoogleGenAI({ apiKey });
-  const response = await client.models.generateContent({
-    model: process.env.GEMINI_MODEL ?? "gemini-2.0-flash",
-    contents: prompt,
-  });
-  return response.text ?? "";
-}
 
 async function buildDraftPrompt(card: {
   title: string;
@@ -59,9 +43,13 @@ export async function generateDraftForCard(learningCardId: string): Promise<void
 
   try {
     const prompt = await buildDraftPrompt(card);
-    const raw = (await callAiText(prompt)).trim();
+    const { content: raw } = await xaiChat({
+      messages: [{ role: "user", content: prompt }],
+      jsonMode: true,
+      temperature: 0.7,
+    });
 
-    let content = raw;
+    let content = raw.trim();
     try {
       const jsonMatch = raw.match(/\{[\s\S]*\}/);
       if (jsonMatch) {

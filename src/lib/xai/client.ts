@@ -18,6 +18,9 @@ export interface XaiChatOptions {
     mode?: "on" | "off" | "auto";
     sources?: XaiSource[];
   };
+  /** Request JSON output (response_format: json_object) */
+  jsonMode?: boolean;
+  temperature?: number;
 }
 
 export interface XaiChatResult {
@@ -91,6 +94,8 @@ export async function xaiChat(options: XaiChatOptions): Promise<XaiChatResult> {
     body: JSON.stringify({
       model: options.model ?? getDefaultModel(),
       messages: options.messages,
+      ...(options.temperature !== undefined ? { temperature: options.temperature } : {}),
+      ...(options.jsonMode ? { response_format: { type: "json_object" } } : {}),
       ...(options.searchParameters
         ? { search_parameters: options.searchParameters }
         : {}),
@@ -151,9 +156,7 @@ export async function xaiSearchWeb(query: string): Promise<XaiChatResult> {
   return xaiChatWithTools(query, "web_search");
 }
 
-// Phase 5: implement when xAI OAuth is wired up for zero-cost image generation.
-// Until then, callers should fall back to Gemini providers.
 export async function xaiImagine(options: XaiImagineOptions): Promise<XaiImagineResult> {
   void options;
-  throw new Error("xaiImagine not yet implemented — implement in Phase 5 with OAuth");
+  throw new Error("xaiImagine not yet implemented");
 }
