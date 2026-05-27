@@ -99,6 +99,8 @@ export function getAiProvider(): AiProvider {
     async generateStrictLearning(input: {
       postText: string;
       classification: { primaryCategory: string; summary: string };
+      articleTitle?: string;
+      articleDescription?: string;
       learningCardJson?: string;
       userMemo?: string | null;
     }): Promise<StrictLearningOutput> {
@@ -108,6 +110,8 @@ export function getAiProvider(): AiProvider {
       const prompt = await buildStrictLearningPrompt({
         postText: input.postText,
         classification: input.classification,
+        articleTitle: input.articleTitle,
+        articleDescription: input.articleDescription,
         learningCardJson: input.learningCardJson,
         userMemo: input.userMemo,
       });

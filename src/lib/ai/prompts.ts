@@ -165,10 +165,20 @@ JSONのみ返してください。説明文は不要です。`;
 export async function buildStrictLearningPrompt(input: {
   postText: string;
   classification: { primaryCategory: string; summary: string };
+  articleTitle?: string;
+  articleDescription?: string;
   learningCardJson?: string;
   userMemo?: string | null;
 }): Promise<string> {
   const profile = await getProfile();
+
+  const articleSection =
+    input.articleTitle || input.articleDescription
+      ? `## 元投稿が参照している記事本文（必ずこちらを主な分析対象にすること）
+${input.articleTitle ? `タイトル: ${input.articleTitle}\n` : ""}${input.articleDescription ? `本文:\n${input.articleDescription}\n` : ""}
+注意: 元投稿に含まれる t.co などの短縮URLそのものを主題として扱ってはならない。上記の記事本文の内容を主題として厳密学習を構築すること。
+`
+      : "";
 
   return `あなたはSeedThoughtの専属学習コーチです。
 保存済み投稿を、さとり式「厳密学習」のテンプレートに沿って1ショットで構造化してください。
@@ -182,6 +192,7 @@ export async function buildStrictLearningPrompt(input: {
 ## 元投稿
 ${input.postText}
 
+${articleSection}
 ## 投稿分類
 カテゴリ: ${input.classification.primaryCategory}
 要約: ${input.classification.summary}

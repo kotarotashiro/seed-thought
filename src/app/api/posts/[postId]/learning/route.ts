@@ -154,6 +154,8 @@ export async function POST(
           primaryCategory: post.classification?.primaryCategory || "",
           summary: post.classification?.summary || "",
         },
+        articleTitle: sourceWithMode.articleTitle,
+        articleDescription: sourceWithMode.articleDescription,
         userMemo: post.learningCard?.userMemo ?? null,
       }),
     ]);

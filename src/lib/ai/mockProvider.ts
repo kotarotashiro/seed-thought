@@ -176,6 +176,8 @@ export const mockProvider: AiProvider = {
   async generateStrictLearning(input: {
     postText: string;
     classification: { primaryCategory: string; summary: string };
+    articleTitle?: string;
+    articleDescription?: string;
     learningCardJson?: string;
     userMemo?: string | null;
   }): Promise<StrictLearningOutput> {
