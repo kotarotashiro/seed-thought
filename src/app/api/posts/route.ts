@@ -41,7 +41,7 @@ function getPostOrderBy(sort: string): Prisma.PostOrderByWithRelationInput {
   return sortOptions.postedAt_desc;
 }
 
-// GET /api/posts - List all posts with filters
+// GET /api/posts - List all posts with filters (cursor-based pagination)
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const search = searchParams.get("search") || "";
@@ -52,6 +52,12 @@ export async function GET(request: Request) {
   const digestStatus = searchParams.get("digestStatus") || "";
   const author = searchParams.get("author") || "";
   const sort = searchParams.get("sort") || "savedAt_desc";
+  const cursor = searchParams.get("cursor") || "";
+
+  const rawLimit = parseInt(searchParams.get("limit") || "20", 10);
+  const limit = Number.isNaN(rawLimit) || rawLimit < 1 ? 20 : Math.min(rawLimit, 50);
+
+  const isFirstPage = !cursor;
 
   try {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -80,7 +86,7 @@ export async function GET(request: Request) {
       where.learningCard = { isNot: null };
     }
 
-    const posts = await prisma.post.findMany({
+    const rows = await prisma.post.findMany({
       where,
       include: {
         classification: true,
@@ -90,28 +96,37 @@ export async function GET(request: Request) {
       orderBy: [
         getPostOrderBy(sort),
         { savedAt: "desc" },
+        { id: "desc" },
       ],
+      take: limit + 1,
+      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
     });
 
-    const genres = await prisma.postClassification.findMany({
-      select: { primaryCategory: true },
-      distinct: ["primaryCategory"],
-    });
+    const hasNextPage = rows.length > limit;
+    const posts = hasNextPage ? rows.slice(0, limit) : rows;
+    const nextCursor = hasNextPage ? posts[posts.length - 1].id : null;
 
-    const authors = await prisma.post.findMany({
-      where: { authorUsername: { not: null } },
-      select: { authorUsername: true, authorName: true },
-      distinct: ["authorUsername"],
-      orderBy: { authorUsername: "asc" },
-    });
-
-    return NextResponse.json({
-      posts,
-      genres: genres.map((g) => g.primaryCategory),
-      authors: authors
+    // genres and authors are expensive distinct queries — only compute on first page
+    let genres: string[] = [];
+    let authors: { username: string; name: string | null }[] = [];
+    if (isFirstPage) {
+      const genreRows = await prisma.postClassification.findMany({
+        select: { primaryCategory: true },
+        distinct: ["primaryCategory"],
+      });
+      const authorRows = await prisma.post.findMany({
+        where: { authorUsername: { not: null } },
+        select: { authorUsername: true, authorName: true },
+        distinct: ["authorUsername"],
+        orderBy: { authorUsername: "asc" },
+      });
+      genres = genreRows.map((g) => g.primaryCategory);
+      authors = authorRows
         .filter((a) => a.authorUsername)
-        .map((a) => ({ username: a.authorUsername!, name: a.authorName })),
-    });
+        .map((a) => ({ username: a.authorUsername!, name: a.authorName }));
+    }
+
+    return NextResponse.json({ posts, nextCursor, genres, authors });
   } catch (error) {
     console.error("Failed to fetch posts:", error);
     return NextResponse.json({ error: "投稿の取得に失敗しました" }, { status: 500 });

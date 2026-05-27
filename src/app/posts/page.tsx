@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import Link from "next/link";
 import { PostFilters } from "@/components/posts/PostFilters";
 import { PostCard } from "@/components/posts/PostCard";
@@ -33,11 +33,40 @@ interface PostListItem {
   learningCard?: { id: string; status: string } | null;
 }
 
+const PAGE_LIMIT = 20;
+
+function buildParams(opts: {
+  searchQuery: string;
+  selectedGenre: string;
+  selectedPostType: string;
+  selectedSavedType: string;
+  selectedDigestStatus: string;
+  selectedAuthor: string;
+  activeTab: "saved" | "recommend";
+  selectedSort: string;
+  cursor?: string;
+}) {
+  const params = new URLSearchParams();
+  if (opts.searchQuery) params.set("search", opts.searchQuery);
+  if (opts.selectedGenre) params.set("genre", opts.selectedGenre);
+  if (opts.selectedPostType) params.set("postType", opts.selectedPostType);
+  if (opts.selectedSavedType) params.set("savedType", opts.selectedSavedType);
+  if (opts.selectedDigestStatus) params.set("digestStatus", opts.selectedDigestStatus);
+  if (opts.selectedAuthor) params.set("author", opts.selectedAuthor);
+  if (opts.activeTab === "recommend") params.set("source", "agent_recommend");
+  params.set("sort", opts.selectedSort);
+  params.set("limit", String(PAGE_LIMIT));
+  if (opts.cursor) params.set("cursor", opts.cursor);
+  return params;
+}
+
 export default function PostsPage() {
   const [posts, setPosts] = useState<PostListItem[]>([]);
   const [genres, setGenres] = useState<string[]>([]);
   const [authors, setAuthors] = useState<Author[]>([]);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedGenre, setSelectedGenre] = useState("");
@@ -52,52 +81,39 @@ export default function PostsPage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkDeleting, setBulkDeleting] = useState(false);
 
-  const loadPosts = async (showLoading = true) => {
-    if (showLoading) setLoading(true);
-    try {
-      const params = new URLSearchParams();
-      if (searchQuery) params.set("search", searchQuery);
-      if (selectedGenre) params.set("genre", selectedGenre);
-      if (selectedPostType) params.set("postType", selectedPostType);
-      if (selectedSavedType) params.set("savedType", selectedSavedType);
-      if (selectedDigestStatus) params.set("digestStatus", selectedDigestStatus);
-      if (selectedAuthor) params.set("author", selectedAuthor);
-      if (activeTab === "recommend") params.set("source", "agent_recommend");
-      params.set("sort", selectedSort);
+  const sentinelRef = useRef<HTMLDivElement>(null);
 
-      const res = await fetch(`/api/posts?${params}`);
-      const data = await res.json();
-      setPosts(data.posts || []);
-      setGenres(data.genres || []);
-      setAuthors(data.authors || []);
-    } catch (error) {
-      console.error("Failed to fetch posts:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const filterDeps = {
+    searchQuery,
+    selectedGenre,
+    selectedPostType,
+    selectedSavedType,
+    selectedDigestStatus,
+    selectedAuthor,
+    activeTab,
+    selectedSort,
+  } as const;
 
+  // Fetch first page whenever filters change
   useEffect(() => {
     let cancelled = false;
 
-    async function fetchInitialPosts() {
+    async function fetchFirstPage() {
+      // Reset state inside the async function to avoid synchronous setState in effect body
+      if (!cancelled) {
+        setPosts([]);
+        setNextCursor(null);
+        setLoading(true);
+      }
       try {
-        const params = new URLSearchParams();
-        if (searchQuery) params.set("search", searchQuery);
-        if (selectedGenre) params.set("genre", selectedGenre);
-        if (selectedPostType) params.set("postType", selectedPostType);
-        if (selectedSavedType) params.set("savedType", selectedSavedType);
-        if (selectedDigestStatus) params.set("digestStatus", selectedDigestStatus);
-        if (selectedAuthor) params.set("author", selectedAuthor);
-        if (activeTab === "recommend") params.set("source", "agent_recommend");
-        params.set("sort", selectedSort);
-
+        const params = buildParams(filterDeps);
         const res = await fetch(`/api/posts?${params}`);
         const data = await res.json();
         if (cancelled) return;
         setPosts(data.posts || []);
-        setGenres(data.genres || []);
-        setAuthors(data.authors || []);
+        setNextCursor(data.nextCursor ?? null);
+        if (data.genres?.length) setGenres(data.genres);
+        if (data.authors?.length) setAuthors(data.authors);
       } catch (error) {
         console.error("Failed to fetch posts:", error);
       } finally {
@@ -105,17 +121,69 @@ export default function PostsPage() {
       }
     }
 
-    fetchInitialPosts();
-    return () => {
-      cancelled = true;
-    };
+    fetchFirstPage();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchQuery, selectedGenre, selectedPostType, selectedSavedType, selectedDigestStatus, selectedSort, selectedAuthor, activeTab]);
+
+  // Load next page
+  const loadMore = useCallback(async (cursor: string) => {
+    if (loadingMore) return;
+    setLoadingMore(true);
+    try {
+      const params = buildParams({ ...filterDeps, cursor });
+      const res = await fetch(`/api/posts?${params}`);
+      const data = await res.json();
+      setPosts((prev) => [...prev, ...(data.posts || [])]);
+      setNextCursor(data.nextCursor ?? null);
+    } catch (error) {
+      console.error("Failed to load more posts:", error);
+    } finally {
+      setLoadingMore(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loadingMore, searchQuery, selectedGenre, selectedPostType, selectedSavedType, selectedDigestStatus, selectedSort, selectedAuthor, activeTab]);
+
+  // IntersectionObserver to trigger loadMore when sentinel is visible
+  useEffect(() => {
+    if (!nextCursor || !sentinelRef.current) return;
+    const el = sentinelRef.current;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && nextCursor) {
+          loadMore(nextCursor);
+        }
+      },
+      { rootMargin: "200px" }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [nextCursor, loadMore]);
+
+  // Reload from first page (used after delete)
+  const reloadPosts = useCallback(async () => {
+    setLoading(true);
+    try {
+      const params = buildParams(filterDeps);
+      const res = await fetch(`/api/posts?${params}`);
+      const data = await res.json();
+      setPosts(data.posts || []);
+      setNextCursor(data.nextCursor ?? null);
+      if (data.genres?.length) setGenres(data.genres);
+      if (data.authors?.length) setAuthors(data.authors);
+    } catch (error) {
+      console.error("Failed to reload posts:", error);
+    } finally {
+      setLoading(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchQuery, selectedGenre, selectedPostType, selectedSavedType, selectedDigestStatus, selectedSort, selectedAuthor, activeTab]);
 
   const handleDelete = async (postId: string) => {
     if (!confirm("この投稿を削除しますか？")) return;
     try {
       await fetch(`/api/posts/${postId}`, { method: "DELETE" });
-      loadPosts();
+      reloadPosts();
     } catch (error) {
       console.error("Failed to delete:", error);
     }
@@ -150,7 +218,7 @@ export default function PostsPage() {
       });
       setSelectedIds(new Set());
       setSelectMode(false);
-      loadPosts();
+      reloadPosts();
     } catch (error) {
       console.error("Failed to bulk delete:", error);
     } finally {
@@ -285,19 +353,30 @@ export default function PostsPage() {
           )}
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 xl:gap-5">
-          {posts.map((post) => (
-            <PostCard
-              key={post.id}
-              post={post}
-              showLearningButton
-              onDelete={handleDelete}
-              selectMode={selectMode}
-              selected={selectedIds.has(post.id)}
-              onToggleSelect={toggleSelectPost}
-            />
-          ))}
-        </div>
+        <>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 xl:gap-5">
+            {posts.map((post) => (
+              <PostCard
+                key={post.id}
+                post={post}
+                showLearningButton
+                onDelete={handleDelete}
+                selectMode={selectMode}
+                selected={selectedIds.has(post.id)}
+                onToggleSelect={toggleSelectPost}
+              />
+            ))}
+          </div>
+
+          {/* Sentinel for infinite scroll */}
+          <div ref={sentinelRef} className="h-1" />
+
+          {loadingMore && (
+            <div className="flex justify-center py-4">
+              <p className="text-sm text-text-secondary animate-pulse">次を読み込み中...</p>
+            </div>
+          )}
+        </>
       )}
     </div>
   );
