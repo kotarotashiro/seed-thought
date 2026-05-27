@@ -670,44 +670,42 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
               </div>
               <p className="mt-4 text-xs text-text-muted">平均30秒前後かかります</p>
             </div>
-          ) : (
-            {tokenExpired ? (
-              <div className="space-y-4">
-                <div className="flex items-start gap-3 rounded-xl border border-warning/30 bg-warning-light px-4 py-3">
-                  <AlertCircle className="mt-0.5 h-5 w-5 flex-shrink-0 text-warning" />
-                  <div>
-                    <p className="text-sm font-bold text-text">Grok認証の有効期限が切れました</p>
-                    <p className="mt-1 text-sm text-text-secondary">
-                      ローカルで再認証してからもう一度お試しください。
-                    </p>
-                  </div>
-                </div>
-                <a
-                  href="/settings/x"
-                  className="inline-flex items-center gap-1.5 rounded-xl border border-accent/40 bg-accent-light px-4 py-2 text-sm font-medium text-accent hover:bg-accent/10 transition-colors"
-                >
-                  <Sparkles className="h-4 w-4" />
-                  設定画面でGrokを再接続する
-                </a>
-              </div>
-            ) : (
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          ) : tokenExpired ? (
+            <div className="space-y-4">
+              <div className="flex items-start gap-3 rounded-xl border border-warning/30 bg-warning-light px-4 py-3">
+                <AlertCircle className="mt-0.5 h-5 w-5 flex-shrink-0 text-warning" />
                 <div>
-                  <h2 className="mb-1 text-base font-bold text-text">
-                    {error ? "学習カードを生成できませんでした" : "学習カードを準備中…"}
-                  </h2>
-                  <p className="text-sm text-text-secondary">
-                    {error
-                      ? "もう一度試してください。"
-                      : "この投稿からノウハウ・手順・マニュアルを自動生成します。"}
+                  <p className="text-sm font-bold text-text">Grok認証の有効期限が切れました</p>
+                  <p className="mt-1 text-sm text-text-secondary">
+                    ローカルで再認証してからもう一度お試しください。
                   </p>
                 </div>
-                <Button onClick={() => void handleGenerate()} loading={generating} loadingLabel="生成中..." className="w-full sm:w-auto">
-                  <Sparkles className="mr-1.5 h-4 w-4" />
-                  {error ? "再生成" : "学習する"}
-                </Button>
               </div>
-            )}
+              <a
+                href="/settings/x"
+                className="inline-flex items-center gap-1.5 rounded-xl border border-accent/40 bg-accent-light px-4 py-2 text-sm font-medium text-accent hover:bg-accent/10 transition-colors"
+              >
+                <Sparkles className="h-4 w-4" />
+                設定画面でGrokを再接続する
+              </a>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h2 className="mb-1 text-base font-bold text-text">
+                  {error ? "学習カードを生成できませんでした" : "学習カードを準備中…"}
+                </h2>
+                <p className="text-sm text-text-secondary">
+                  {error
+                    ? "もう一度試してください。"
+                    : "この投稿からノウハウ・手順・マニュアルを自動生成します。"}
+                </p>
+              </div>
+              <Button onClick={() => void handleGenerate()} loading={generating} loadingLabel="生成中..." className="w-full sm:w-auto">
+                <Sparkles className="mr-1.5 h-4 w-4" />
+                {error ? "再生成" : "学習する"}
+              </Button>
+            </div>
           )}
         </Card>
       ) : (
