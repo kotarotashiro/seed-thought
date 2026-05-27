@@ -104,6 +104,8 @@ export async function POST(
       .generateOutput({
         outputType: outputType as OutputType,
         postText,
+        postAuthorName: post.authorName ?? null,
+        postAuthorUsername: post.authorUsername ?? null,
         classification,
         steps: [
           {

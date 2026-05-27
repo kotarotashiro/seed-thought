@@ -272,27 +272,32 @@ export async function buildOutputPrompt(input: GenerateOutputInput): Promise<str
     .join("\n\n");
 
   const outputTypeLabel: Record<string, string> = {
-    x: "X投稿（280文字以内）",
-    instagram: "Instagramカルーセル（スライド構成）",
-    note: "note記事（1000-2000文字）",
-    markdown_log: "Markdown学習ログ",
-    seminar: "セミナー（スライド構成＋台本）",
+    x: "短く伝える（X投稿・280文字以内）",
+    instagram: "図で伝える（Instagramカルーセル）",
+    note: "じっくり読ませる（note記事・1000-2000文字）",
+    markdown_log: "学習ログ（Markdown形式）",
+    seminar: "セミナーを作る（スライド構成＋台本）",
   };
 
-  return `あなたはSNS・コンテンツライターです。
+  const authorRef = input.postAuthorUsername
+    ? `@${input.postAuthorUsername}${input.postAuthorName ? `（${input.postAuthorName}）` : ""}`
+    : input.postAuthorName ?? "元投稿者";
+
+  return `あなたはSNSキュレーター・解説者です。
+${profile.name}さんが価値を感じた他者の投稿を、自分の理解を通じてわかりやすく他の人に伝え直すコンテンツを生成します。
 
 ## 重要ルール
 - 元投稿の文章をそのまま転載しないでください
-- ユーザーの理解メモと考えを中心に、自分の言葉として使えるアウトプットを生成してください
+- 「${authorRef}の投稿から学んだ・気づいた」という解説者の視点で書いてください
+- 出典（${authorRef}）を自然な形で明示してください
+- ${profile.name}さん自身の解釈・補足・なぜ有益と思ったかを必ず含めてください
 
-## ユーザープロフィール
-名前: ${profile.name}
+## ${profile.name}さんのプロフィール
 役割: ${profile.role}
 テーマ: ${profile.themes.join("、")}
-出力チャンネル: ${profile.outputChannels.join("、")}
 トーン: ${profile.tone}${profile.knowledge ? `\nナレッジ・コンテキスト: ${profile.knowledge}` : ""}
 
-## 元投稿（参考のみ、転載禁止）
+## 元投稿（${authorRef}、転載禁止）
 ${input.postText}
 
 ## 深掘りステップ

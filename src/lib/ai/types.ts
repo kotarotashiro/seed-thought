@@ -101,6 +101,8 @@ export type OutputType =
 export interface GenerateOutputInput {
   outputType: OutputType;
   postText: string;
+  postAuthorName?: string | null;
+  postAuthorUsername?: string | null;
   classification: PostClassificationResult;
   steps: {
     title: string;

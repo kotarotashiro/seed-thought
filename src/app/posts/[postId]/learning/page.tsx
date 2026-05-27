@@ -53,19 +53,6 @@ const ARTICLE_PREVIEW_CHARS = 240;
 
 const OUTPUT_TYPES = ["x", "instagram", "note", "markdown_log", "seminar"] as const;
 
-const tabs = [
-  "要約",
-  "構造",
-  "手順",
-  "マニュアル",
-  "厳密学習",
-  "応用アイデア",
-  "図解",
-  "自分用メモ",
-] as const;
-
-type TabKey = (typeof tabs)[number];
-
 interface LearningCardView {
   id: string;
   title: string;
@@ -122,12 +109,37 @@ function SectionHeader({ icon: Icon, title }: { icon: typeof BookOpen; title: st
   );
 }
 
+function CollapsibleHeader({
+  icon: Icon,
+  title,
+  open,
+  onToggle,
+}: {
+  icon: typeof BookOpen;
+  title: string;
+  open: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      className="flex w-full items-center justify-between gap-2 text-left"
+    >
+      <div className="flex items-center gap-2">
+        <Icon className="h-5 w-5 text-accent" />
+        <h2 className="text-base font-bold text-text">{title}</h2>
+      </div>
+      {open ? <ChevronUp className="h-4 w-4 text-text-muted" /> : <ChevronDown className="h-4 w-4 text-text-muted" />}
+    </button>
+  );
+}
+
 export default function PostLearningPage({ params }: { params: Promise<{ postId: string }> }) {
   const { postId } = use(params);
   const safeBack = useSafeBack();
   const [post, setPost] = useState<PostView | null>(null);
   const [card, setCard] = useState<LearningCardView | null>(null);
-  const [activeTab, setActiveTab] = useState<TabKey>("要約");
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -160,6 +172,12 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
 
   const [articleExpanded, setArticleExpanded] = useState(false);
   const [postExpanded, setPostExpanded] = useState(false);
+
+  // Collapsible section states (secondary content starts closed)
+  const [structureOpen, setStructureOpen] = useState(false);
+  const [manualOpen, setManualOpen] = useState(false);
+  const [strictOpen, setStrictOpen] = useState(false);
+  const [diagramOpen, setDiagramOpen] = useState(false);
 
   const article = useMemo(() => (post ? parseArticleContent(post.urlCardJson) : null), [post]);
 
@@ -343,7 +361,6 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
       setSelectedOutput(null);
       setGeneratedOutput(null);
       setOutputHistory([]);
-      setActiveTab("要約");
       setMessage("学習カードを削除しました。もう一度「学習する」を押すと再生成できます。");
     } catch (deleteError) {
       setError(deleteError instanceof Error ? deleteError.message : "学習カードの削除に失敗しました");
@@ -672,118 +689,147 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
             </p>
           )}
 
-          {/* Tabs */}
-          <div className="flex gap-2 overflow-x-auto border-b border-border pb-2">
-            {tabs.map((tab) => (
-              <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                className={
-                  activeTab === tab
-                    ? "whitespace-nowrap rounded-full bg-accent px-3 py-1.5 text-sm font-medium text-white"
-                    : "whitespace-nowrap rounded-full px-3 py-1.5 text-sm font-medium text-text-secondary hover:bg-border-light hover:text-text"
-                }
-              >
-                {tab}
-              </button>
-            ))}
-          </div>
-
+          {/* 要約 */}
           <Card>
-            {activeTab === "要約" && (
-              <div>
-                <SectionHeader icon={Sparkles} title="要約" />
-                {output.title && (
-                  <p className="mb-4 text-base font-semibold text-text">{output.title}</p>
-                )}
-                <div className="space-y-4">
-                  <p className="whitespace-pre-wrap text-sm leading-relaxed text-text">{output.summary}</p>
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <div className="rounded-xl bg-accent-subtle px-4 py-3">
-                      <p className="mb-1 text-xs font-medium text-accent">本質</p>
-                      <p className="text-sm leading-relaxed text-text">{output.originalIntent}</p>
-                    </div>
-                    <div className="rounded-xl bg-border-light px-4 py-3">
-                      <p className="mb-1 text-xs font-medium text-text-muted">面白さ</p>
-                      <p className="text-sm leading-relaxed text-text">{output.whatIsInteresting}</p>
-                    </div>
-                  </div>
-                  <div>
-                    <p className="mb-2 text-sm font-medium text-text">中心洞察</p>
-                    <p className="rounded-xl border border-border px-4 py-3 text-sm leading-relaxed text-text">
-                      {output.coreInsight}
-                    </p>
-                  </div>
+            <SectionHeader icon={Sparkles} title="要約" />
+            {output.title && (
+              <p className="mb-4 text-base font-semibold text-text">{output.title}</p>
+            )}
+            <div className="space-y-4">
+              <p className="whitespace-pre-wrap text-sm leading-relaxed text-text">{output.summary}</p>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="rounded-xl bg-accent-subtle px-4 py-3">
+                  <p className="mb-1 text-xs font-medium text-accent">本質</p>
+                  <p className="text-sm leading-relaxed text-text">{output.originalIntent}</p>
+                </div>
+                <div className="rounded-xl bg-border-light px-4 py-3">
+                  <p className="mb-1 text-xs font-medium text-text-muted">面白さ</p>
+                  <p className="text-sm leading-relaxed text-text">{output.whatIsInteresting}</p>
                 </div>
               </div>
-            )}
-
-            {activeTab === "構造" && (
               <div>
-                <SectionHeader icon={Layers} title="抽出できる構造" />
-                <div className="space-y-3">
-                  {output.structure.map((item, index) => (
-                    <div key={`${item.label}-${index}`} className="rounded-xl border border-border px-4 py-3">
-                      <p className="mb-1 text-sm font-semibold text-text">{item.label}</p>
-                      <p className="text-sm leading-relaxed text-text-secondary">{item.description}</p>
-                    </div>
+                <p className="mb-2 text-sm font-medium text-text">中心洞察</p>
+                <p className="rounded-xl border border-border px-4 py-3 text-sm leading-relaxed text-text">
+                  {output.coreInsight}
+                </p>
+              </div>
+            </div>
+          </Card>
+
+          {/* 手順 */}
+          <Card>
+            <SectionHeader icon={ListChecks} title="実践手順" />
+            <div className="space-y-4">
+              {output.steps.map((step, index) => (
+                <div key={`${step.title}-${index}`} className="rounded-xl border border-border px-4 py-4">
+                  <div className="mb-2 flex items-center gap-2">
+                    <Badge variant="learning">{index + 1}</Badge>
+                    <p className="text-sm font-semibold text-text">{step.title}</p>
+                  </div>
+                  <p className="mb-3 text-sm leading-relaxed text-text-secondary">{step.description}</p>
+                  <ul className="space-y-1.5">
+                    {step.actions.map((action, actionIndex) => (
+                      <li key={`${action}-${actionIndex}`} className="flex gap-2 text-sm text-text">
+                        <CheckCircle2 className="mt-0.5 h-4 w-4 flex-shrink-0 text-success" />
+                        {action}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          </Card>
+
+          {/* 応用アイデア */}
+          <Card>
+            <SectionHeader icon={Lightbulb} title="応用アイデア" />
+            <div className="mb-5 grid gap-3 sm:grid-cols-2">
+              {output.applicationIdeas.map((idea, index) => (
+                <div key={`${idea.title}-${index}`} className="rounded-xl bg-border-light px-4 py-3">
+                  <p className="mb-1 text-sm font-semibold text-text">{idea.title}</p>
+                  <p className="text-sm leading-relaxed text-text-secondary">{idea.description}</p>
+                </div>
+              ))}
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <p className="mb-2 text-sm font-semibold text-text">うまく使うコツ</p>
+                <ul className="space-y-1.5">
+                  {output.tips.map((tip, index) => (
+                    <li key={`${tip}-${index}`} className="text-sm text-text-secondary">・{tip}</li>
+                  ))}
+                </ul>
+              </div>
+              <div>
+                <p className="mb-2 text-sm font-semibold text-text">向いている用途</p>
+                <div className="flex flex-wrap gap-2">
+                  {output.useCases.map((useCase) => (
+                    <Badge key={useCase}>{useCase}</Badge>
                   ))}
                 </div>
               </div>
-            )}
+            </div>
+          </Card>
 
-            {activeTab === "手順" && (
-              <div>
-                <SectionHeader icon={ListChecks} title="実践手順" />
-                <div className="space-y-4">
-                  {output.steps.map((step, index) => (
-                    <div key={`${step.title}-${index}`} className="rounded-xl border border-border px-4 py-4">
-                      <div className="mb-2 flex items-center gap-2">
-                        <Badge variant="learning">{index + 1}</Badge>
-                        <p className="text-sm font-semibold text-text">{step.title}</p>
-                      </div>
-                      <p className="mb-3 text-sm leading-relaxed text-text-secondary">{step.description}</p>
-                      <ul className="space-y-1.5">
-                        {step.actions.map((action, actionIndex) => (
-                          <li key={`${action}-${actionIndex}`} className="flex gap-2 text-sm text-text">
-                            <CheckCircle2 className="mt-0.5 h-4 w-4 flex-shrink-0 text-success" />
-                            {action}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  ))}
-                </div>
+          {/* 構造 — collapsible */}
+          <Card>
+            <CollapsibleHeader
+              icon={Layers}
+              title="抽出できる構造"
+              open={structureOpen}
+              onToggle={() => setStructureOpen((v) => !v)}
+            />
+            {structureOpen && (
+              <div className="mt-4 space-y-3">
+                {output.structure.map((item, index) => (
+                  <div key={`${item.label}-${index}`} className="rounded-xl border border-border px-4 py-3">
+                    <p className="mb-1 text-sm font-semibold text-text">{item.label}</p>
+                    <p className="text-sm leading-relaxed text-text-secondary">{item.description}</p>
+                  </div>
+                ))}
               </div>
             )}
+          </Card>
 
-            {activeTab === "マニュアル" && (
-              <div>
-                <SectionHeader icon={FileText} title="実践マニュアル" />
+          {/* マニュアル — collapsible */}
+          <Card>
+            <CollapsibleHeader
+              icon={FileText}
+              title="実践マニュアル"
+              open={manualOpen}
+              onToggle={() => setManualOpen((v) => !v)}
+            />
+            {manualOpen && (
+              <div className="mt-4">
                 <p className="whitespace-pre-wrap text-sm leading-7 text-text">{output.manual}</p>
               </div>
             )}
+          </Card>
 
-            {activeTab === "厳密学習" && (
-              <div>
-                <SectionHeader icon={BookOpen} title="厳密学習" />
+          {/* 厳密学習 — collapsible */}
+          <Card>
+            <CollapsibleHeader
+              icon={BookOpen}
+              title="厳密学習"
+              open={strictOpen}
+              onToggle={() => setStrictOpen((v) => !v)}
+            />
+            {strictOpen && (
+              <div className="mt-4">
                 {strictLearning ? (
                   <div className="space-y-4">
                     <div className="rounded-xl bg-accent-subtle px-4 py-3">
                       <p className="mb-1 text-xs font-medium text-accent">一言でいうと</p>
                       <p className="text-sm font-medium leading-relaxed text-text">{strictLearning.oneLiner}</p>
                     </div>
-
                     <div className="rounded-xl border border-border px-4 py-3">
                       <p className="mb-1 text-xs font-medium text-text-muted">なぜ重要か</p>
                       <p className="text-sm leading-relaxed text-text">{strictLearning.whyItMatters}</p>
                     </div>
-
                     <div className="rounded-xl border border-border px-4 py-3">
                       <p className="mb-1 text-xs font-medium text-text-muted">前提知識</p>
                       <p className="text-sm leading-relaxed text-text">{strictLearning.prerequisites}</p>
                     </div>
-
                     <div>
                       <p className="mb-2 text-sm font-semibold text-text">主張の分解</p>
                       <div className="space-y-2">
@@ -804,7 +850,6 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
                         ))}
                       </div>
                     </div>
-
                     <div>
                       <p className="mb-2 text-sm font-semibold text-text">厳密学習ビュー</p>
                       <div className="space-y-3">
@@ -865,12 +910,10 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
                         </div>
                       </div>
                     </div>
-
                     <div className="rounded-xl border border-border px-4 py-3">
                       <p className="mb-1 text-xs font-medium text-text-muted">抽象化</p>
                       <p className="text-sm leading-relaxed text-text">{strictLearning.abstraction}</p>
                     </div>
-
                     <div>
                       <p className="mb-2 text-sm font-semibold text-text">他分野への転用</p>
                       <div className="space-y-2">
@@ -882,12 +925,10 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
                         ))}
                       </div>
                     </div>
-
                     <div className="rounded-xl bg-accent-subtle px-4 py-3">
                       <p className="mb-1 text-xs font-medium text-accent">自分に使うなら</p>
                       <p className="text-sm leading-relaxed text-text">{strictLearning.applyToYourself}</p>
                     </div>
-
                     <div className="rounded-xl border border-border px-4 py-4">
                       <p className="mb-3 flex items-center gap-1.5 text-sm font-semibold text-text">
                         <Clock className="h-4 w-4 text-accent" />
@@ -922,42 +963,18 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
                 )}
               </div>
             )}
+          </Card>
 
-            {activeTab === "応用アイデア" && (
-              <div>
-                <SectionHeader icon={Lightbulb} title="応用アイデア" />
-                <div className="mb-5 grid gap-3 sm:grid-cols-2">
-                  {output.applicationIdeas.map((idea, index) => (
-                    <div key={`${idea.title}-${index}`} className="rounded-xl bg-border-light px-4 py-3">
-                      <p className="mb-1 text-sm font-semibold text-text">{idea.title}</p>
-                      <p className="text-sm leading-relaxed text-text-secondary">{idea.description}</p>
-                    </div>
-                  ))}
-                </div>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div>
-                    <p className="mb-2 text-sm font-semibold text-text">うまく使うコツ</p>
-                    <ul className="space-y-1.5">
-                      {output.tips.map((tip, index) => (
-                        <li key={`${tip}-${index}`} className="text-sm text-text-secondary">・{tip}</li>
-                      ))}
-                    </ul>
-                  </div>
-                  <div>
-                    <p className="mb-2 text-sm font-semibold text-text">向いている用途</p>
-                    <div className="flex flex-wrap gap-2">
-                      {output.useCases.map((useCase) => (
-                        <Badge key={useCase}>{useCase}</Badge>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {activeTab === "図解" && (
-              <div>
-                <SectionHeader icon={ImageIcon} title="図解構成" />
+          {/* 図解 — collapsible */}
+          <Card>
+            <CollapsibleHeader
+              icon={ImageIcon}
+              title="図解構成"
+              open={diagramOpen}
+              onToggle={() => setDiagramOpen((v) => !v)}
+            />
+            {diagramOpen && (
+              <div className="mt-4">
                 <div className="mb-6 space-y-3">
                   {output.diagramStructure.sections.map((section, index) => (
                     <div key={`${section.heading}-${index}`} className="rounded-xl border border-border px-4 py-3">
@@ -971,7 +988,10 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
                     </div>
                   ))}
                 </div>
-                <SectionHeader icon={Copy} title="画像生成プロンプト" />
+                <div className="mb-2 flex items-center gap-2">
+                  <Copy className="h-4 w-4 text-accent" />
+                  <p className="text-sm font-bold text-text">画像生成プロンプト</p>
+                </div>
                 <div className="mb-4 rounded-xl border border-border bg-border-light px-4 py-3">
                   <p className="whitespace-pre-wrap text-sm leading-relaxed text-text">{output.imageExplanationPrompt}</p>
                 </div>
@@ -979,7 +999,6 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
                   <Copy className="mr-1.5 h-4 w-4" />
                   コピー
                 </Button>
-
                 {card?.id && (
                   <div className="mt-8">
                     <SectionHeader icon={ImageIcon} title="生成画像" />
@@ -990,7 +1009,6 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
                     />
                   </div>
                 )}
-
                 {card?.id && (
                   <div className="mt-8">
                     <SectionHeader icon={Film} title="生成動画" />
@@ -999,38 +1017,37 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
                 )}
               </div>
             )}
-
-            {activeTab === "自分用メモ" && (
-              <div>
-                <SectionHeader icon={Pencil} title="自分用メモ" />
-                <textarea
-                  value={memo}
-                  onChange={(event) => setMemo(event.target.value)}
-                  className="min-h-[180px] w-full resize-y rounded-xl border border-border px-4 py-3 text-sm leading-relaxed text-text focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20"
-                  placeholder="あとで見返すためのメモを書いてください"
-                />
-                <div className="mt-3 flex gap-2">
-                  <Button onClick={handleSave} loading={saving} loadingLabel="保存中...">
-                    <CheckCircle2 className="mr-1.5 h-4 w-4" />
-                    メモを保存
-                  </Button>
-                  <Button variant="secondary" onClick={handleCopyMemo} disabled={!memo}>
-                    <Copy className="mr-1.5 h-4 w-4" />
-                    コピー
-                  </Button>
-                </div>
-              </div>
-            )}
           </Card>
 
-          {/* SNS Output section */}
+          {/* 自分用メモ */}
+          <Card>
+            <SectionHeader icon={Pencil} title="自分用メモ" />
+            <textarea
+              value={memo}
+              onChange={(event) => setMemo(event.target.value)}
+              className="min-h-[180px] w-full resize-y rounded-xl border border-border px-4 py-3 text-sm leading-relaxed text-text focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20"
+              placeholder="あとで見返すためのメモを書いてください"
+            />
+            <div className="mt-3 flex gap-2">
+              <Button onClick={handleSave} loading={saving} loadingLabel="保存中...">
+                <CheckCircle2 className="mr-1.5 h-4 w-4" />
+                メモを保存
+              </Button>
+              <Button variant="secondary" onClick={handleCopyMemo} disabled={!memo}>
+                <Copy className="mr-1.5 h-4 w-4" />
+                コピー
+              </Button>
+            </div>
+          </Card>
+
+          {/* 発信コンテンツを作る */}
           <Card>
             <div className="mb-4 flex items-center gap-2">
               <Sparkles className="h-5 w-5 text-accent" />
-              <h3 className="text-base font-bold text-text">SNS発信コンテンツ</h3>
+              <h3 className="text-base font-bold text-text">発信コンテンツを作る</h3>
             </div>
             <p className="mb-4 text-sm text-text-secondary">
-              学習内容を発信用コンテンツに変換します。
+              学んだことを、わかりやすく他の人に伝えるコンテンツに変換します。
             </p>
             <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
               {OUTPUT_TYPES.map((type) => (
