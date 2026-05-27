@@ -15,6 +15,7 @@ import {
   AlertTriangle,
   Sparkles,
   FileText,
+  CircleHelp,
 } from "lucide-react";
 
 function parseAccountScopes(account: { scopesJson?: string | null } | null | undefined): string[] {
@@ -112,6 +113,7 @@ export default function XSettingsPage() {
   });
   const [loading, setLoading] = useState(true);
   const [articlePendingCount, setArticlePendingCount] = useState<number | null>(null);
+  const [showReauthHelp, setShowReauthHelp] = useState(false);
   const accountScopes = parseAccountScopes(xStatus?.account);
   const missingSyncScopes = getMissingSyncScopes(syncType, accountScopes);
 
@@ -342,7 +344,31 @@ export default function XSettingsPage() {
 
       {/* Grok OAuth Status */}
       <Card>
-        <h3 className="text-base font-bold text-text mb-4">Grok OAuth連携</h3>
+        <div className="flex items-center gap-2 mb-4">
+          <h3 className="text-base font-bold text-text">Grok OAuth連携</h3>
+          <button
+            type="button"
+            onClick={() => setShowReauthHelp((v) => !v)}
+            className="rounded-full p-0.5 text-text-muted hover:text-text transition-colors"
+            title="再認証の手順を見る"
+          >
+            <CircleHelp className="w-4 h-4" />
+          </button>
+        </div>
+        {showReauthHelp && (
+          <div className="mb-4 rounded-xl border border-border bg-border-light px-4 py-3 space-y-2">
+            <p className="text-xs font-semibold text-text">認証が切れたときの再接続手順</p>
+            <ol className="space-y-1 text-xs text-text-secondary list-decimal list-inside">
+              <li>ローカルでターミナルを開き <code className="bg-white rounded px-1">pnpm run dev</code> を実行</li>
+              <li>ブラウザで <code className="bg-white rounded px-1">http://localhost:3000/settings/x</code> を開く</li>
+              <li>「Grokを切断」→「Grokに接続」でX認証を完了</li>
+              <li>Vercelでの学習カード生成が復旧します（ターミナルは止めてOK）</li>
+            </ol>
+            <p className="text-xs text-text-muted">
+              ※ X Premium+サブスクが有効な間は無料で使えます。トークンは数日〜数週間で期限切れになります。
+            </p>
+          </div>
+        )}
         {grokStatus?.connected ? (
           <div className="space-y-4">
             <div className="flex items-center gap-3">

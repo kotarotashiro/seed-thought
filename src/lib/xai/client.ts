@@ -1,10 +1,11 @@
 // xAI client — OAuth bearer preferred, API key fallback.
 
 import { decryptToken, encryptToken } from "@/lib/x/tokenStore";
-import { findXaiAuth, upsertXaiAuth } from "@/lib/xai/authStore";
+import { deleteXaiAuth, findXaiAuth, upsertXaiAuth } from "@/lib/xai/authStore";
 import {
   getXaiTokenEncryptionKey,
   refreshXaiToken,
+  XaiTokenExpiredError,
 } from "@/lib/xai/oauth";
 
 const XAI_API_BASE = "https://api.x.ai/v1";
@@ -47,16 +48,28 @@ export async function getAuthHeader(): Promise<string> {
       const shouldRefresh = expiresAt > 0 && expiresAt - Date.now() < 60_000;
 
       if (shouldRefresh && oauth.refreshToken) {
-        const refreshed = await refreshXaiToken(decryptToken(oauth.refreshToken, encryptionKey));
-        await upsertXaiAuth({
-          accessToken: encryptToken(refreshed.accessToken, encryptionKey),
-          refreshToken: refreshed.refreshToken
-            ? encryptToken(refreshed.refreshToken, encryptionKey)
-            : oauth.refreshToken,
-          expiresAt: refreshed.expiresAt,
-          scope: refreshed.scope,
-        });
-        return `Bearer ${refreshed.accessToken}`;
+        try {
+          const refreshed = await refreshXaiToken(decryptToken(oauth.refreshToken, encryptionKey));
+          await upsertXaiAuth({
+            accessToken: encryptToken(refreshed.accessToken, encryptionKey),
+            refreshToken: refreshed.refreshToken
+              ? encryptToken(refreshed.refreshToken, encryptionKey)
+              : oauth.refreshToken,
+            expiresAt: refreshed.expiresAt,
+            scope: refreshed.scope,
+          });
+          return `Bearer ${refreshed.accessToken}`;
+        } catch (refreshErr) {
+          // 401 / invalid_client / invalid_grant = refresh token itself is dead.
+          // Delete stale tokens so the UI shows "reconnect" state on next visit.
+          const msg = refreshErr instanceof Error ? refreshErr.message : "";
+          if (msg.includes("401") || msg.includes("invalid_client") || msg.includes("invalid_grant")) {
+            console.warn("[xai/client] refresh token expired — deleting stale auth");
+            await deleteXaiAuth().catch(() => {});
+            throw new XaiTokenExpiredError();
+          }
+          throw refreshErr;
+        }
       }
 
       return `Bearer ${decryptToken(oauth.accessToken, encryptionKey)}`;

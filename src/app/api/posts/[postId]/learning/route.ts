@@ -5,6 +5,7 @@ import type { SourcePostForLearning } from "@/lib/ai/types";
 import { getUserFacingError } from "@/lib/api/errors";
 import { buildPostTextWithThread } from "@/lib/posts/threadText";
 import { resolveArticleForAi } from "@/lib/posts/articleContent";
+import { XaiTokenExpiredError } from "@/lib/xai/oauth";
 
 type RawMediaItem = {
   type?: unknown;
@@ -216,6 +217,12 @@ export async function POST(
     );
   } catch (error) {
     console.error("Failed to generate learning card:", error);
+    if (error instanceof XaiTokenExpiredError) {
+      return NextResponse.json(
+        { error: error.message, code: "GROK_TOKEN_EXPIRED" },
+        { status: 503 }
+      );
+    }
     return NextResponse.json(
       { error: getUserFacingError(error, "学習カードの生成に失敗しました") },
       { status: 500 }

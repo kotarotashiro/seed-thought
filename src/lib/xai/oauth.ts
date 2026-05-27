@@ -1,5 +1,12 @@
 import crypto from "crypto";
 
+export class XaiTokenExpiredError extends Error {
+  constructor() {
+    super("Grokの認証が切れています。ローカルで再認証してください。");
+    this.name = "XaiTokenExpiredError";
+  }
+}
+
 export const XAI_OAUTH_ID = "xai-oauth";
 export const XAI_OAUTH_ISSUER = "https://auth.x.ai";
 export const XAI_OAUTH_DISCOVERY_URL =
