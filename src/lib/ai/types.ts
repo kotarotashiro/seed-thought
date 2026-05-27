@@ -73,7 +73,23 @@ export interface LearningOutput {
   };
   imageExplanationPrompt: string;
   userLearningMemo: string;
+  backgroundContext?: BackgroundContext | null;
   status: "draft" | "saved";
+}
+
+/**
+ * 投稿を理解するための「周辺情報」。
+ * 勉強のできる解説者が補足する形：原典・時代背景・類似フレームワーク等。
+ * 投稿タイプによって該当しない項目は null/空配列で返す。
+ */
+export interface BackgroundContext {
+  postType?: string | null;
+  origin?: string | null;
+  historicalContext?: string | null;
+  relatedFrameworks?: { name: string; description: string; relation: string }[];
+  referencedWorks?: { name: string; context: string }[];
+  furtherReading?: { topic: string; reason: string }[];
+  terminology?: { term: string; explanation: string }[];
 }
 
 export interface PostClassificationResult {

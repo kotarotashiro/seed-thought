@@ -30,6 +30,7 @@ import {
   Image as ImageIcon,
   Languages,
   Layers,
+  Library,
   Lightbulb,
   ListChecks,
   Loader2,
@@ -715,6 +716,96 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
               </div>
             </div>
           </Card>
+
+          {/* 周辺情報（background context） */}
+          {output.backgroundContext && (() => {
+            const bg = output.backgroundContext;
+            const hasContent =
+              bg.origin ||
+              bg.historicalContext ||
+              (bg.relatedFrameworks && bg.relatedFrameworks.length > 0) ||
+              (bg.referencedWorks && bg.referencedWorks.length > 0) ||
+              (bg.furtherReading && bg.furtherReading.length > 0) ||
+              (bg.terminology && bg.terminology.length > 0);
+            if (!hasContent) return null;
+            return (
+              <Card>
+                <SectionHeader icon={Library} title="背景・周辺情報" />
+                {bg.postType && (
+                  <p className="mb-4 text-xs text-text-muted">投稿タイプ: {bg.postType}</p>
+                )}
+                <div className="space-y-4">
+                  {bg.origin && (
+                    <div className="rounded-xl border border-border px-4 py-3">
+                      <p className="mb-1 text-xs font-medium text-text-muted">原典・出典</p>
+                      <p className="whitespace-pre-wrap text-sm leading-relaxed text-text">{bg.origin}</p>
+                    </div>
+                  )}
+                  {bg.historicalContext && (
+                    <div className="rounded-xl border border-border px-4 py-3">
+                      <p className="mb-1 text-xs font-medium text-text-muted">時代背景・文脈</p>
+                      <p className="whitespace-pre-wrap text-sm leading-relaxed text-text">{bg.historicalContext}</p>
+                    </div>
+                  )}
+                  {bg.relatedFrameworks && bg.relatedFrameworks.length > 0 && (
+                    <div>
+                      <p className="mb-2 text-sm font-semibold text-text">類似フレームワーク・関連する考え方</p>
+                      <div className="space-y-2">
+                        {bg.relatedFrameworks.map((f, i) => (
+                          <div key={`${f.name}-${i}`} className="rounded-xl border border-border px-4 py-3">
+                            <p className="mb-1 text-sm font-semibold text-text">{f.name}</p>
+                            <p className="mb-1 text-sm leading-relaxed text-text-secondary">{f.description}</p>
+                            {f.relation && (
+                              <p className="text-xs text-accent">関係: {f.relation}</p>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {bg.referencedWorks && bg.referencedWorks.length > 0 && (
+                    <div>
+                      <p className="mb-2 text-sm font-semibold text-text">投稿で言及されているもの</p>
+                      <div className="space-y-2">
+                        {bg.referencedWorks.map((w, i) => (
+                          <div key={`${w.name}-${i}`} className="rounded-xl bg-border-light px-4 py-3">
+                            <p className="mb-1 text-sm font-semibold text-text">{w.name}</p>
+                            <p className="text-sm leading-relaxed text-text-secondary">{w.context}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {bg.terminology && bg.terminology.length > 0 && (
+                    <div>
+                      <p className="mb-2 text-sm font-semibold text-text">用語解説</p>
+                      <div className="space-y-2">
+                        {bg.terminology.map((t, i) => (
+                          <div key={`${t.term}-${i}`} className="rounded-xl border border-border px-4 py-3">
+                            <p className="mb-1 text-sm font-semibold text-text">{t.term}</p>
+                            <p className="text-sm leading-relaxed text-text-secondary">{t.explanation}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {bg.furtherReading && bg.furtherReading.length > 0 && (
+                    <div>
+                      <p className="mb-2 text-sm font-semibold text-text">もっと知りたい人へ</p>
+                      <div className="space-y-2">
+                        {bg.furtherReading.map((r, i) => (
+                          <div key={`${r.topic}-${i}`} className="rounded-xl border border-border px-4 py-3">
+                            <p className="mb-1 text-sm font-semibold text-text">{r.topic}</p>
+                            <p className="text-sm leading-relaxed text-text-secondary">{r.reason}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </Card>
+            );
+          })()}
 
           {/* 手順 */}
           <Card>
