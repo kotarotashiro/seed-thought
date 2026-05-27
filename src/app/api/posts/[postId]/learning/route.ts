@@ -146,7 +146,8 @@ export async function POST(
     const source = await buildSourcePost(post);
     const sourceWithMode: SourcePostForLearning = { ...source, learningMode };
 
-    const [learningOutput, strictLearningOutput] = await Promise.all([
+    // 学習カード生成は必須。厳密学習は失敗しても継続（片方失敗で全部落とさない）。
+    const [learningResult, strictResult] = await Promise.allSettled([
       getAiProvider().generateLearningCard(sourceWithMode),
       getAiProvider().generateStrictLearning({
         postText: sourceWithMode.text,
@@ -159,6 +160,22 @@ export async function POST(
         userMemo: post.learningCard?.userMemo ?? null,
       }),
     ]);
+
+    if (learningResult.status === "rejected") {
+      console.error("[learning route] generateLearningCard failed:", learningResult.reason);
+      throw learningResult.reason;
+    }
+    const learningOutput = learningResult.value;
+
+    let strictLearningOutput = null;
+    if (strictResult.status === "fulfilled") {
+      strictLearningOutput = strictResult.value;
+    } else {
+      console.error(
+        "[learning route] generateStrictLearning failed (non-fatal):",
+        strictResult.reason
+      );
+    }
 
     const draftOutput = { ...learningOutput, sourcePostId: post.id, status: "draft" as const };
 

@@ -11,17 +11,26 @@ export function parseAiJson<T>(
   label: string
 ): T {
   if (!raw.trim()) {
+    console.error(`[parseAiJson] ${label}: empty response`);
     throw new AiJsonError(`${label}のAI応答が空でした`);
   }
 
   let parsed: unknown;
   try {
     parsed = JSON.parse(extractJson(raw));
-  } catch {
+  } catch (parseErr) {
+    console.error(
+      `[parseAiJson] ${label}: JSON parse failed. ParseErr:`,
+      (parseErr as Error)?.message,
+      `\nRaw response (first 2000 chars):\n${raw.slice(0, 2000)}`
+    );
     throw new AiJsonError(`${label}のAI応答をJSONとして解析できませんでした`);
   }
 
   if (!validate(parsed)) {
+    console.error(
+      `[parseAiJson] ${label}: validation failed.\nParsed object (first 2000 chars):\n${JSON.stringify(parsed).slice(0, 2000)}`
+    );
     throw new AiJsonError(`${label}のAI応答形式が想定と違いました`);
   }
 

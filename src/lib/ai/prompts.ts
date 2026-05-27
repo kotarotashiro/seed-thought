@@ -100,87 +100,49 @@ export function buildLearningPrompt(input: SourcePostForLearning): string {
 
   return `${modeInstruction}
 
-${KOTARO_LENS_PROFILE}
+${input.articleTitle || input.articleDescription ? `## 記事情報（投稿リンク先の内容）
+${input.articleTitle ? `タイトル: ${input.articleTitle}` : ""}
+${input.articleDescription ? `内容: ${input.articleDescription}` : ""}
+` : ""}${input.videoTranscript ? `## 動画文字起こし（ユーザーが貼り付けた動画の文字起こしテキスト）
+${input.videoTranscript}
+` : ""}## 投稿データ
+${JSON.stringify(input, null, 2)}
 
-## 周辺情報の提供（必須・ただし投稿タイプで調整）
+## あなたの出力（必須・JSONの全フィールドを必ず埋める）
 
-「勉強できる人」として、投稿を理解するための周辺情報を提供してください。
-まず投稿のタイプを判定し、活きるフィールドのみを埋めてください。
+以下のJSON構造で返してください。**status を含むすべての必須フィールドを省略しないこと**。
+backgroundContext は新規追加フィールド。該当しないサブフィールドは null/空配列でOK。
 
-### 投稿タイプ別の目安
-- **既存概念・著作・出来事の解説**（例：歴史的フレームワーク、有名な書籍の紹介）
-  → 原典・時代背景・類似フレームワーク全て活きる
-- **著者自身の経験・気づき・主張**（例：「今日こう失敗した」系のエッセイ）
-  → 類似する考え方・系譜が中心。原典なし
-- **ハウツー・チュートリアル**（例：ツール使い方、技術解説）
-  → 公式ソース・代替手段・用語解説
-- **統計・データ・ニュース**
-  → 一次ソース・推移・関連レポート
-- **エッセイ・思想・社会論**
-  → 類似する論者・批判的見解
-- **製品・サービス紹介**
-  → 公式情報・競合・業界文脈
-- **短い感想・ジョーク・ミーム**
-  → 周辺情報は最小、または空でよい
-
-### 共通の作法
-- 該当しない項目は \`null\` または空配列 \`[]\` を返す。**無理に埋めない**
-- 投稿そのものが一次ソースなら origin は「投稿者自身の主張」と明記
-- 不確かな情報は「諸説あり」「一説には」と明示
-- 推測ではなく事実ベース。AIが知らない領域は素直に簡潔に
-- 網羅性ではなく「これを知っていると見え方が変わる」ものを厳選（各カテゴリ3〜5個まで）
-
-## あなたの出力
-
-以下を必ず出力してください（投稿の内容に忠実に、Kotaroの持論をねじ込まない）：
-
-1. タイトル（バズタイトル禁止）
-2. 要約（投稿の主張を3〜5文で。後から読み返したときに何に響いたか分かる粒度）
-3. 投稿が伝えようとしている本質
-4. 何が面白いのか（投稿の文脈内で評価）
-5. 中心となる洞察
-6. 投稿が示している構造
-7. 投稿が示す実践手順
-8. 実践マニュアル
-9. ユーザーの業務への応用アイデア（自然に接続するときのみ。無理な接続をしない）
-10. うまく使うコツ
-11. 向いている用途
-12. 図解構成（Swiss Modern & Bento風の視覚案）
-13. 解説画像生成用プロンプト
-14. あとで見返すための学習メモ
-15. **周辺情報（背景・原典・類似フレームワーク等）** ← 今回追加
-
-## 出力JSON
 {
   "sourcePostId": "${input.id}",
-  "title": "学習カードのタイトル",
-  "summary": "投稿の主張を3〜5文で",
+  "title": "学習カードのタイトル（バズタイトル禁止、構造的に）",
+  "summary": "投稿の主張を3〜5文で。後から読み返して何に響いたか分かる粒度",
   "originalIntent": "投稿者が本当に伝えたかったこと",
-  "whatIsInteresting": "何が面白いのか（投稿の文脈内で）",
-  "coreInsight": "中心となる洞察",
+  "whatIsInteresting": "何が面白いのか（投稿の文脈内で評価）",
+  "coreInsight": "中心となる洞察。抽象化を含む",
   "structure": [
     { "label": "構造名", "description": "説明" }
   ],
   "steps": [
-    { "title": "手順名", "description": "説明", "actions": ["具体アクション"] }
+    { "title": "手順名", "description": "説明", "actions": ["具体アクション1", "具体アクション2"] }
   ],
   "manual": "実践マニュアル本文",
   "applicationIdeas": [
     { "title": "応用アイデア", "description": "説明" }
   ],
-  "tips": ["うまく使うコツ"],
-  "useCases": ["向いている用途"],
+  "tips": ["うまく使うコツ1", "コツ2"],
+  "useCases": ["向いている用途1", "用途2"],
   "diagramStructure": {
     "title": "図解タイトル",
     "sections": [
-      { "heading": "見出し", "body": "本文", "visualIdea": "視覚表現案（Swiss Modern & Bento風）" }
+      { "heading": "見出し", "body": "本文", "visualIdea": "視覚表現案" }
     ]
   },
   "imageExplanationPrompt": "解説画像生成用プロンプト",
   "userLearningMemo": "あとで見返すための学習メモ",
   "backgroundContext": {
-    "postType": "判定した投稿タイプ（例: 既存概念の解説 / 著者の経験 / ハウツー / 統計 / エッセイ / 製品紹介 / 感想）",
-    "origin": "原典・出典の詳細（年・著者・公式URL等）。該当しない場合は null",
+    "postType": "判定タイプ（例: 既存概念の解説/著者の経験/ハウツー/統計/エッセイ/製品紹介/感想）",
+    "origin": "原典・出典詳細（年・著者・公式URL等）。該当しない場合は null",
     "historicalContext": "時代背景・なぜこの主張が生まれたか。該当しない場合は null",
     "relatedFrameworks": [
       { "name": "類似フレームワーク名", "description": "説明", "relation": "どう似ているか・違うか" }
@@ -198,15 +160,26 @@ ${KOTARO_LENS_PROFILE}
   "status": "draft"
 }
 
-${input.articleTitle || input.articleDescription ? `## 記事情報（投稿リンク先の内容）
-${input.articleTitle ? `タイトル: ${input.articleTitle}` : ""}
-${input.articleDescription ? `内容: ${input.articleDescription}` : ""}
-` : ""}${input.videoTranscript ? `## 動画文字起こし（ユーザーが貼り付けた動画の文字起こしテキスト）
-${input.videoTranscript}
-` : ""}投稿データ:
-${JSON.stringify(input, null, 2)}
+## 周辺情報（backgroundContext）の作法
+「勉強できる人」として、投稿を理解するための周辺情報を提供する。
+まず投稿のタイプを判定し、活きるフィールドのみを埋める：
+- 既存概念・著作・出来事の解説 → 原典・時代背景・類似フレームワーク全て
+- 著者の経験・気づき → 類似する考え方が中心、原典は「投稿者自身の主張」
+- ハウツー・チュートリアル → 公式ソース・代替手段・用語解説
+- 統計・データ・ニュース → 一次ソース・推移・関連レポート
+- エッセイ・思想・社会論 → 類似する論者・批判的見解
+- 短い感想・ジョーク・ミーム → 周辺情報はほぼ空でよい
 
-JSONのみ返してください。説明文は不要です。`;
+該当しないサブフィールドは null または空配列 []。不確かな情報は「諸説あり」と明示。
+推測ではなく事実ベース。AIが知らない領域は素直に簡潔に。網羅より厳選（各3〜5個まで）。
+
+${KOTARO_LENS_PROFILE}
+
+## 最終確認
+- すべての必須フィールド（特に diagramStructure, status）を省略しない
+- 投稿の内容に忠実に、Kotaroの持論をねじ込まない
+- 投稿が興味の核に自然に接続するときだけ、自然に指摘する（無理に接続しない）
+- JSONのみ返してください。説明文・前置きは不要です`;
 }
 
 export async function buildStrictLearningPrompt(input: {
