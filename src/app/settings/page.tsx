@@ -136,6 +136,7 @@ function AiSettingsSection({ open, onToggle }: { open: boolean; onToggle: () => 
   const [defaultProvider, setDefaultProvider] = useState<AiProviderName>("grok");
   const [defaultModel, setDefaultModel] = useState("");
   const [modelLists, setModelLists] = useState<Partial<Record<AiProviderName, ModelInfo[]>>>({});
+  const [modelSources, setModelSources] = useState<Partial<Record<AiProviderName, "live" | "fallback">>>({});
   const [loadingModels, setLoadingModels] = useState<Partial<Record<AiProviderName, boolean>>>({});
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
@@ -150,6 +151,9 @@ function AiSettingsSection({ open, onToggle }: { open: boolean; onToggle: () => 
       const data = await res.json();
       if (data.models) {
         setModelLists((prev) => ({ ...prev, [provider]: data.models }));
+        if (data.source === "live" || data.source === "fallback") {
+          setModelSources((prev) => ({ ...prev, [provider]: data.source }));
+        }
       }
     } catch {
       // ignore
@@ -173,12 +177,17 @@ function AiSettingsSection({ open, onToggle }: { open: boolean; onToggle: () => 
   // モデル一覧を持っているProviderを表示時に取得
   useEffect(() => {
     if (!open || !settings) return;
-    for (const p of (["grok", "claude", "openai", "gemini", "kimi"] as AiProviderName[])) {
-      if (settings.keyStatus[p]?.hasKey && !modelLists[p]) {
-        fetchModels(p);
+    queueMicrotask(() => {
+      for (const p of (["grok", "claude", "openai", "gemini", "kimi"] as AiProviderName[])) {
+        if (settings.keyStatus[p]?.hasKey && !modelLists[p]) {
+          fetchModels(p);
+        }
       }
-    }
+    });
   }, [open, settings]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ※自動モデル修復は誤って正しいモデル(kimi-k2.6 等)を上書きしてしまうリスクがあるため
+  // 行わない。ユーザが UI から手動で選び直す前提。
 
   const getModelsForProvider = (provider: AiProviderName): ModelInfo[] => {
     return modelLists[provider] ?? [];
@@ -307,6 +316,9 @@ function AiSettingsSection({ open, onToggle }: { open: boolean; onToggle: () => 
               <div className="flex items-center gap-2 mb-2">
                 <span className="text-sm font-medium text-text">{p.label}</span>
                 <KeySourceBadge source={settings.keyStatus[p.value]?.source ?? "none"} />
+                {settings.keyStatus[p.value]?.hasKey && modelSources[p.value] === "fallback" && (
+                  <Badge variant="warning">モデル一覧取得失敗</Badge>
+                )}
                 {settings.keyStatus[p.value]?.hasKey && (
                   <CheckCircle className="w-3.5 h-3.5 text-success ml-auto" />
                 )}

@@ -1,5 +1,6 @@
 import { fetchArticlePreview } from "@/lib/fetchArticle";
 import { parseArticleContent } from "./articleParser";
+import { readRelatedLinks } from "./relatedLinks";
 
 const URL_ONLY_RE = /^https?:\/\/\S+$/;
 
@@ -19,38 +20,57 @@ export async function resolveArticleForAi(
   postText: string
 ): Promise<{ title?: string; description?: string }> {
   const card = parseArticleContent(urlCardJson);
+  const related = readRelatedLinks(urlCardJson);
+
+  // 取得済みリンクの情報を1ブロックに整形（メインの description に追記する用途）
+  const relatedBlock = related.length
+    ? related
+        .filter((l) => l.title || l.description)
+        .map((l, i) => {
+          const head = l.title ? `${i + 1}. ${l.title}` : `${i + 1}.`;
+          const body = l.description ?? "";
+          return [head, l.url, body].filter(Boolean).join("\n");
+        })
+        .join("\n\n")
+    : "";
+
+  function withRelated(base: { title?: string; description?: string }) {
+    if (!relatedBlock) return base;
+    const desc = base.description ? `${base.description}\n\n---\n投稿内リンク情報:\n${relatedBlock}` : `投稿内リンク情報:\n${relatedBlock}`;
+    return { title: base.title, description: desc };
+  }
 
   // 1. User-pasted content always wins
   if (card.pastedContent) {
-    return {
+    return withRelated({
       title: card.title || undefined,
       description: card.pastedContent,
-    };
+    });
   }
 
   // 2. Existing cached metadata
   if (card.title || card.description) {
-    return {
+    return withRelated({
       title: card.title || undefined,
       description: card.description || undefined,
-    };
+    });
   }
 
-  // 3. X Articles cannot be fetched — bail out
+  // 3. X Articles cannot be fetched — bail out (relatedLinks があれば渡す)
   if (card.isXArticle) {
-    return {};
+    return withRelated({});
   }
 
   // 4. Live fetch for URL-only posts
   const trimmed = (postText || "").trim();
-  if (!URL_ONLY_RE.test(trimmed)) return {};
+  if (!URL_ONLY_RE.test(trimmed)) return withRelated({});
   try {
     const preview = await fetchArticlePreview(card.expandedUrl ?? trimmed);
-    return {
+    return withRelated({
       title: preview.title || undefined,
       description: preview.description || undefined,
-    };
+    });
   } catch {
-    return {};
+    return withRelated({});
   }
 }

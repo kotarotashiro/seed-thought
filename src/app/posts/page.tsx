@@ -73,7 +73,7 @@ export default function PostsPage() {
   const [selectedPostType, setSelectedPostType] = useState("");
   const [selectedSavedType, setSelectedSavedType] = useState("");
   const [selectedDigestStatus, setSelectedDigestStatus] = useState("");
-  const [selectedSort, setSelectedSort] = useState("savedAt_desc");
+  const [selectedSort, setSelectedSort] = useState("likedAt_desc");
   const [selectedAuthor, setSelectedAuthor] = useState("");
 
   const [activeTab, setActiveTab] = useState<"saved" | "recommend">("saved");

@@ -16,7 +16,6 @@ import {
   ExternalLink,
   GitBranch,
   Languages,
-  Lightbulb,
   Newspaper,
   User,
 } from "lucide-react";
@@ -34,12 +33,48 @@ export default function ConfirmPage({ params }: { params: Promise<{ postId: stri
   const [selectedThreadIds, setSelectedThreadIds] = useState<string[]>([]);
   const [threadMessage, setThreadMessage] = useState<string | null>(null);
   const [threadError, setThreadError] = useState<string | null>(null);
+  // 強制追記モード
+  const [manualThreadOpen, setManualThreadOpen] = useState(false);
+  const [manualThreadUrl, setManualThreadUrl] = useState("");
+  const [manualThreadText, setManualThreadText] = useState("");
+  const [addingManualThread, setAddingManualThread] = useState(false);
+  // 記事 / 字幕の追加
+  const [articleUrl, setArticleUrl] = useState("");
+  const [fetchingArticle, setFetchingArticle] = useState(false);
+  const [articleMessage, setArticleMessage] = useState<string | null>(null);
+  const [articleError, setArticleError] = useState<string | null>(null);
+  const [transcriptText, setTranscriptText] = useState("");
+  const [savingTranscript, setSavingTranscript] = useState(false);
+  const [transcriptMessage, setTranscriptMessage] = useState<string | null>(null);
+  const [transcriptError, setTranscriptError] = useState<string | null>(null);
+  // 投稿内リンクの enrichment
+  const [enrichingLinks, setEnrichingLinks] = useState(false);
+  const [enrichMessage, setEnrichMessage] = useState<string | null>(null);
+  const [enrichError, setEnrichError] = useState<string | null>(null);
+  type RelatedLink = {
+    url: string;
+    title: string | null;
+    description: string | null;
+    imageUrl: string | null;
+  };
+  const [relatedLinks, setRelatedLinks] = useState<RelatedLink[]>([]);
 
   const loadPost = async () => {
     try {
       const res = await fetch(`/api/posts/${postId}`);
       const data = await res.json();
       setPost(data);
+      // urlCardJson.relatedLinks を抽出
+      try {
+        const parsed = data?.urlCardJson ? JSON.parse(data.urlCardJson) : null;
+        if (parsed && Array.isArray(parsed.relatedLinks)) {
+          setRelatedLinks(parsed.relatedLinks);
+        } else {
+          setRelatedLinks([]);
+        }
+      } catch {
+        setRelatedLinks([]);
+      }
     } catch (error) {
       console.error("Failed to fetch post:", error);
     } finally {
@@ -54,7 +89,14 @@ export default function ConfirmPage({ params }: { params: Promise<{ postId: stri
       try {
         const res = await fetch(`/api/posts/${postId}`);
         const data = await res.json();
-        if (!cancelled) setPost(data);
+        if (cancelled) return;
+        setPost(data);
+        try {
+          const parsed = data?.urlCardJson ? JSON.parse(data.urlCardJson) : null;
+          if (parsed && Array.isArray(parsed.relatedLinks)) {
+            setRelatedLinks(parsed.relatedLinks);
+          }
+        } catch { /* ignore */ }
       } catch (error) {
         console.error("Failed to fetch post:", error);
       } finally {
@@ -98,6 +140,154 @@ export default function ConfirmPage({ params }: { params: Promise<{ postId: stri
     setSelectedThreadIds((current) =>
       current.includes(id) ? current.filter((item) => item !== id) : [...current, id]
     );
+  };
+
+  // 投稿内に含まれる全URLの情報を取得
+  const handleEnrichLinks = async () => {
+    setEnrichingLinks(true);
+    setEnrichMessage(null);
+    setEnrichError(null);
+    try {
+      const res = await fetch(`/api/posts/${postId}/enrich-content`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) {
+        setEnrichError(data.error || "リンク情報の取得に失敗しました");
+        return;
+      }
+      setRelatedLinks(Array.isArray(data.links) ? data.links : []);
+      if (data.fetchedCount > 0) {
+        setEnrichMessage(`${data.fetchedCount}件のリンク情報を取得しました。`);
+      } else if (Array.isArray(data.links) && data.links.length > 0) {
+        setEnrichMessage("既に取得済みのリンク情報を表示しています。");
+      } else {
+        setEnrichMessage("取得対象のリンクは見つかりませんでした。");
+      }
+      await loadPost();
+    } catch {
+      setEnrichError("リンク情報の取得に失敗しました");
+    } finally {
+      setEnrichingLinks(false);
+    }
+  };
+
+  const handleAddArticle = async () => {
+    const url = articleUrl.trim();
+    if (!url) {
+      setArticleError("記事URLを入力してください");
+      return;
+    }
+    if (!/^https?:\/\//.test(url)) {
+      setArticleError("URL は http(s) で始まる形式を入力してください");
+      return;
+    }
+    setFetchingArticle(true);
+    setArticleMessage(null);
+    setArticleError(null);
+    try {
+      const res = await fetch(`/api/fetch-article?url=${encodeURIComponent(url)}`);
+      const data = await res.json();
+      if (!res.ok) {
+        setArticleError(data.error || "記事の取得に失敗しました");
+        return;
+      }
+      const next = {
+        expandedUrl: data.finalUrl || url,
+        title: data.title || null,
+        description: data.description || null,
+        pastedContent: data.description || null,
+        pastedByUser: false,
+        isXArticle: Boolean(data.isXArticle),
+        imageUrl: data.image || null,
+      };
+      const patch = await fetch(`/api/posts/${postId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ urlCardJson: JSON.stringify(next) }),
+      });
+      if (!patch.ok) {
+        const err = await patch.json().catch(() => ({}));
+        setArticleError(err.error || "記事情報の保存に失敗しました");
+        return;
+      }
+      setArticleMessage("記事情報を投稿に追加しました。");
+      setArticleUrl("");
+      await loadPost();
+    } catch {
+      setArticleError("記事の取得に失敗しました");
+    } finally {
+      setFetchingArticle(false);
+    }
+  };
+
+  const handleSaveTranscript = async () => {
+    const text = transcriptText.trim();
+    if (!text) {
+      setTranscriptError("動画文字起こしのテキストを入力してください");
+      return;
+    }
+    setSavingTranscript(true);
+    setTranscriptMessage(null);
+    setTranscriptError(null);
+    try {
+      const res = await fetch(`/api/posts/${postId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ videoTranscriptText: text }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        setTranscriptError(err.error || "文字起こしの保存に失敗しました");
+        return;
+      }
+      setTranscriptMessage("動画文字起こしを保存しました。");
+      setTranscriptText("");
+      await loadPost();
+    } catch {
+      setTranscriptError("文字起こしの保存に失敗しました");
+    } finally {
+      setSavingTranscript(false);
+    }
+  };
+
+  const handleAddManualThread = async () => {
+    const url = manualThreadUrl.trim();
+    const text = manualThreadText.trim();
+    if (!url && !text) {
+      setThreadError("URL か 本文 を入力してください");
+      return;
+    }
+    setAddingManualThread(true);
+    setThreadMessage(null);
+    setThreadError(null);
+    try {
+      const res = await fetch(`/api/posts/${postId}/thread`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url, text }),
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) {
+        setThreadError(data.error || "ツリーへの追記に失敗しました");
+        return;
+      }
+      setThreadMessage(
+        data.source === "x_api"
+          ? "X APIから取得して追記しました。"
+          : "本文をそのまま追記しました。"
+      );
+      setManualThreadUrl("");
+      setManualThreadText("");
+      setManualThreadOpen(false);
+      await loadPost();
+    } catch {
+      setThreadError("ツリーへの追記に失敗しました");
+    } finally {
+      setAddingManualThread(false);
+    }
   };
 
   const handleDeleteSelectedThreads = async () => {
@@ -320,13 +510,20 @@ export default function ConfirmPage({ params }: { params: Promise<{ postId: stri
                 variant="secondary"
                 size="sm"
                 onClick={handleFetchThread}
-                disabled={fetchingThread || deletingThread}
+                disabled={fetchingThread || deletingThread || addingManualThread}
                 loading={fetchingThread}
                 loadingLabel="取得中..."
               >
                 <GitBranch className="w-4 h-4 mr-1" />
-                {threadPosts.length > 0 ? "ツリーを再取得" : "ツリーを追加"}
+                {threadPosts.length > 0 ? "ツリーを再取得" : "ツリーを取得"}
               </Button>
+              <button
+                type="button"
+                onClick={() => setManualThreadOpen((v) => !v)}
+                className="text-xs text-text-secondary underline-offset-2 hover:underline"
+              >
+                {manualThreadOpen ? "強制追記を閉じる" : "強制追記（URLや本文を直接入力）"}
+              </button>
               {threadPosts.length > 0 && (
                 <Badge variant="success">ツリー {threadPosts.length + 1}投稿</Badge>
               )}
@@ -338,6 +535,38 @@ export default function ConfirmPage({ params }: { params: Promise<{ postId: stri
               <div className="mt-3 flex items-start gap-2 rounded-xl border border-danger/20 bg-danger-light px-3 py-2">
                 <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0 text-danger" />
                 <p className="text-xs text-danger">{threadError}</p>
+              </div>
+            )}
+            {manualThreadOpen && (
+              <div className="mt-3 rounded-xl border border-border bg-border-light/40 px-3 py-3 space-y-2">
+                <p className="text-xs text-text-muted">
+                  X APIで取れなかった続き投稿を、URL（推奨）または本文の直接入力で強制的に追記できます。
+                </p>
+                <input
+                  type="text"
+                  value={manualThreadUrl}
+                  onChange={(e) => setManualThreadUrl(e.target.value)}
+                  placeholder="https://x.com/.../status/123... または tweet ID"
+                  className="w-full rounded-lg border border-border bg-white px-3 py-2 text-sm text-text outline-none focus:border-accent"
+                />
+                <textarea
+                  value={manualThreadText}
+                  onChange={(e) => setManualThreadText(e.target.value)}
+                  placeholder="本文を直接入力（URLで取れないときの代わりとして使う）"
+                  rows={3}
+                  className="w-full resize-none rounded-lg border border-border bg-white px-3 py-2 text-sm text-text outline-none focus:border-accent"
+                />
+                <div className="flex justify-end">
+                  <Button
+                    size="sm"
+                    onClick={handleAddManualThread}
+                    disabled={addingManualThread || (!manualThreadUrl.trim() && !manualThreadText.trim())}
+                    loading={addingManualThread}
+                    loadingLabel="追記中..."
+                  >
+                    強制追記する
+                  </Button>
+                </div>
               </div>
             )}
           </div>
@@ -394,20 +623,132 @@ export default function ConfirmPage({ params }: { params: Promise<{ postId: stri
         </Card>
       )}
 
-      {/* AI Summary */}
-      {post.classification && (
-        <Card>
-          <div className="flex items-start gap-3">
-            <Lightbulb className="w-5 h-5 text-text-muted flex-shrink-0 mt-0.5" />
-            <div>
-              <p className="text-sm font-semibold text-text mb-1">AIのざっくり要約</p>
-              <p className="text-sm text-text-secondary leading-relaxed">
-                {post.classification.summary}
-              </p>
-            </div>
+      {/* 補助情報の追加（記事URL / 動画文字起こし / 投稿内リンク） */}
+      <Card>
+        <div className="mb-3 flex items-center gap-2">
+          <Newspaper className="h-5 w-5 text-accent" />
+          <h3 className="text-base font-bold text-text">補助情報を追加</h3>
+        </div>
+        <p className="mb-4 text-xs text-text-muted">
+          投稿に含まれる記事URLや、動画の文字起こしを追加すると、学習カードの精度が上がります。
+        </p>
+
+        {/* 投稿内リンクの自動取得 */}
+        <div className="space-y-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="text-xs font-semibold text-text-secondary">
+              投稿内に含まれる全リンクの情報を一括取得
+            </p>
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={handleEnrichLinks}
+              disabled={enrichingLinks}
+              loading={enrichingLinks}
+              loadingLabel="取得中..."
+            >
+              <ExternalLink className="w-4 h-4 mr-1" />
+              リンク情報を取得
+            </Button>
           </div>
-        </Card>
-      )}
+          {enrichMessage && (
+            <p className="text-xs text-success">{enrichMessage}</p>
+          )}
+          {enrichError && (
+            <div className="flex items-start gap-2 rounded-xl border border-danger/20 bg-danger-light px-3 py-2">
+              <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0 text-danger" />
+              <p className="text-xs text-danger">{enrichError}</p>
+            </div>
+          )}
+          {relatedLinks.length > 0 && (
+            <div className="mt-2 space-y-2">
+              {relatedLinks.map((link, idx) => (
+                <a
+                  key={`${link.url}-${idx}`}
+                  href={link.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="block rounded-xl border border-border bg-white px-3 py-2 transition-colors hover:border-accent/40"
+                >
+                  {link.title && (
+                    <p className="mb-0.5 text-xs font-medium text-text">{link.title}</p>
+                  )}
+                  {link.description && (
+                    <p className="line-clamp-2 text-xs text-text-secondary">{link.description}</p>
+                  )}
+                  <p className="mt-1 break-all text-[10px] text-text-muted">{link.url}</p>
+                </a>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="mt-5 border-t border-border-light pt-4" />
+
+        {/* 記事URL */}
+        <div className="space-y-2">
+          <p className="text-xs font-semibold text-text-secondary">記事URLを追加</p>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <input
+              type="text"
+              value={articleUrl}
+              onChange={(e) => setArticleUrl(e.target.value)}
+              placeholder="https://example.com/article"
+              className="flex-1 rounded-lg border border-border bg-white px-3 py-2 text-sm text-text outline-none focus:border-accent"
+            />
+            <Button
+              size="sm"
+              onClick={handleAddArticle}
+              disabled={fetchingArticle || !articleUrl.trim()}
+              loading={fetchingArticle}
+              loadingLabel="取得中..."
+            >
+              取得して追加
+            </Button>
+          </div>
+          {articleMessage && (
+            <p className="text-xs text-success">{articleMessage}</p>
+          )}
+          {articleError && (
+            <div className="flex items-start gap-2 rounded-xl border border-danger/20 bg-danger-light px-3 py-2">
+              <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0 text-danger" />
+              <p className="text-xs text-danger">{articleError}</p>
+            </div>
+          )}
+        </div>
+
+        {/* 動画文字起こし */}
+        <div className="mt-5 space-y-2">
+          <p className="text-xs font-semibold text-text-secondary">動画の文字起こしを貼り付け</p>
+          <textarea
+            value={transcriptText}
+            onChange={(e) => setTranscriptText(e.target.value)}
+            placeholder={post.videoTranscriptText ? "（既存の文字起こしを上書きします）" : "動画の文字起こしテキストを貼り付け..."}
+            rows={4}
+            className="w-full resize-none rounded-xl border border-border bg-white px-3 py-2 text-sm text-text outline-none focus:border-accent"
+          />
+          <div className="flex justify-end">
+            <Button
+              size="sm"
+              onClick={handleSaveTranscript}
+              disabled={savingTranscript || !transcriptText.trim()}
+              loading={savingTranscript}
+              loadingLabel="保存中..."
+            >
+              文字起こしを保存
+            </Button>
+          </div>
+          {transcriptMessage && (
+            <p className="text-xs text-success">{transcriptMessage}</p>
+          )}
+          {transcriptError && (
+            <div className="flex items-start gap-2 rounded-xl border border-danger/20 bg-danger-light px-3 py-2">
+              <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0 text-danger" />
+              <p className="text-xs text-danger">{transcriptError}</p>
+            </div>
+          )}
+        </div>
+      </Card>
 
       {/* Actions */}
       <div className="flex flex-col gap-3 sm:flex-row">

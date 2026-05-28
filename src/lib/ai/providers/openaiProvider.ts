@@ -15,14 +15,18 @@ async function fetchOpenAIModels(apiKey: string): Promise<ModelInfo[]> {
       signal: controller.signal,
       cache: "no-store",
     });
-    if (!res.ok) return [];
+    if (!res.ok) {
+      console.warn(`[openaiProvider] /v1/models returned ${res.status}`);
+      return [];
+    }
     const data = (await res.json()) as { data?: Array<{ id: string; created?: number }> };
     if (!Array.isArray(data.data)) return [];
     return data.data
-      .filter((m) => typeof m.id === "string" && /^gpt-/.test(m.id) && !m.id.includes("instruct"))
+      .filter((m) => typeof m.id === "string" && /^(gpt-|o[1-9])/.test(m.id) && !m.id.includes("instruct") && !m.id.includes("audio") && !m.id.includes("realtime") && !m.id.includes("transcribe") && !m.id.includes("tts") && !m.id.includes("image"))
       .sort((a, b) => (b.created ?? 0) - (a.created ?? 0))
       .map((m) => ({ id: m.id, name: m.id }));
-  } catch {
+  } catch (err) {
+    console.warn("[openaiProvider] failed to fetch models:", err);
     return [];
   } finally {
     clearTimeout(timeout);

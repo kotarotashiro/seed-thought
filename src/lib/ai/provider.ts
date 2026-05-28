@@ -60,48 +60,94 @@ function buildLLMClient(
   }
 }
 
-async function getClient(task: AiTaskName): Promise<{ client: LLMClient; isMock: boolean }> {
+async function getClient(task: AiTaskName): Promise<{
+  client: LLMClient;
+  isMock: boolean;
+  provider: string;
+  model: string;
+}> {
   const settings = await getAiRuntimeSettings();
   if (settings.tasks[task].provider === "mock") {
-    return { client: null as unknown as LLMClient, isMock: true };
+    return {
+      client: null as unknown as LLMClient,
+      isMock: true,
+      provider: "mock",
+      model: "mock",
+    };
   }
   const { provider, model, apiKey } = settings.tasks[task];
-  return { client: buildLLMClient(provider, model, apiKey), isMock: false };
+  if (!apiKey) {
+    throw new Error(
+      `[ai/${task}] provider=${provider} の APIキーが見つかりません。設定画面でAPIキーを登録してください。`
+    );
+  }
+  return {
+    client: buildLLMClient(provider, model, apiKey),
+    isMock: false,
+    provider,
+    model,
+  };
+}
+
+// LLM 呼び出し失敗時に provider/model/task を含めた診断ログを出す
+function logAiError(task: AiTaskName, provider: string, model: string, err: unknown): void {
+  const message = err instanceof Error ? err.message : String(err);
+  console.error(`[ai/${task}] provider=${provider} model=${model} call failed: ${message}`);
 }
 
 export function getAiProvider(): AiProvider {
   return {
     async classifyPost(input: ClassifyPostInput): Promise<PostClassificationResult> {
-      const { client, isMock } = await getClient("classifyPost");
-      if (isMock) return mockProvider.classifyPost(input);
-      const prompt = await buildClassifyPrompt(input);
-      const result = await client.chatJson(prompt);
-      const classification = parseAiJson(result, isPostClassificationResult, "投稿分類");
-      return mergeClassificationFallback(input.text, classification);
+      const ctx = await getClient("classifyPost");
+      if (ctx.isMock) return mockProvider.classifyPost(input);
+      try {
+        const prompt = await buildClassifyPrompt(input);
+        const result = await ctx.client.chatJson(prompt);
+        const classification = parseAiJson(result, isPostClassificationResult, "投稿分類");
+        return mergeClassificationFallback(input.text, classification);
+      } catch (err) {
+        logAiError("classifyPost", ctx.provider, ctx.model, err);
+        throw err;
+      }
     },
 
     async translateText(input: TranslateTextInput): Promise<string> {
-      const { client, isMock } = await getClient("translateText");
-      if (isMock) return input.text;
-      const prompt = buildTranslatePrompt(input);
-      const result = await client.chatJson(prompt);
-      return parseAiJson(result, isTranslatedTextResult, "日本語翻訳").translatedText;
+      const ctx = await getClient("translateText");
+      if (ctx.isMock) return input.text;
+      try {
+        const prompt = buildTranslatePrompt(input);
+        const result = await ctx.client.chatJson(prompt);
+        return parseAiJson(result, isTranslatedTextResult, "日本語翻訳").translatedText;
+      } catch (err) {
+        logAiError("translateText", ctx.provider, ctx.model, err);
+        throw err;
+      }
     },
 
     async generateLearningCard(input: SourcePostForLearning): Promise<LearningOutput> {
-      const { client, isMock } = await getClient("generateLearningCard");
-      if (isMock) return mockProvider.generateLearningCard(input);
-      const prompt = buildLearningPrompt(input);
-      const result = await client.chatJson(prompt);
-      return parseAiJson(result, isLearningOutput, "学習カード");
+      const ctx = await getClient("generateLearningCard");
+      if (ctx.isMock) return mockProvider.generateLearningCard(input);
+      try {
+        const prompt = buildLearningPrompt(input);
+        const result = await ctx.client.chatJson(prompt);
+        return parseAiJson(result, isLearningOutput, "学習カード");
+      } catch (err) {
+        logAiError("generateLearningCard", ctx.provider, ctx.model, err);
+        throw err;
+      }
     },
 
     async generateOutput(input: GenerateOutputInput): Promise<GeneratedOutputResult> {
-      const { client, isMock } = await getClient("generateOutput");
-      if (isMock) return mockProvider.generateOutput(input);
-      const prompt = await buildOutputPrompt(input);
-      const result = await client.chatJson(prompt);
-      return parseAiJson(result, isGeneratedOutputResult, "アウトプット生成");
+      const ctx = await getClient("generateOutput");
+      if (ctx.isMock) return mockProvider.generateOutput(input);
+      try {
+        const prompt = await buildOutputPrompt(input);
+        const result = await ctx.client.chatJson(prompt);
+        return parseAiJson(result, isGeneratedOutputResult, "アウトプット生成");
+      } catch (err) {
+        logAiError("generateOutput", ctx.provider, ctx.model, err);
+        throw err;
+      }
     },
 
     async generateStrictLearning(input: {
@@ -112,34 +158,49 @@ export function getAiProvider(): AiProvider {
       learningCardJson?: string;
       userMemo?: string | null;
     }): Promise<StrictLearningOutput> {
-      const { client, isMock } = await getClient("generateStrictLearning");
-      if (isMock) return mockProvider.generateStrictLearning(input);
-      const prompt = await buildStrictLearningPrompt(input);
-      const result = await client.chatJson(prompt);
-      const wrapper = parseAiJson(result, isGeneratedOutputResult, "厳密学習");
-      if (!isStrictLearningOutput(wrapper.contentJson)) {
-        throw new Error("厳密学習の形式が不正です");
+      const ctx = await getClient("generateStrictLearning");
+      if (ctx.isMock) return mockProvider.generateStrictLearning(input);
+      try {
+        const prompt = await buildStrictLearningPrompt(input);
+        const result = await ctx.client.chatJson(prompt);
+        const wrapper = parseAiJson(result, isGeneratedOutputResult, "厳密学習");
+        if (!isStrictLearningOutput(wrapper.contentJson)) {
+          throw new Error("厳密学習の形式が不正です");
+        }
+        return wrapper.contentJson as unknown as StrictLearningOutput;
+      } catch (err) {
+        logAiError("generateStrictLearning", ctx.provider, ctx.model, err);
+        throw err;
       }
-      return wrapper.contentJson as unknown as StrictLearningOutput;
     },
 
     async searchSemantically(
       query: string,
       posts: PostSummaryForSearch[]
     ): Promise<SemanticSearchResult> {
-      const { client, isMock } = await getClient("searchSemantically");
-      if (isMock) return mockProvider.searchSemantically(query, posts);
-      const prompt = buildSemanticSearchPrompt(query, posts);
-      const result = await client.chatJson(prompt);
-      return parseAiJson(result, isSemanticSearchResult, "セマンティック検索");
+      const ctx = await getClient("searchSemantically");
+      if (ctx.isMock) return mockProvider.searchSemantically(query, posts);
+      try {
+        const prompt = buildSemanticSearchPrompt(query, posts);
+        const result = await ctx.client.chatJson(prompt);
+        return parseAiJson(result, isSemanticSearchResult, "セマンティック検索");
+      } catch (err) {
+        logAiError("searchSemantically", ctx.provider, ctx.model, err);
+        throw err;
+      }
     },
 
     async analyzeLikeTrends(posts: PostSummaryForTrend[]): Promise<TrendInsight> {
-      const { client, isMock } = await getClient("analyzeLikeTrends");
-      if (isMock) return mockProvider.analyzeLikeTrends(posts);
-      const prompt = await buildTrendAnalysisPrompt(posts);
-      const result = await client.chatJson(prompt);
-      return parseAiJson(result, isTrendInsight, "傾向分析");
+      const ctx = await getClient("analyzeLikeTrends");
+      if (ctx.isMock) return mockProvider.analyzeLikeTrends(posts);
+      try {
+        const prompt = await buildTrendAnalysisPrompt(posts);
+        const result = await ctx.client.chatJson(prompt);
+        return parseAiJson(result, isTrendInsight, "傾向分析");
+      } catch (err) {
+        logAiError("analyzeLikeTrends", ctx.provider, ctx.model, err);
+        throw err;
+      }
     },
 
     async chat(
@@ -147,10 +208,15 @@ export function getAiProvider(): AiProvider {
       history: ChatMessage[],
       posts: PostContext[]
     ): Promise<string> {
-      const { client, isMock } = await getClient("chat");
-      if (isMock) return mockProvider.chat(message, history, posts);
-      const prompt = await buildChatPrompt(message, history, posts);
-      return client.chatText(prompt);
+      const ctx = await getClient("chat");
+      if (ctx.isMock) return mockProvider.chat(message, history, posts);
+      try {
+        const prompt = await buildChatPrompt(message, history, posts);
+        return await ctx.client.chatText(prompt);
+      } catch (err) {
+        logAiError("chat", ctx.provider, ctx.model, err);
+        throw err;
+      }
     },
   };
 }

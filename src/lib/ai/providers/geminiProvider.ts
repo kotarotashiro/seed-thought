@@ -2,9 +2,9 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import type { LLMClient, ModelInfo, ModelListResult, ProviderConfig } from "./types";
 
 const FALLBACK_MODELS: ModelInfo[] = [
+  { id: "gemini-2.5-pro", name: "Gemini 2.5 Pro" },
+  { id: "gemini-2.5-flash", name: "Gemini 2.5 Flash" },
   { id: "gemini-2.0-flash", name: "Gemini 2.0 Flash" },
-  { id: "gemini-1.5-pro", name: "Gemini 1.5 Pro" },
-  { id: "gemini-1.5-flash", name: "Gemini 1.5 Flash" },
 ];
 
 async function fetchGeminiModels(apiKey: string): Promise<ModelInfo[]> {
@@ -15,7 +15,10 @@ async function fetchGeminiModels(apiKey: string): Promise<ModelInfo[]> {
       `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`,
       { signal: controller.signal, cache: "no-store" }
     );
-    if (!res.ok) return [];
+    if (!res.ok) {
+      console.warn(`[geminiProvider] /v1beta/models returned ${res.status}`);
+      return [];
+    }
     const data = (await res.json()) as {
       models?: Array<{ name: string; displayName?: string; supportedGenerationMethods?: string[] }>;
     };
@@ -31,7 +34,8 @@ async function fetchGeminiModels(apiKey: string): Promise<ModelInfo[]> {
         const id = m.name.replace(/^models\//, "");
         return { id, name: m.displayName || id };
       });
-  } catch {
+  } catch (err) {
+    console.warn("[geminiProvider] failed to fetch models:", err);
     return [];
   } finally {
     clearTimeout(timeout);
