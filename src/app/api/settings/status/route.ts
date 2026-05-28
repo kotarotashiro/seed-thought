@@ -5,7 +5,7 @@ export async function GET() {
   const ai = await getAiPublicSettings();
 
   return NextResponse.json({
-    aiProvider: ai.provider,
+    aiProvider: ai.defaultProvider,
     ai,
   });
 }

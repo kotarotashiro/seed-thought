@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -9,6 +9,7 @@ import {
   AlertCircle,
   CheckCircle,
   ChevronDown,
+  Cpu,
   Database,
   Loader2,
   RefreshCw,
@@ -16,6 +17,8 @@ import {
   Settings,
   User,
 } from "lucide-react";
+
+// ─── Types ───────────────────────────────────────────────────────────────────
 
 type ProfileForm = {
   name: string;
@@ -26,6 +29,33 @@ type ProfileForm = {
   knowledge: string;
 };
 
+type AiProviderName = "grok" | "claude" | "openai" | "gemini" | "kimi" | "mock";
+type AiTaskName =
+  | "classifyPost"
+  | "translateText"
+  | "generateLearningCard"
+  | "generateStrictLearning"
+  | "generateOutput"
+  | "searchSemantically"
+  | "analyzeLikeTrends"
+  | "chat";
+
+type KeyStatus = { hasKey: boolean; source: "ui" | "env" | "oauth" | "none" };
+type ProviderInfo = { value: AiProviderName; label: string; hasKey: boolean; keySource: string };
+type ModelInfo = { id: string; name: string };
+type TaskAssignment = { provider: AiProviderName; model: string };
+
+type AiSettings = {
+  defaultProvider: AiProviderName;
+  defaultModel: string;
+  taskAssignments: Partial<Record<AiTaskName, TaskAssignment>>;
+  keyStatus: Record<AiProviderName, KeyStatus>;
+  providers: ProviderInfo[];
+  taskLabels: Record<AiTaskName, string>;
+};
+
+// ─── Constants ───────────────────────────────────────────────────────────────
+
 const roleOptions = [
   "AI活用・SNS運用・LINE導線設計を発信する個人クリエイター",
   "AI活用を発信する個人クリエイター",
@@ -35,16 +65,8 @@ const roleOptions = [
 ];
 
 const themeOptions = [
-  "AI活用",
-  "Instagram",
-  "公式LINE",
-  "X運用",
-  "note",
-  "チラシ",
-  "セミナー",
-  "マーケティング",
-  "導線設計",
-  "業務効率化",
+  "AI活用", "Instagram", "公式LINE", "X運用", "note",
+  "チラシ", "セミナー", "マーケティング", "導線設計", "業務効率化",
 ];
 
 const toneOptions = [
@@ -55,18 +77,30 @@ const toneOptions = [
   "落ち着いていて、信頼感のある文章",
 ];
 
+const ALL_TASKS: AiTaskName[] = [
+  "classifyPost", "translateText", "generateLearningCard", "generateStrictLearning",
+  "generateOutput", "searchSemantically", "analyzeLikeTrends", "chat",
+];
+
+const PROVIDER_NAMES: Record<AiProviderName, string> = {
+  grok: "Grok (xAI)",
+  claude: "Claude (Anthropic)",
+  openai: "OpenAI",
+  gemini: "Gemini (Google)",
+  kimi: "Kimi (Moonshot)",
+  mock: "Mock",
+};
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
 function toggleListValue(values: string[], value: string): string[] {
-  return values.includes(value)
-    ? values.filter((item) => item !== value)
-    : [...values, value];
+  return values.includes(value) ? values.filter((i) => i !== value) : [...values, value];
 }
 
+// ─── Sub-components ──────────────────────────────────────────────────────────
+
 function SectionHeader({
-  open,
-  onToggle,
-  icon,
-  title,
-  badge,
+  open, onToggle, icon, title, badge,
 }: {
   open: boolean;
   onToggle: () => void;
@@ -75,11 +109,7 @@ function SectionHeader({
   badge?: React.ReactNode;
 }) {
   return (
-    <button
-      type="button"
-      onClick={onToggle}
-      className="w-full flex items-center gap-3 text-left"
-    >
+    <button type="button" onClick={onToggle} className="w-full flex items-center gap-3 text-left">
       {icon}
       <span className="flex-1 text-base font-bold text-text">{title}</span>
       {badge}
@@ -90,10 +120,412 @@ function SectionHeader({
   );
 }
 
+function KeySourceBadge({ source }: { source: string }) {
+  if (source === "env") return <Badge variant="learning">環境変数</Badge>;
+  if (source === "ui")  return <Badge variant="success">設定済み</Badge>;
+  if (source === "oauth") return <Badge variant="success">OAuth</Badge>;
+  return null;
+}
+
+// ─── AI Settings Section ─────────────────────────────────────────────────────
+
+function AiSettingsSection({ open, onToggle }: { open: boolean; onToggle: () => void }) {
+  const [settings, setSettings] = useState<AiSettings | null>(null);
+  const [apiKeyInputs, setApiKeyInputs] = useState<Partial<Record<AiProviderName, string>>>({});
+  const [taskAssignments, setTaskAssignments] = useState<Partial<Record<AiTaskName, TaskAssignment>>>({});
+  const [defaultProvider, setDefaultProvider] = useState<AiProviderName>("grok");
+  const [defaultModel, setDefaultModel] = useState("");
+  const [modelLists, setModelLists] = useState<Partial<Record<AiProviderName, ModelInfo[]>>>({});
+  const [loadingModels, setLoadingModels] = useState<Partial<Record<AiProviderName, boolean>>>({});
+  const [saving, setSaving] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchModels = useCallback(async (provider: AiProviderName) => {
+    if (loadingModels[provider]) return;
+    setLoadingModels((prev) => ({ ...prev, [provider]: true }));
+    try {
+      const res = await fetch(`/api/settings/ai/models?provider=${provider}`);
+      const data = await res.json();
+      if (data.models) {
+        setModelLists((prev) => ({ ...prev, [provider]: data.models }));
+      }
+    } catch {
+      // ignore
+    } finally {
+      setLoadingModels((prev) => ({ ...prev, [provider]: false }));
+    }
+  }, [loadingModels]);
+
+  useEffect(() => {
+    fetch("/api/settings/ai")
+      .then((r) => r.json())
+      .then((data: AiSettings) => {
+        setSettings(data);
+        setDefaultProvider(data.defaultProvider);
+        setDefaultModel(data.defaultModel);
+        setTaskAssignments(data.taskAssignments ?? {});
+      })
+      .catch(() => setError("AI設定の読み込みに失敗しました"));
+  }, []);
+
+  // モデル一覧を持っているProviderを表示時に取得
+  useEffect(() => {
+    if (!open || !settings) return;
+    for (const p of (["grok", "claude", "openai", "gemini", "kimi"] as AiProviderName[])) {
+      if (settings.keyStatus[p]?.hasKey && !modelLists[p]) {
+        fetchModels(p);
+      }
+    }
+  }, [open, settings]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const getModelsForProvider = (provider: AiProviderName): ModelInfo[] => {
+    return modelLists[provider] ?? [];
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const apiKeys: Partial<Record<AiProviderName, string | null>> = {};
+      for (const [p, key] of Object.entries(apiKeyInputs)) {
+        if (key === "") {
+          apiKeys[p as AiProviderName] = null; // 削除
+        } else if (key) {
+          apiKeys[p as AiProviderName] = key;
+        }
+      }
+
+      const res = await fetch("/api/settings/ai", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          defaultProvider,
+          defaultModel,
+          taskAssignments,
+          apiKeys: Object.keys(apiKeys).length > 0 ? apiKeys : undefined,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "保存に失敗しました");
+        return;
+      }
+      setSettings((prev) => prev ? { ...prev, ...data } : prev);
+      setApiKeyInputs({});
+      setMessage("AI設定を保存しました");
+      // 再取得
+      const fresh = await fetch("/api/settings/ai").then((r) => r.json());
+      setSettings(fresh);
+      setDefaultProvider(fresh.defaultProvider);
+      setDefaultModel(fresh.defaultModel);
+      setTaskAssignments(fresh.taskAssignments ?? {});
+    } catch {
+      setError("保存に失敗しました");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleTest = async () => {
+    setTesting(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const res = await fetch("/api/settings/ai", { method: "POST" });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        setError(data.error || "接続テストに失敗しました");
+      } else {
+        setMessage(`接続テスト成功: ${data.summary || data.category}`);
+      }
+    } catch {
+      setError("接続テストに失敗しました");
+    } finally {
+      setTesting(false);
+    }
+  };
+
+  const getTaskProvider = (task: AiTaskName): AiProviderName =>
+    taskAssignments[task]?.provider ?? defaultProvider;
+
+  const getTaskModel = (task: AiTaskName): string =>
+    taskAssignments[task]?.model ?? defaultModel;
+
+  const setTaskProvider = (task: AiTaskName, provider: AiProviderName) => {
+    const models = getModelsForProvider(provider);
+    const model = models[0]?.id ?? defaultModel;
+    setTaskAssignments((prev) => ({ ...prev, [task]: { provider, model } }));
+    if (!modelLists[provider]) fetchModels(provider);
+  };
+
+  const setTaskModel = (task: AiTaskName, model: string) => {
+    const provider = getTaskProvider(task);
+    setTaskAssignments((prev) => ({ ...prev, [task]: { provider, model } }));
+  };
+
+  const handleDefaultProviderChange = (provider: AiProviderName) => {
+    setDefaultProvider(provider);
+    const models = getModelsForProvider(provider);
+    if (models.length > 0) setDefaultModel(models[0].id);
+    if (!modelLists[provider]) fetchModels(provider);
+  };
+
+  if (!settings) {
+    return (
+      <div className="mt-4">
+        <div className="h-8 bg-border-light rounded-xl animate-pulse" />
+      </div>
+    );
+  }
+
+  const availableProviders = settings.providers.filter((p) => p.value !== "mock");
+
+  return (
+    <div className="mt-4 space-y-6">
+      {error && (
+        <div className="rounded-xl border border-danger/20 bg-danger-light px-4 py-3 text-sm text-danger flex gap-2 items-start">
+          <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+          {error}
+        </div>
+      )}
+      {message && (
+        <div className="rounded-xl border border-success/20 bg-success-light px-4 py-3 text-sm text-success flex gap-2 items-start">
+          <CheckCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+          {message}
+        </div>
+      )}
+
+      {/* セクション1: APIキー管理 */}
+      <div>
+        <p className="text-xs font-semibold text-text-secondary mb-3">APIキー管理</p>
+        <div className="space-y-3">
+          {availableProviders.map((p) => (
+            <div key={p.value} className="rounded-xl border border-border bg-white p-3">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-sm font-medium text-text">{p.label}</span>
+                <KeySourceBadge source={settings.keyStatus[p.value]?.source ?? "none"} />
+                {settings.keyStatus[p.value]?.hasKey && (
+                  <CheckCircle className="w-3.5 h-3.5 text-success ml-auto" />
+                )}
+              </div>
+              {p.keySource !== "env" && (
+                <div className="flex gap-2">
+                  <input
+                    type="password"
+                    value={apiKeyInputs[p.value] ?? ""}
+                    onChange={(e) =>
+                      setApiKeyInputs((prev) => ({ ...prev, [p.value]: e.target.value }))
+                    }
+                    placeholder={
+                      settings.keyStatus[p.value]?.hasKey
+                        ? "（設定済み・変更する場合のみ入力）"
+                        : "APIキーを入力..."
+                    }
+                    className="flex-1 rounded-lg border border-border bg-white px-3 py-2 text-sm text-text outline-none focus:border-accent"
+                  />
+                  {settings.keyStatus[p.value]?.source === "ui" && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setApiKeyInputs((prev) => ({ ...prev, [p.value]: "" }))
+                      }
+                      className="text-xs text-danger hover:underline whitespace-nowrap"
+                    >
+                      削除
+                    </button>
+                  )}
+                </div>
+              )}
+              {p.keySource === "env" && (
+                <p className="text-xs text-text-muted">環境変数で設定済みのため変更不可</p>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* セクション2: デフォルトモデル */}
+      <div>
+        <p className="text-xs font-semibold text-text-secondary mb-3">デフォルトモデル</p>
+        <p className="text-xs text-text-muted mb-3">工程別に指定がない場合にこのProvider・モデルが使われます</p>
+        <div className="rounded-xl border border-border bg-white p-3 space-y-3">
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="text-xs text-text-secondary block mb-1">Provider</label>
+              <select
+                value={defaultProvider}
+                onChange={(e) => handleDefaultProviderChange(e.target.value as AiProviderName)}
+                className="w-full rounded-lg border border-border bg-white px-3 py-2 text-sm text-text outline-none focus:border-accent"
+              >
+                {availableProviders.map((p) => (
+                  <option key={p.value} value={p.value} disabled={!p.hasKey}>
+                    {p.label}{!p.hasKey ? " (未設定)" : ""}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs text-text-secondary block mb-1">
+                モデル
+                {loadingModels[defaultProvider] && (
+                  <Loader2 className="w-3 h-3 animate-spin inline ml-1" />
+                )}
+              </label>
+              {getModelsForProvider(defaultProvider).length > 0 ? (
+                <select
+                  value={defaultModel}
+                  onChange={(e) => setDefaultModel(e.target.value)}
+                  className="w-full rounded-lg border border-border bg-white px-3 py-2 text-sm text-text outline-none focus:border-accent"
+                >
+                  {getModelsForProvider(defaultProvider).map((m) => (
+                    <option key={m.id} value={m.id}>{m.name}</option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  type="text"
+                  value={defaultModel}
+                  onChange={(e) => setDefaultModel(e.target.value)}
+                  placeholder="モデル名を入力..."
+                  className="w-full rounded-lg border border-border bg-white px-3 py-2 text-sm text-text outline-none focus:border-accent"
+                />
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* セクション3: 工程別モデル割り当て */}
+      <div>
+        <p className="text-xs font-semibold text-text-secondary mb-3">工程別モデル割り当て</p>
+        <p className="text-xs text-text-muted mb-3">
+          空白の工程はデフォルトモデル（{PROVIDER_NAMES[defaultProvider]} / {defaultModel}）を使用
+        </p>
+        <div className="space-y-2">
+          {ALL_TASKS.map((task) => {
+            const taskLabel = settings.taskLabels[task] ?? task;
+            const taskProvider = getTaskProvider(task);
+            const taskModel = getTaskModel(task);
+            const models = getModelsForProvider(taskProvider);
+            const isCustom = Boolean(taskAssignments[task]);
+
+            return (
+              <div key={task} className={`rounded-xl border p-3 ${isCustom ? "border-accent/30 bg-accent-light/30" : "border-border bg-white"}`}>
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-xs font-medium text-text">{taskLabel}</span>
+                  {isCustom && <Badge variant="learning">カスタム</Badge>}
+                  {!isCustom && <span className="text-xs text-text-muted ml-auto">デフォルト使用</span>}
+                  {isCustom && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setTaskAssignments((prev) => {
+                          const next = { ...prev };
+                          delete next[task];
+                          return next;
+                        })
+                      }
+                      className="text-xs text-text-muted hover:text-danger ml-auto"
+                    >
+                      リセット
+                    </button>
+                  )}
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <select
+                    value={taskProvider}
+                    onChange={(e) => setTaskProvider(task, e.target.value as AiProviderName)}
+                    className="rounded-lg border border-border bg-white px-2 py-1.5 text-xs text-text outline-none focus:border-accent"
+                  >
+                    {availableProviders.map((p) => (
+                      <option key={p.value} value={p.value} disabled={!p.hasKey}>
+                        {p.label}{!p.hasKey ? " (未設定)" : ""}
+                      </option>
+                    ))}
+                  </select>
+                  {models.length > 0 ? (
+                    <select
+                      value={taskModel}
+                      onChange={(e) => setTaskModel(task, e.target.value)}
+                      className="rounded-lg border border-border bg-white px-2 py-1.5 text-xs text-text outline-none focus:border-accent"
+                    >
+                      {models.map((m) => (
+                        <option key={m.id} value={m.id}>{m.name}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input
+                      type="text"
+                      value={taskModel}
+                      onChange={(e) => setTaskModel(task, e.target.value)}
+                      placeholder="モデル名..."
+                      className="rounded-lg border border-border bg-white px-2 py-1.5 text-xs text-text outline-none focus:border-accent"
+                    />
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* 推奨プリセット */}
+      <div>
+        <p className="text-xs font-semibold text-text-secondary mb-2">プリセット</p>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => setTaskAssignments({})}
+            className="rounded-lg border border-border bg-white px-3 py-1.5 text-xs text-text hover:border-accent"
+          >
+            すべてデフォルト
+          </button>
+          {settings.keyStatus.claude?.hasKey && (
+            <button
+              type="button"
+              onClick={() => {
+                const claudeModels = getModelsForProvider("claude");
+                const opusModel = claudeModels.find((m) => m.id.includes("opus"))?.id
+                  ?? claudeModels[0]?.id
+                  ?? "claude-opus-4-7";
+                setTaskAssignments({
+                  generateLearningCard: { provider: "claude", model: opusModel },
+                  generateStrictLearning: { provider: "claude", model: opusModel },
+                });
+              }}
+              className="rounded-lg border border-border bg-white px-3 py-1.5 text-xs text-text hover:border-accent"
+            >
+              学習系のみ Claude Opus
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* アクション */}
+      <div className="flex flex-wrap gap-2">
+        <Button onClick={handleSave} disabled={saving} size="sm" loading={saving} loadingLabel="保存中...">
+          <Save className="w-4 h-4 mr-1.5" />
+          設定を保存
+        </Button>
+        <Button variant="secondary" onClick={handleTest} disabled={testing} size="sm">
+          {testing ? <Loader2 className="w-4 h-4 animate-spin mr-1.5" /> : null}
+          接続テスト
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+// ─── Main Page ────────────────────────────────────────────────────────────────
+
 export default function SettingsPage() {
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
     notion: false,
     profile: false,
+    ai: false,
   });
 
   const toggleSection = (key: string) => {
@@ -101,12 +533,7 @@ export default function SettingsPage() {
   };
 
   const [profile, setProfile] = useState<ProfileForm>({
-    name: "",
-    role: "",
-    themes: [],
-    outputChannels: [],
-    tone: "",
-    knowledge: "",
+    name: "", role: "", themes: [], outputChannels: [], tone: "", knowledge: "",
   });
   const [notionApiKey, setNotionApiKey] = useState("");
   const [notionDatabaseId, setNotionDatabaseId] = useState("");
@@ -152,16 +579,13 @@ export default function SettingsPage() {
     }
 
     loadSettings();
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, []);
 
   const handleSave = async () => {
     setSaving(true);
     setError(null);
     setMessage(null);
-
     try {
       const res = await fetch("/api/settings/profile", {
         method: "PUT",
@@ -176,12 +600,10 @@ export default function SettingsPage() {
         }),
       });
       const data = await res.json();
-
       if (!res.ok || data.error) {
         setError(data.error || "保存に失敗しました");
         return;
       }
-
       setProfile({
         name: data.name,
         role: data.role,
@@ -256,9 +678,7 @@ export default function SettingsPage() {
         </div>
         <div>
           <h1 className="text-xl font-bold text-text sm:text-2xl">設定</h1>
-          <p className="text-sm text-text-secondary">
-            アプリケーションの設定を編集
-          </p>
+          <p className="text-sm text-text-secondary">アプリケーションの設定を編集</p>
         </div>
       </div>
 
@@ -272,6 +692,19 @@ export default function SettingsPage() {
           {message}
         </div>
       )}
+
+      {/* AI Settings */}
+      <Card>
+        <SectionHeader
+          open={openSections.ai}
+          onToggle={() => toggleSection("ai")}
+          icon={<Cpu className="w-5 h-5 text-accent flex-shrink-0" />}
+          title="AI設定"
+        />
+        {openSections.ai && (
+          <AiSettingsSection open={openSections.ai} onToggle={() => toggleSection("ai")} />
+        )}
+      </Card>
 
       {/* Notion Integration */}
       <Card>
@@ -300,12 +733,10 @@ export default function SettingsPage() {
                 {notionMessage}
               </div>
             )}
-
             <p className="text-xs text-text-secondary">
               保存済みの学びメモをNotionデータベースに同期します。<br />
               Notionでインテグレーションを作成し、データベースと共有してください。
             </p>
-
             <div className="space-y-1">
               <label className="text-xs font-semibold text-text-secondary">
                 Notion APIキー（Internal Integration Token）
@@ -320,11 +751,8 @@ export default function SettingsPage() {
                 />
               </div>
             </div>
-
             <div className="space-y-1">
-              <label className="text-xs font-semibold text-text-secondary">
-                データベースID
-              </label>
+              <label className="text-xs font-semibold text-text-secondary">データベースID</label>
               <input
                 type="text"
                 value={notionDatabaseId}
@@ -332,17 +760,10 @@ export default function SettingsPage() {
                 placeholder="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
                 className="w-full rounded-xl border border-border bg-white px-4 py-2.5 text-sm text-text outline-none focus:border-accent"
               />
-              <p className="text-xs text-text-muted">
-                NotionのデータベースURLの末尾32文字
-              </p>
+              <p className="text-xs text-text-muted">NotionのデータベースURLの末尾32文字</p>
             </div>
-
             <div className="flex flex-wrap gap-2">
-              <Button
-                onClick={handleSaveNotion}
-                disabled={savingNotion}
-                size="sm"
-              >
+              <Button onClick={handleSaveNotion} disabled={savingNotion} size="sm">
                 {savingNotion ? <Loader2 className="w-4 h-4 animate-spin mr-1.5" /> : <Save className="w-4 h-4 mr-1.5" />}
                 設定を保存
               </Button>
@@ -383,7 +804,6 @@ export default function SettingsPage() {
                 保存
               </Button>
             </div>
-
             {loading ? (
               <div className="space-y-3 animate-pulse">
                 <div className="h-12 bg-border-light rounded-xl" />
@@ -396,14 +816,14 @@ export default function SettingsPage() {
                   <span className="block text-sm font-medium text-text mb-1">名前</span>
                   <input
                     value={profile.name}
-                    onChange={(e) => setProfile((current) => ({ ...current, name: e.target.value }))}
+                    onChange={(e) => setProfile((c) => ({ ...c, name: e.target.value }))}
                     className="w-full rounded-xl border border-border bg-white px-4 py-3 text-sm text-text outline-none focus:border-accent"
                   />
                 </label>
                 <Select
                   label="役割"
                   value={profile.role}
-                  onChange={(e) => setProfile((current) => ({ ...current, role: e.target.value }))}
+                  onChange={(e) => setProfile((c) => ({ ...c, role: e.target.value }))}
                   options={roleOptions.map((value) => ({ value, label: value }))}
                 />
                 <div>
@@ -418,9 +838,9 @@ export default function SettingsPage() {
                           type="checkbox"
                           checked={profile.themes.includes(theme)}
                           onChange={() =>
-                            setProfile((current) => ({
-                              ...current,
-                              themes: toggleListValue(current.themes, theme),
+                            setProfile((c) => ({
+                              ...c,
+                              themes: toggleListValue(c.themes, theme),
                             }))
                           }
                           className="h-4 w-4 accent-accent"
@@ -433,7 +853,7 @@ export default function SettingsPage() {
                 <Select
                   label="トーン"
                   value={profile.tone}
-                  onChange={(e) => setProfile((current) => ({ ...current, tone: e.target.value }))}
+                  onChange={(e) => setProfile((c) => ({ ...c, tone: e.target.value }))}
                   options={toneOptions.map((value) => ({ value, label: value }))}
                 />
                 <label className="block">
@@ -445,7 +865,7 @@ export default function SettingsPage() {
                   </p>
                   <textarea
                     value={profile.knowledge}
-                    onChange={(e) => setProfile((current) => ({ ...current, knowledge: e.target.value }))}
+                    onChange={(e) => setProfile((c) => ({ ...c, knowledge: e.target.value }))}
                     placeholder={"例）私はAI活用×Instagram集客を専門とする個人クリエイターです。\n主なターゲットは地方の女性起業家（30〜50代）で、難しい専門用語を使わず、すぐに行動できる実用的なノウハウを届けています。\nSNSの発信歴は3年で、フォロワーは約2,000人です。"}
                     rows={6}
                     className="w-full rounded-xl border border-border bg-white px-4 py-3 text-sm text-text outline-none focus:border-accent resize-none leading-relaxed"

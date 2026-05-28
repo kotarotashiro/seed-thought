@@ -1,196 +1,336 @@
 import { prisma } from "@/lib/db/prisma";
 import { decryptToken, encryptToken } from "@/lib/x/tokenStore";
 import { hasXaiAuthConfigured } from "@/lib/xai/client";
+import { getGrokModels } from "./providers/grokProvider";
+import { getClaudeModels } from "./providers/claudeProvider";
+import { getOpenAIModels } from "./providers/openaiProvider";
+import { getGeminiModels } from "./providers/geminiProvider";
+import { getKimiModels } from "./providers/kimiProvider";
+import type { ModelListResult } from "./providers/types";
 
 export const AI_SETTING_KEY = "ai";
 
-export type AiProviderName = "grok" | "mock";
+export type AiProviderName = "grok" | "claude" | "openai" | "gemini" | "kimi" | "mock";
 
-export interface AiSettingsPublic {
+export const PROVIDER_LABELS: Record<AiProviderName, string> = {
+  grok: "Grok (xAI)",
+  claude: "Claude (Anthropic)",
+  openai: "OpenAI",
+  gemini: "Gemini (Google)",
+  kimi: "Kimi (Moonshot)",
+  mock: "Mock",
+};
+
+export type AiTaskName =
+  | "classifyPost"
+  | "translateText"
+  | "generateLearningCard"
+  | "generateStrictLearning"
+  | "generateOutput"
+  | "searchSemantically"
+  | "analyzeLikeTrends"
+  | "chat";
+
+export const TASK_LABELS: Record<AiTaskName, string> = {
+  classifyPost: "投稿分類",
+  translateText: "翻訳",
+  generateLearningCard: "学習カード生成",
+  generateStrictLearning: "厳密学習生成",
+  generateOutput: "アウトプット生成",
+  searchSemantically: "セマンティック検索",
+  analyzeLikeTrends: "傾向分析",
+  chat: "チャット",
+};
+
+export interface AiTaskAssignment {
   provider: AiProviderName;
   model: string;
-  hasApiKey: boolean;
-  keySource: "ui" | "env" | "oauth" | "none";
-}
-
-export interface AiRuntimeSettings extends AiSettingsPublic {
-  apiKey: string | null;
-}
-
-export interface AiProviderModelOptions {
-  defaultModel: string;
-  models: string[];
-  source: "live" | "fallback";
 }
 
 interface StoredAiSettings {
+  // 全工程共通デフォルト
+  defaultProvider?: AiProviderName;
+  defaultModel?: string;
+  // Provider別の暗号化APIキー
+  apiKeys?: Partial<Record<AiProviderName, string>>;
+  // 工程別の割り当て
+  taskAssignments?: Partial<Record<AiTaskName, AiTaskAssignment>>;
+  // 旧スキーマ互換（読み込みのみ）
   provider?: AiProviderName;
   model?: string;
   apiKeyEncrypted?: string;
 }
 
-const defaultModels: Record<AiProviderName, string> = {
-  grok: "grok-4.3",
+export interface AiKeyStatus {
+  hasKey: boolean;
+  source: "ui" | "env" | "oauth" | "none";
+}
+
+export interface AiTaskResolved extends AiTaskAssignment {
+  apiKey: string | null;
+}
+
+export interface AiRuntimeSettings {
+  defaultProvider: AiProviderName;
+  defaultModel: string;
+  tasks: Record<AiTaskName, AiTaskResolved>;
+  keyStatus: Record<AiProviderName, AiKeyStatus>;
+}
+
+export interface AiPublicSettings {
+  defaultProvider: AiProviderName;
+  defaultModel: string;
+  taskAssignments: Partial<Record<AiTaskName, AiTaskAssignment>>;
+  keyStatus: Record<AiProviderName, Omit<AiKeyStatus, never>>;
+}
+
+// 環境変数キー
+const ENV_KEYS: Record<AiProviderName, string | undefined> = {
+  grok: process.env.GROK_API_KEY || process.env.XAI_API_KEY,
+  claude: process.env.ANTHROPIC_API_KEY || process.env.CLAUDE_API_KEY,
+  openai: process.env.OPENAI_API_KEY,
+  gemini: process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY,
+  kimi: process.env.KIMI_API_KEY || process.env.MOONSHOT_API_KEY,
+  mock: undefined,
+};
+
+// デフォルトモデル（保守的な既知モデルのみ）
+const DEFAULT_MODELS: Record<AiProviderName, string> = {
+  grok: "grok-3",
+  claude: "claude-sonnet-4-6",
+  openai: "gpt-4o",
+  gemini: "gemini-2.0-flash",
+  kimi: "moonshot-v1-32k",
   mock: "mock",
 };
 
-const modelPresets: Record<AiProviderName, string[]> = {
-  grok: ["grok-4.3", "grok-4.20", "grok-3", "grok-3-mini"],
-  mock: ["mock"],
-};
+const ALL_PROVIDERS: AiProviderName[] = ["grok", "claude", "openai", "gemini", "kimi"];
+const ALL_TASKS: AiTaskName[] = [
+  "classifyPost",
+  "translateText",
+  "generateLearningCard",
+  "generateStrictLearning",
+  "generateOutput",
+  "searchSemantically",
+  "analyzeLikeTrends",
+  "chat",
+];
 
-const envKeys: Record<AiProviderName, string | undefined> = {
-  grok: process.env.GROK_API_KEY || process.env.XAI_API_KEY,
-  mock: undefined,
-};
-
-const envModels: Record<AiProviderName, string | undefined> = {
-  grok: process.env.GROK_MODEL || process.env.XAI_MODEL,
-  mock: undefined,
-};
-
-function normalizeProvider(value: unknown): AiProviderName {
-  const provider = String(value || process.env.AI_PROVIDER || "grok");
-  if (provider === "mock" && process.env.NODE_ENV !== "production") return "mock";
-  return "grok";
+function normalizeProvider(value: unknown, fallback: AiProviderName = "grok"): AiProviderName {
+  const p = String(value || "");
+  const valid: AiProviderName[] = ["grok", "claude", "openai", "gemini", "kimi", "mock"];
+  if (!valid.includes(p as AiProviderName)) return fallback;
+  if (p === "mock" && process.env.NODE_ENV === "production") return fallback;
+  return p as AiProviderName;
 }
 
 function readStoredSettings(valueJson: string | null | undefined): StoredAiSettings {
   if (!valueJson) return {};
   try {
-    const value = JSON.parse(valueJson);
-    return typeof value === "object" && value !== null ? value : {};
+    const v = JSON.parse(valueJson);
+    return typeof v === "object" && v !== null ? v : {};
   } catch {
     return {};
   }
 }
 
-async function fetchJson(url: string, init?: RequestInit): Promise<unknown> {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 3500);
+function migrateStoredSettings(stored: StoredAiSettings): StoredAiSettings {
+  // 旧 provider/model/apiKeyEncrypted → 新スキーマへマイグレーション
+  if (!stored.defaultProvider && stored.provider) {
+    const migrated: StoredAiSettings = { ...stored };
+    migrated.defaultProvider = normalizeProvider(stored.provider);
+    migrated.defaultModel = stored.model;
+    if (stored.apiKeyEncrypted && stored.provider) {
+      migrated.apiKeys = { [stored.provider]: stored.apiKeyEncrypted };
+    }
+    return migrated;
+  }
+  return stored;
+}
+
+function getEnvApiKey(provider: AiProviderName): string | null {
+  return ENV_KEYS[provider] || null;
+}
+
+function getUiApiKey(stored: StoredAiSettings, provider: AiProviderName): string | null {
+  const encrypted = stored.apiKeys?.[provider];
+  if (!encrypted) return null;
   try {
-    const response = await fetch(url, { ...init, signal: controller.signal, cache: "no-store" });
-    if (!response.ok) return null;
-    return response.json();
-  } finally {
-    clearTimeout(timeout);
+    return decryptToken(encrypted);
+  } catch {
+    return null;
   }
-}
-
-function uniqueModels(models: string[]): string[] {
-  return Array.from(new Set(models.map((m) => m.trim()).filter(Boolean)));
-}
-
-function getModelSortScore(model: string): number {
-  const idx = modelPresets.grok.indexOf(model);
-  return idx >= 0 ? idx : 1000;
-}
-
-function selectCurrentModels(models: string[], limit = 4): string[] {
-  return uniqueModels(models)
-    .filter((m) => m.startsWith("grok-"))
-    .sort((a, b) => {
-      const score = getModelSortScore(a) - getModelSortScore(b);
-      return score !== 0 ? score : b.localeCompare(a);
-    })
-    .slice(0, limit);
-}
-
-async function fetchGrokModels(apiKey: string): Promise<string[]> {
-  const data = await fetchJson("https://api.x.ai/v1/models", {
-    headers: { authorization: `Bearer ${apiKey}` },
-  });
-  if (!data || typeof data !== "object" || !("data" in data) || !Array.isArray((data as { data: unknown }).data)) {
-    return [];
-  }
-  return (data as { data: Array<{ id?: unknown }> }).data.map((m) =>
-    typeof m.id === "string" ? m.id : ""
-  );
 }
 
 export function getDefaultModel(provider: AiProviderName): string {
-  return envModels[provider] || defaultModels[provider];
-}
-
-export function getRecommendedModel(provider: AiProviderName): string {
-  return defaultModels[provider];
-}
-
-export function getEnvApiKey(provider: AiProviderName): string | null {
-  return envKeys[provider] || null;
-}
-
-export function getModelPresets(provider: AiProviderName): string[] {
-  const envModel = envModels[provider];
-  return Array.from(new Set([...modelPresets[provider], ...(envModel ? [envModel] : [])]));
+  const envModel =
+    provider === "grok"
+      ? process.env.GROK_MODEL || process.env.XAI_MODEL
+      : provider === "claude"
+      ? process.env.CLAUDE_MODEL || process.env.ANTHROPIC_MODEL
+      : provider === "openai"
+      ? process.env.OPENAI_MODEL
+      : provider === "gemini"
+      ? process.env.GEMINI_MODEL
+      : provider === "kimi"
+      ? process.env.KIMI_MODEL || process.env.MOONSHOT_MODEL
+      : undefined;
+  return envModel || DEFAULT_MODELS[provider];
 }
 
 export async function getProviderModelOptions(
   provider: AiProviderName,
   apiKey: string | null
-): Promise<AiProviderModelOptions> {
-  const fallbackModels = getModelPresets(provider);
-  let liveModels: string[] = [];
-  if (provider === "grok" && apiKey) {
-    const raw = await fetchGrokModels(apiKey).catch(() => []);
-    liveModels = selectCurrentModels(raw);
+): Promise<ModelListResult> {
+  switch (provider) {
+    case "grok":   return getGrokModels(apiKey);
+    case "claude": return getClaudeModels(apiKey);
+    case "openai": return getOpenAIModels(apiKey);
+    case "gemini": return getGeminiModels(apiKey);
+    case "kimi":   return getKimiModels(apiKey);
+    default:       return { models: [], source: "fallback" };
   }
-  const models = liveModels.length > 0 ? liveModels : fallbackModels;
-  return {
-    defaultModel: models[0] || getRecommendedModel(provider),
-    models,
-    source: liveModels.length > 0 ? "live" : "fallback",
-  };
+}
+
+export async function getProviderApiKey(provider: AiProviderName): Promise<string | null> {
+  const setting = await prisma.appSetting.findUnique({ where: { key: AI_SETTING_KEY } });
+  const stored = migrateStoredSettings(readStoredSettings(setting?.valueJson));
+  return getUiApiKey(stored, provider) || getEnvApiKey(provider);
 }
 
 export async function getAiRuntimeSettings(): Promise<AiRuntimeSettings> {
   const setting = await prisma.appSetting.findUnique({ where: { key: AI_SETTING_KEY } });
-  const stored = readStoredSettings(setting?.valueJson);
-  const provider = normalizeProvider(stored.provider);
-  const model = stored.model?.trim() || getDefaultModel(provider);
-  const uiKey = stored.apiKeyEncrypted ? decryptToken(stored.apiKeyEncrypted) : null;
-  const envKey = envKeys[provider] || null;
-  const apiKey = uiKey || envKey;
-  const hasOAuth = provider === "grok" && !apiKey ? await hasXaiAuthConfigured() : false;
+  const raw = readStoredSettings(setting?.valueJson);
+  const stored = migrateStoredSettings(raw);
 
-  return {
-    provider,
-    model,
-    apiKey,
-    hasApiKey: Boolean(apiKey) || hasOAuth || provider === "mock",
-    keySource: uiKey ? "ui" : envKey ? "env" : hasOAuth ? "oauth" : "none",
-  };
+  const envProvider = process.env.AI_PROVIDER as AiProviderName | undefined;
+  const defaultProvider = normalizeProvider(stored.defaultProvider ?? envProvider ?? "grok");
+  const defaultModel = stored.defaultModel?.trim() || getDefaultModel(defaultProvider);
+
+  // xAI OAuth
+  const hasGrokOAuth =
+    defaultProvider === "grok" && !getEnvApiKey("grok") && !getUiApiKey(stored, "grok")
+      ? await hasXaiAuthConfigured()
+      : false;
+
+  // keyStatus
+  const keyStatus = {} as Record<AiProviderName, AiKeyStatus>;
+  for (const p of ALL_PROVIDERS) {
+    const ui = getUiApiKey(stored, p);
+    const env = getEnvApiKey(p);
+    const oauth = p === "grok" && !ui && !env ? hasGrokOAuth : false;
+    keyStatus[p] = {
+      hasKey: Boolean(ui || env || oauth) || p === "mock",
+      source: ui ? "ui" : env ? "env" : oauth ? "oauth" : "none",
+    };
+  }
+  keyStatus.mock = { hasKey: true, source: "none" };
+
+  // 各工程のAPIキー取得ヘルパー
+  function resolveKey(provider: AiProviderName): string | null {
+    return getUiApiKey(stored, provider) || getEnvApiKey(provider);
+  }
+
+  // 工程別割り当て解決
+  const tasks = {} as Record<AiTaskName, AiTaskResolved>;
+  for (const task of ALL_TASKS) {
+    const assignment = stored.taskAssignments?.[task];
+    if (assignment && normalizeProvider(assignment.provider) !== "grok" || assignment) {
+      const provider = normalizeProvider(assignment?.provider ?? defaultProvider, defaultProvider);
+      const model = assignment?.model?.trim() || getDefaultModel(provider);
+      const apiKey = resolveKey(provider);
+      // APIキーが無い場合はデフォルトにフォールバック
+      if (apiKey || provider === "mock" || (provider === "grok" && hasGrokOAuth)) {
+        tasks[task] = { provider, model, apiKey };
+      } else {
+        const fallbackKey = resolveKey(defaultProvider);
+        tasks[task] = { provider: defaultProvider, model: defaultModel, apiKey: fallbackKey };
+        console.warn(`[ai/settings] ${task}: provider=${provider} has no API key, falling back to ${defaultProvider}`);
+      }
+    } else {
+      const apiKey = resolveKey(defaultProvider);
+      tasks[task] = { provider: defaultProvider, model: defaultModel, apiKey };
+    }
+  }
+
+  return { defaultProvider, defaultModel, tasks, keyStatus };
 }
 
-export async function getAiPublicSettings(): Promise<AiSettingsPublic> {
-  const settings = await getAiRuntimeSettings();
+export async function getAiPublicSettings(): Promise<AiPublicSettings> {
+  const setting = await prisma.appSetting.findUnique({ where: { key: AI_SETTING_KEY } });
+  const raw = readStoredSettings(setting?.valueJson);
+  const stored = migrateStoredSettings(raw);
+
+  const envProvider = process.env.AI_PROVIDER as AiProviderName | undefined;
+  const defaultProvider = normalizeProvider(stored.defaultProvider ?? envProvider ?? "grok");
+  const defaultModel = stored.defaultModel?.trim() || getDefaultModel(defaultProvider);
+
+  const hasGrokOAuth = await hasXaiAuthConfigured();
+
+  const keyStatus = {} as Record<AiProviderName, AiKeyStatus>;
+  for (const p of ALL_PROVIDERS) {
+    const ui = getUiApiKey(stored, p);
+    const env = getEnvApiKey(p);
+    const oauth = p === "grok" && !ui && !env ? hasGrokOAuth : false;
+    keyStatus[p] = {
+      hasKey: Boolean(ui || env || oauth),
+      source: ui ? "ui" : env ? "env" : oauth ? "oauth" : "none",
+    };
+  }
+  keyStatus.mock = { hasKey: true, source: "none" };
+
   return {
-    provider: settings.provider,
-    model: settings.model,
-    hasApiKey: settings.hasApiKey,
-    keySource: settings.keySource,
+    defaultProvider,
+    defaultModel,
+    taskAssignments: stored.taskAssignments ?? {},
+    keyStatus,
   };
 }
 
 export async function saveAiSettings(input: {
-  provider: AiProviderName;
-  model?: string;
-  apiKey?: string;
-  clearApiKey?: boolean;
-}): Promise<AiSettingsPublic> {
+  defaultProvider?: AiProviderName;
+  defaultModel?: string;
+  taskAssignments?: Partial<Record<AiTaskName, AiTaskAssignment | null>>;
+  apiKeys?: Partial<Record<AiProviderName, string | null>>;
+}): Promise<AiPublicSettings> {
   const current = await prisma.appSetting.findUnique({ where: { key: AI_SETTING_KEY } });
-  const stored = readStoredSettings(current?.valueJson);
-  const provider = normalizeProvider(input.provider);
+  const raw = readStoredSettings(current?.valueJson);
+  const stored = migrateStoredSettings(raw);
+
   const next: StoredAiSettings = {
-    provider,
-    model: input.model?.trim() || getDefaultModel(provider),
-    apiKeyEncrypted: stored.apiKeyEncrypted,
+    defaultProvider: input.defaultProvider
+      ? normalizeProvider(input.defaultProvider)
+      : stored.defaultProvider,
+    defaultModel: input.defaultModel?.trim() || stored.defaultModel,
+    apiKeys: { ...(stored.apiKeys ?? {}) },
+    taskAssignments: { ...(stored.taskAssignments ?? {}) },
   };
 
-  if (input.clearApiKey) {
-    delete next.apiKeyEncrypted;
-  } else if (input.apiKey?.trim()) {
-    next.apiKeyEncrypted = encryptToken(input.apiKey.trim());
+  // APIキーの更新
+  if (input.apiKeys) {
+    for (const [provider, key] of Object.entries(input.apiKeys)) {
+      const p = provider as AiProviderName;
+      if (key === null) {
+        delete next.apiKeys![p];
+      } else if (key.trim()) {
+        next.apiKeys![p] = encryptToken(key.trim());
+      }
+    }
+  }
+
+  // 工程別割り当ての更新
+  if (input.taskAssignments) {
+    for (const [task, assignment] of Object.entries(input.taskAssignments)) {
+      const t = task as AiTaskName;
+      if (assignment === null) {
+        delete next.taskAssignments![t];
+      } else if (assignment) {
+        next.taskAssignments![t] = {
+          provider: normalizeProvider(assignment.provider),
+          model: assignment.model.trim(),
+        };
+      }
+    }
   }
 
   await prisma.appSetting.upsert({

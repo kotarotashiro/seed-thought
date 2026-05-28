@@ -1,39 +1,35 @@
 import { NextResponse } from "next/server";
 import {
+  getAiPublicSettings,
   getAiRuntimeSettings,
-  getEnvApiKey,
   getProviderModelOptions,
   saveAiSettings,
+  PROVIDER_LABELS,
+  TASK_LABELS,
   type AiProviderName,
+  type AiTaskName,
+  type AiTaskAssignment,
 } from "@/lib/ai/settings";
 import { getAiProvider } from "@/lib/ai/provider";
 import { getUserFacingError } from "@/lib/api/errors";
 
-const providers: AiProviderName[] = ["grok"];
+const PROVIDERS: AiProviderName[] = ["grok", "claude", "openai", "gemini", "kimi"];
 
 export async function GET() {
   try {
-    const settings = await getAiRuntimeSettings();
-    const providerOptions = await Promise.all(
-      providers.map(async (provider) => {
-        const apiKey = provider === settings.provider ? settings.apiKey : getEnvApiKey(provider);
-        const options = await getProviderModelOptions(provider, apiKey);
-        return {
-          value: provider,
-          label: "Grok (xAI)",
-          defaultModel: options.defaultModel,
-          modelsSource: options.source,
-          models: options.models.map((model) => ({ value: model, label: model })),
-        };
-      })
-    );
-
+    const settings = await getAiPublicSettings();
     return NextResponse.json({
-      provider: settings.provider,
-      model: settings.model,
-      hasApiKey: settings.hasApiKey,
-      keySource: settings.keySource,
-      providers: providerOptions,
+      defaultProvider: settings.defaultProvider,
+      defaultModel: settings.defaultModel,
+      taskAssignments: settings.taskAssignments,
+      keyStatus: settings.keyStatus,
+      providers: PROVIDERS.map((p) => ({
+        value: p,
+        label: PROVIDER_LABELS[p],
+        hasKey: settings.keyStatus[p]?.hasKey ?? false,
+        keySource: settings.keyStatus[p]?.source ?? "none",
+      })),
+      taskLabels: TASK_LABELS,
     });
   } catch (error) {
     console.error("Failed to load AI settings:", error);
@@ -47,13 +43,25 @@ export async function GET() {
 export async function PUT(request: Request) {
   try {
     const body = await request.json();
-    // Always use grok — only model and apiKey are variable
-    const settings = await saveAiSettings({
-      provider: "grok",
-      model: typeof body.model === "string" ? body.model : undefined,
-      apiKey: typeof body.apiKey === "string" ? body.apiKey : undefined,
-      clearApiKey: Boolean(body.clearApiKey),
-    });
+
+    const input: Parameters<typeof saveAiSettings>[0] = {};
+
+    if (typeof body.defaultProvider === "string") {
+      input.defaultProvider = body.defaultProvider as AiProviderName;
+    }
+    if (typeof body.defaultModel === "string") {
+      input.defaultModel = body.defaultModel;
+    }
+    if (body.taskAssignments && typeof body.taskAssignments === "object") {
+      input.taskAssignments = body.taskAssignments as Partial<
+        Record<AiTaskName, AiTaskAssignment | null>
+      >;
+    }
+    if (body.apiKeys && typeof body.apiKeys === "object") {
+      input.apiKeys = body.apiKeys as Partial<Record<AiProviderName, string | null>>;
+    }
+
+    const settings = await saveAiSettings(input);
     return NextResponse.json(settings);
   } catch (error) {
     console.error("Failed to save AI settings:", error);
@@ -64,6 +72,7 @@ export async function PUT(request: Request) {
   }
 }
 
+// 接続テスト
 export async function POST() {
   try {
     const provider = getAiProvider();
