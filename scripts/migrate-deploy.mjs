@@ -51,15 +51,31 @@ async function prewarmAndClearLocks() {
   // Sanity probe.
   await client.query("SELECT 1");
 
-  // Release any stale migration advisory lock from a prior aborted run.
-  // pg_advisory_unlock_all() only releases session-level locks held by
-  // *this* session, so it's safe — it won't yank a lock from a live peer.
-  // For a stuck lock from a dead session, Postgres releases it when that
-  // session's backend exits; this call mostly documents intent.
+  // Release locks held by *this* session (defensive — should be none).
   try {
     await client.query("SELECT pg_advisory_unlock_all()");
   } catch (err) {
     console.warn("[migrate-deploy] pg_advisory_unlock_all() failed (non-fatal):", err.message);
+  }
+
+  // Kill any *other* session still holding Prisma's migration advisory lock
+  // (id 72707369). These are orphaned from aborted/canceled builds — Vercel
+  // doesn't run concurrent deploys for one project, so a peer holding this
+  // lock is definitionally stale. Without this, P1002 fires every retry.
+  try {
+    const { rows } = await client.query(`
+      SELECT pg_terminate_backend(l.pid) AS terminated, l.pid
+      FROM pg_locks l
+      JOIN pg_stat_activity a ON a.pid = l.pid
+      WHERE l.locktype = 'advisory'
+        AND l.objid = 72707369
+        AND a.pid <> pg_backend_pid()
+    `);
+    if (rows.length > 0) {
+      console.log(`[migrate-deploy] Terminated ${rows.length} stale session(s) holding migration lock: ${rows.map((r) => r.pid).join(", ")}`);
+    }
+  } catch (err) {
+    console.warn("[migrate-deploy] stale-lock cleanup failed (non-fatal):", err.message);
   }
 
   await client.end();
