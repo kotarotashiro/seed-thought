@@ -227,8 +227,13 @@ export async function getAiRuntimeSettings(): Promise<AiRuntimeSettings> {
   keyStatus.mock = { hasKey: true, source: "none" };
 
   // 各工程のAPIキー取得ヘルパー
+  // Grok OAuth の場合は xaiChat が内部で認証を解決するため、
+  // "oauth" センチネルを返して apiKey non-null を保証する
   function resolveKey(provider: AiProviderName): string | null {
-    return getUiApiKey(stored, provider) || getEnvApiKey(provider);
+    const uiOrEnv = getUiApiKey(stored, provider) || getEnvApiKey(provider);
+    if (uiOrEnv) return uiOrEnv;
+    if (provider === "grok" && hasGrokOAuth) return "oauth";
+    return null;
   }
 
   // 工程別割り当て解決
@@ -244,14 +249,26 @@ export async function getAiRuntimeSettings(): Promise<AiRuntimeSettings> {
         tasks[task] = { provider, model, apiKey };
       } else {
         const fallbackKey = resolveKey(defaultProvider);
-        tasks[task] = { provider: defaultProvider, model: defaultModel, apiKey: fallbackKey };
+        if (fallbackKey || defaultProvider === "mock" || (defaultProvider === "grok" && hasGrokOAuth)) {
+          tasks[task] = { provider: defaultProvider, model: defaultModel, apiKey: fallbackKey };
+        } else {
+          tasks[task] = { provider: "mock", model: "mock", apiKey: null };
+        }
         console.warn(
-          `[ai/settings] ${task}: provider=${provider} has no API key, falling back to ${defaultProvider}`
+          `[ai/settings] ${task}: provider=${provider} has no API key, falling back to ${tasks[task].provider}`
         );
       }
     } else {
       const apiKey = resolveKey(defaultProvider);
-      tasks[task] = { provider: defaultProvider, model: defaultModel, apiKey };
+      if (apiKey || defaultProvider === "mock" || (defaultProvider === "grok" && hasGrokOAuth)) {
+        tasks[task] = { provider: defaultProvider, model: defaultModel, apiKey };
+      } else {
+        // どのプロバイダにもキーが無い場合の最終フォールバック
+        tasks[task] = { provider: "mock", model: "mock", apiKey: null };
+        console.warn(
+          `[ai/settings] ${task}: no API key available for ${defaultProvider}, falling back to mock`
+        );
+      }
     }
   }
 

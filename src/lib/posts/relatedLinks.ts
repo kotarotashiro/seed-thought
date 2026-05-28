@@ -97,21 +97,27 @@ export async function enrichPostRelatedLinks(
     return { links: existingLinks, fetchedCount: 0, skippedCount: urls.length };
   }
 
+  // URLごとの fetch を並列実行。1件あたり Grok 経由で 10〜25s かかるため、
+  // 直列にするとサーバ側で 1分以上ブロックされて Vercel/Edge のタイムアウトに
+  // 引っかかる。allSettled で失敗 URL は単にスキップする。
+  const results = await Promise.allSettled(
+    targets.map((url) => fetchArticlePreview(url))
+  );
   const fetched: RelatedLink[] = [];
-  for (const url of targets) {
-    try {
-      const preview = await fetchArticlePreview(url);
+  results.forEach((r, i) => {
+    const url = targets[i];
+    if (r.status === "fulfilled") {
       fetched.push({
         url,
-        title: preview.title,
-        description: preview.description,
-        imageUrl: preview.imageUrl,
+        title: r.value.title,
+        description: r.value.description,
+        imageUrl: r.value.imageUrl,
         fetchedAt: new Date().toISOString(),
       });
-    } catch (err) {
-      console.warn(`[relatedLinks] failed to fetch ${url}:`, err);
+    } else {
+      console.warn(`[relatedLinks] failed to fetch ${url}:`, r.reason);
     }
-  }
+  });
 
   // 既存(優先) + 新規 をマージ
   const merged: RelatedLink[] = [
