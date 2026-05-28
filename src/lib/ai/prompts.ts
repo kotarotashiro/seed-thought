@@ -331,12 +331,90 @@ ${input.finalSummary || "なし"}
 
 ## 出力形式: ${outputTypeLabel[input.outputType] || input.outputType}
 
-以下のJSON形式で返してください：
+${input.outputType === "seminar" ? `以下のJSON形式で必ず返してください。contentは一文の要旨のみ。セミナーの全データをcontentJsonに入れること：
+{
+  "title": "決定したセミナー名",
+  "content": "セミナーを一文で表した要旨（finalStatementと同内容でよい）",
+  "contentJson": {
+    "coreInterpretation": {
+      "surface": "投稿が直接言っていること",
+      "essence": "本当に重要なポイント（本質）",
+      "applicability": "どんな業務・制作・発信に応用できるか",
+      "participantPain": "このセミナーが解決する参加者の悩み"
+    },
+    "titleOptions": [
+      { "title": "タイトル", "subtitle": "サブタイトル", "targetAudience": "誰に刺さるか", "oneLiner": "一言で言うと何を学ぶ講座か" }
+    ],
+    "seminar": {
+      "name": "セミナー名",
+      "subtitle": "サブタイトル",
+      "targetAudience": "対象者",
+      "outcomes": ["受講後にできること1", "受講後にできること2"],
+      "value": "このセミナーの価値",
+      "whyNow": "なぜ今この内容を学ぶべきか"
+    },
+    "schedule": [
+      { "time": "0:00〜0:10", "part": "導入", "content": "内容", "purpose": "目的" }
+    ],
+    "chapterDetails": [
+      {
+        "part": "パート名",
+        "teachingPoint": "この章で伝えること",
+        "script": "話す内容（具体的に）",
+        "slideContent": "見せるスライドの内容",
+        "demonstration": "実演する場合の具体例",
+        "question": "参加者に考えてもらう問い"
+      }
+    ],
+    "demonstration": {
+      "theme": "実演テーマ",
+      "badExample": "実演前の悪い例",
+      "goodExample": "改善後の良い例",
+      "prompt": "実際に使うプロンプト",
+      "expectedOutput": "期待される出力",
+      "showPoints": ["参加者に見せるポイント"]
+    },
+    "workshop": {
+      "name": "ワーク名",
+      "purpose": "ワークの目的",
+      "steps": ["手順1", "手順2"],
+      "fillItems": ["記入項目1", "記入項目2"],
+      "completionImage": "完成イメージ",
+      "facilitatorTips": ["講師が補足すべきポイント"]
+    },
+    "templates": {
+      "basic": "基本テンプレート（そのままコピーして使える形）",
+      "advanced": "応用テンプレート",
+      "fixFailed": "失敗したときの修正テンプレート",
+      "snsPost": "SNS投稿用テンプレート",
+      "seminarMaterial": "セミナー資料用テンプレート",
+      "blogNote": "ブログ・note用テンプレート"
+    },
+    "slides": [
+      { "slideNumber": 1, "title": "スライドタイトル", "content": "内容", "visualIdea": "ビジュアル案" }
+    ],
+    "promotion": {
+      "xPost": "X投稿用告知文",
+      "instagram": "Instagram投稿用告知文",
+      "line": "LINE配信用告知文",
+      "noteIntro": "note記事冒頭文",
+      "lpCopy": "LPファーストビューコピー"
+    },
+    "salesFunnel": {
+      "nextProduct": "セミナー内で案内する次の商品",
+      "consultationBridge": "個別相談へのつなげ方",
+      "templateSales": "有料テンプレート販売案",
+      "continuationCourse": "継続講座にする場合の発展案"
+    },
+    "finalStatement": "このセミナーは、〇〇を学ぶ講座ではなく、〇〇できるようになる講座です"
+  }
+}
+スライドは15〜25枚程度で構成してください。` : `以下のJSON形式で返してください：
 {
   "title": "タイトル",
   "content": "本文内容",
   "contentJson": { /* 必要に応じた構造データ */ }
-}
+}`}
 
 ${input.outputType === "instagram" ? `
 Instagramカルーセルの場合、contentJsonに以下を含めてください:
@@ -386,84 +464,7 @@ ${input.outputType === "seminar" ? `
 - 具体例・実演・ワークを必ず入れる
 - 受講後に使えるテンプレートを必ず作る
 - セミナー告知文も作る
-- 抽象論だけでなく、実際に使える手順まで落とし込む
-
-contentJsonに以下の構造で返してください:
-{
-  "coreInterpretation": {
-    "surface": "投稿が直接言っていること",
-    "essence": "本当に重要なポイント（本質）",
-    "applicability": "どんな業務・制作・発信に応用できるか",
-    "participantPain": "このセミナーが解決する参加者の悩み"
-  },
-  "titleOptions": [
-    { "title": "タイトル", "subtitle": "サブタイトル", "targetAudience": "誰に刺さるか", "oneLiner": "一言で言うと何を学ぶ講座か" }
-  ],
-  "seminar": {
-    "name": "セミナー名",
-    "subtitle": "サブタイトル",
-    "targetAudience": "対象者",
-    "outcomes": ["受講後にできること1", "受講後にできること2"],
-    "value": "このセミナーの価値",
-    "whyNow": "なぜ今この内容を学ぶべきか"
-  },
-  "schedule": [
-    { "time": "0:00〜0:10", "part": "導入", "content": "内容", "purpose": "目的" }
-  ],
-  "chapterDetails": [
-    {
-      "part": "パート名",
-      "teachingPoint": "この章で伝えること",
-      "script": "話す内容（具体的に）",
-      "slideContent": "見せるスライドの内容",
-      "demonstration": "実演する場合の具体例",
-      "question": "参加者に考えてもらう問い"
-    }
-  ],
-  "demonstration": {
-    "theme": "実演テーマ",
-    "badExample": "実演前の悪い例",
-    "goodExample": "改善後の良い例",
-    "prompt": "実際に使うプロンプト",
-    "expectedOutput": "期待される出力",
-    "showPoints": ["参加者に見せるポイント"]
-  },
-  "workshop": {
-    "name": "ワーク名",
-    "purpose": "ワークの目的",
-    "steps": ["手順1", "手順2"],
-    "fillItems": ["記入項目1", "記入項目2"],
-    "completionImage": "完成イメージ",
-    "facilitatorTips": ["講師が補足すべきポイント"]
-  },
-  "templates": {
-    "basic": "基本テンプレート（そのままコピーして使える形）",
-    "advanced": "応用テンプレート",
-    "fixFailed": "失敗したときの修正テンプレート",
-    "snsPost": "SNS投稿用テンプレート",
-    "seminarMaterial": "セミナー資料用テンプレート",
-    "blogNote": "ブログ・note用テンプレート"
-  },
-  "slides": [
-    { "slideNumber": 1, "title": "スライドタイトル", "content": "内容", "visualIdea": "ビジュアル案" }
-  ],
-  "promotion": {
-    "xPost": "X投稿用告知文",
-    "instagram": "Instagram投稿用告知文",
-    "line": "LINE配信用告知文",
-    "noteIntro": "note記事冒頭文",
-    "lpCopy": "LPファーストビューコピー"
-  },
-  "salesFunnel": {
-    "nextProduct": "セミナー内で案内する次の商品",
-    "consultationBridge": "個別相談へのつなげ方",
-    "templateSales": "有料テンプレート販売案",
-    "continuationCourse": "継続講座にする場合の発展案"
-  },
-  "finalStatement": "このセミナーは、〇〇を学ぶ講座ではなく、〇〇できるようになる講座です"
-}
-
-スライドは15〜25枚程度で構成してください。` : ""}
+- 抽象論だけでなく、実際に使える手順まで落とし込む` : ""}
 
 JSONのみ返してください。`;
 }
