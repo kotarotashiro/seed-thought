@@ -1,4 +1,4 @@
-import { xaiChat } from "@/lib/xai/client";
+import { xaiChat, getAuthHeader } from "@/lib/xai/client";
 import type { LLMClient, ModelInfo, ModelListResult, ProviderConfig } from "./types";
 
 const FALLBACK_MODELS: ModelInfo[] = [
@@ -6,12 +6,12 @@ const FALLBACK_MODELS: ModelInfo[] = [
   { id: "grok-3-mini", name: "Grok 3 Mini" },
 ];
 
-async function fetchGrokModels(apiKey: string): Promise<ModelInfo[]> {
+async function fetchGrokModels(authHeader: string): Promise<ModelInfo[]> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 5000);
   try {
     const res = await fetch("https://api.x.ai/v1/models", {
-      headers: { Authorization: `Bearer ${apiKey}` },
+      headers: { Authorization: authHeader },
       signal: controller.signal,
       cache: "no-store",
     });
@@ -33,17 +33,31 @@ async function fetchGrokModels(apiKey: string): Promise<ModelInfo[]> {
 const modelCache = new Map<string, { models: ModelInfo[]; fetchedAt: number }>();
 const CACHE_TTL = 60 * 60 * 1000;
 
+// apiKey が明示指定されていればそれを Bearer に使う。
+// OAuth ("oauth" センチネル or null) の場合は getAuthHeader() で
+// OAuth トークン or env キーを解決する。どちらも無ければ fallback。
 export async function getGrokModels(apiKey: string | null): Promise<ModelListResult> {
-  if (!apiKey) return { models: FALLBACK_MODELS, source: "fallback" };
+  let authHeader: string | null = null;
+  if (apiKey && apiKey !== "oauth") {
+    authHeader = `Bearer ${apiKey}`;
+  } else {
+    try {
+      authHeader = await getAuthHeader();
+    } catch {
+      authHeader = null;
+    }
+  }
+  if (!authHeader) return { models: FALLBACK_MODELS, source: "fallback" };
 
-  const cached = modelCache.get(apiKey);
+  const cacheKey = apiKey && apiKey !== "oauth" ? apiKey : "oauth";
+  const cached = modelCache.get(cacheKey);
   if (cached && Date.now() - cached.fetchedAt < CACHE_TTL) {
     return { models: cached.models, source: "live" };
   }
 
-  const live = await fetchGrokModels(apiKey);
+  const live = await fetchGrokModels(authHeader);
   if (live.length > 0) {
-    modelCache.set(apiKey, { models: live, fetchedAt: Date.now() });
+    modelCache.set(cacheKey, { models: live, fetchedAt: Date.now() });
     return { models: live, source: "live" };
   }
   return { models: FALLBACK_MODELS, source: "fallback" };
