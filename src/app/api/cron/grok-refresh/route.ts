@@ -1,10 +1,9 @@
 import { NextResponse } from "next/server";
-import { decryptToken, encryptToken } from "@/lib/x/tokenStore";
-import { deleteXaiAuth, findXaiAuth, upsertXaiAuth } from "@/lib/xai/authStore";
-import { getXaiTokenEncryptionKey, refreshXaiToken } from "@/lib/xai/oauth";
+import { refreshStoredXaiTokens } from "@/lib/xai/refresh";
 
-// Vercel Cron: refreshes Grok OAuth tokens proactively to keep the refresh_token
-// chain "warm" — xAI may invalidate refresh_tokens after inactivity.
+// Manual / fallback endpoint for refreshing Grok OAuth tokens.
+// In production, this is also called from /api/cron/x-sync once per day to stay
+// within Vercel Hobby plan cron limits (max 2 cron entries in vercel.json).
 // Manual test: curl /api/cron/grok-refresh -H "Authorization: Bearer $CRON_SECRET"
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -22,60 +21,13 @@ export async function GET(request: Request) {
   }
 
   try {
-    if (!process.env.XAI_CLIENT_ID) {
-      return NextResponse.json({ ok: false, reason: "XAI_CLIENT_ID not set" });
+    const result = await refreshStoredXaiTokens();
+    if (result.ok) {
+      console.log("[cron/grok-refresh] refreshed successfully", result);
+    } else {
+      console.log("[cron/grok-refresh] skipped:", result.reason);
     }
-
-    const oauth = await findXaiAuth();
-    if (!oauth?.refreshToken) {
-      return NextResponse.json({ ok: false, reason: "no refresh token stored" });
-    }
-
-    const encryptionKey = getXaiTokenEncryptionKey();
-    if (!encryptionKey) {
-      return NextResponse.json(
-        { ok: false, reason: "encryption key not configured" },
-        { status: 500 }
-      );
-    }
-
-    try {
-      const refreshed = await refreshXaiToken(decryptToken(oauth.refreshToken, encryptionKey));
-      await upsertXaiAuth({
-        accessToken: encryptToken(refreshed.accessToken, encryptionKey),
-        refreshToken: refreshed.refreshToken
-          ? encryptToken(refreshed.refreshToken, encryptionKey)
-          : oauth.refreshToken,
-        expiresAt: refreshed.expiresAt,
-        scope: refreshed.scope,
-      });
-
-      console.log("[cron/grok-refresh] refreshed successfully", {
-        expiresAt: refreshed.expiresAt?.toISOString(),
-        rotated: Boolean(refreshed.refreshToken),
-      });
-
-      return NextResponse.json({
-        ok: true,
-        expiresAt: refreshed.expiresAt?.toISOString() ?? null,
-        rotated: Boolean(refreshed.refreshToken),
-      });
-    } catch (refreshErr) {
-      const msg = refreshErr instanceof Error ? refreshErr.message : "";
-      if (
-        msg.includes("401") ||
-        msg.includes("invalid_client") ||
-        msg.includes("invalid_grant")
-      ) {
-        console.warn("[cron/grok-refresh] refresh token rejected — deleting stale auth", msg);
-        await deleteXaiAuth().catch(() => {});
-        return NextResponse.json(
-          { ok: false, reason: "refresh token expired, re-auth required" },
-          { status: 200 }
-        );
-      }
-      throw refreshErr;
-    }
+    return NextResponse.json(result);
   } catch (error) {
     const message = error instanceof Error ? error.message : "refresh failed";
     console.error("[cron/grok-refresh]", message);

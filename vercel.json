@@ -9,10 +9,6 @@
     {
       "path": "/api/cron/enrich",
       "schedule": "0 6 * * *"
-    },
-    {
-      "path": "/api/cron/grok-refresh",
-      "schedule": "0 */6 * * *"
     }
   ]
 }
