@@ -1,9 +1,11 @@
 import OpenAI from "openai";
 import type { LLMClient, ModelInfo, ModelListResult, ProviderConfig } from "./types";
 
-const KIMI_BASE_URL = "https://api.moonshot.cn/v1";
+const KIMI_BASE_URL = "https://api.moonshot.ai/v1";
 
 const FALLBACK_MODELS: ModelInfo[] = [
+  { id: "kimi-k2.6", name: "Kimi K2.6" },
+  { id: "kimi-k2.5", name: "Kimi K2.5" },
   { id: "moonshot-v1-128k", name: "Moonshot v1 128k" },
   { id: "moonshot-v1-32k", name: "Moonshot v1 32k" },
   { id: "moonshot-v1-8k", name: "Moonshot v1 8k" },

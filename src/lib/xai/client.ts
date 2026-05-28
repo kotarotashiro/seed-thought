@@ -108,9 +108,20 @@ function extractContent(data: unknown): string {
 }
 
 export async function xaiChat(options: XaiChatOptions): Promise<XaiChatResult> {
+  const inputMessages = options.jsonMode
+    ? [
+        {
+          role: "system" as const,
+          content:
+            "Respond with valid JSON only. No markdown code fences. No explanatory text before or after the JSON object.",
+        },
+        ...options.messages,
+      ]
+    : options.messages;
+
   const body: Record<string, unknown> = {
     model: options.model ?? getDefaultModel(),
-    input: options.messages,
+    input: inputMessages,
   };
   if (options.tools && options.tools.length > 0) {
     body.tools = options.tools;
