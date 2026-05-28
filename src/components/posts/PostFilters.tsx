@@ -89,8 +89,10 @@ export function PostFilters({
             value={selectedSort}
             onChange={(e) => onSortChange(e.target.value)}
             options={[
-              { value: "savedAt_desc", label: "保存日が新しい順" },
-              { value: "savedAt_asc", label: "保存日が古い順" },
+              { value: "likedAt_desc", label: "いいねした日が新しい順" },
+              { value: "likedAt_asc", label: "いいねした日が古い順" },
+              { value: "savedAt_desc", label: "アプリ取り込み日が新しい順" },
+              { value: "savedAt_asc", label: "アプリ取り込み日が古い順" },
               { value: "postedAt_desc", label: "投稿日が新しい順" },
               { value: "postedAt_asc", label: "投稿日が古い順" },
             ]}

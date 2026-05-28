@@ -94,12 +94,12 @@ const ENV_KEYS: Record<AiProviderName, string | undefined> = {
   mock: undefined,
 };
 
-// デフォルトモデル（保守的な既知モデルのみ）
+// デフォルトモデル（実在する既知モデルのみ）
 const DEFAULT_MODELS: Record<AiProviderName, string> = {
   grok: "grok-3",
   claude: "claude-sonnet-4-6",
   openai: "gpt-4o",
-  gemini: "gemini-2.0-flash",
+  gemini: "gemini-2.5-flash",
   kimi: "kimi-k2.6",
   mock: "mock",
 };
@@ -235,9 +235,9 @@ export async function getAiRuntimeSettings(): Promise<AiRuntimeSettings> {
   const tasks = {} as Record<AiTaskName, AiTaskResolved>;
   for (const task of ALL_TASKS) {
     const assignment = stored.taskAssignments?.[task];
-    if (assignment && normalizeProvider(assignment.provider) !== "grok" || assignment) {
-      const provider = normalizeProvider(assignment?.provider ?? defaultProvider, defaultProvider);
-      const model = assignment?.model?.trim() || getDefaultModel(provider);
+    if (assignment) {
+      const provider = normalizeProvider(assignment.provider, defaultProvider);
+      const model = assignment.model?.trim() || getDefaultModel(provider);
       const apiKey = resolveKey(provider);
       // APIキーが無い場合はデフォルトにフォールバック
       if (apiKey || provider === "mock" || (provider === "grok" && hasGrokOAuth)) {
@@ -245,7 +245,9 @@ export async function getAiRuntimeSettings(): Promise<AiRuntimeSettings> {
       } else {
         const fallbackKey = resolveKey(defaultProvider);
         tasks[task] = { provider: defaultProvider, model: defaultModel, apiKey: fallbackKey };
-        console.warn(`[ai/settings] ${task}: provider=${provider} has no API key, falling back to ${defaultProvider}`);
+        console.warn(
+          `[ai/settings] ${task}: provider=${provider} has no API key, falling back to ${defaultProvider}`
+        );
       }
     } else {
       const apiKey = resolveKey(defaultProvider);

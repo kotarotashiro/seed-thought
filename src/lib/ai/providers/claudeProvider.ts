@@ -19,13 +19,17 @@ async function fetchClaudeModels(apiKey: string): Promise<ModelInfo[]> {
       signal: controller.signal,
       cache: "no-store",
     });
-    if (!res.ok) return [];
+    if (!res.ok) {
+      console.warn(`[claudeProvider] /v1/models returned ${res.status}`);
+      return [];
+    }
     const data = (await res.json()) as { data?: Array<{ id: string; display_name?: string }> };
     if (!Array.isArray(data.data)) return [];
     return data.data
       .filter((m) => typeof m.id === "string")
       .map((m) => ({ id: m.id, name: m.display_name || m.id }));
-  } catch {
+  } catch (err) {
+    console.warn("[claudeProvider] failed to fetch models:", err);
     return [];
   } finally {
     clearTimeout(timeout);

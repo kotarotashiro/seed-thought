@@ -27,7 +27,12 @@ export async function OPTIONS() {
   return new NextResponse(null, { status: 204, headers: CORS_HEADERS });
 }
 
+// X API は「いいねした日時」を返さないため、投稿日時(postedAt) を「いいねした日」の
+// 代理値として使う（リアルタイムでいいねする使い方なら近似として十分機能する）。
+// likedAt_* は postedAt_* のエイリアス。
 const sortOptions = {
+  likedAt_desc: { postedAt: { sort: "desc", nulls: "last" } },
+  likedAt_asc: { postedAt: { sort: "asc", nulls: "last" } },
   savedAt_desc: { savedAt: "desc" },
   savedAt_asc: { savedAt: "asc" },
   postedAt_desc: { postedAt: { sort: "desc", nulls: "last" } },
@@ -38,7 +43,7 @@ function getPostOrderBy(sort: string): Prisma.PostOrderByWithRelationInput {
   if (sort in sortOptions) {
     return sortOptions[sort as keyof typeof sortOptions];
   }
-  return sortOptions.postedAt_desc;
+  return sortOptions.likedAt_desc;
 }
 
 // GET /api/posts - List all posts with filters (cursor-based pagination)
@@ -51,7 +56,7 @@ export async function GET(request: Request) {
   const source = searchParams.get("source") || "";
   const digestStatus = searchParams.get("digestStatus") || "";
   const author = searchParams.get("author") || "";
-  const sort = searchParams.get("sort") || "savedAt_desc";
+  const sort = searchParams.get("sort") || "likedAt_desc";
   const cursor = searchParams.get("cursor") || "";
 
   const rawLimit = parseInt(searchParams.get("limit") || "20", 10);
