@@ -684,15 +684,22 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
             </div>
           ) : (
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-              <div>
+              <div className="min-w-0 flex-1">
                 <h2 className="mb-1 text-base font-bold text-text">
                   {error ? "学習カードを生成できませんでした" : "学習カードを準備中…"}
                 </h2>
-                <p className="text-sm text-text-secondary">
-                  {error
-                    ? "もう一度試してください。"
-                    : "この投稿からノウハウ・手順・マニュアルを自動生成します。"}
-                </p>
+                {error ? (
+                  <>
+                    <p className="text-sm text-text-secondary">もう一度試してください。</p>
+                    <p className="mt-2 whitespace-pre-wrap break-words rounded-lg border border-danger/30 bg-danger-light px-3 py-2 text-xs text-danger">
+                      {error}
+                    </p>
+                  </>
+                ) : (
+                  <p className="text-sm text-text-secondary">
+                    この投稿からノウハウ・手順・マニュアルを自動生成します。
+                  </p>
+                )}
               </div>
               <Button onClick={() => void handleGenerate()} loading={generating} loadingLabel="生成中..." className="w-full sm:w-auto">
                 <Sparkles className="mr-1.5 h-4 w-4" />

@@ -1,6 +1,33 @@
 import OpenAI from "openai";
 import type { LLMClient, ModelInfo, ModelListResult, ProviderConfig } from "./types";
 
+// Moonshot / OpenAI SDK が投げる例外を、UIに出して原因が分かる文字列に整形する。
+// SDK の APIError は status / code / message / error.message を持つ。
+function describeKimiError(baseUrl: string, model: string, err: unknown): Error {
+  type ApiErrorLike = {
+    status?: number;
+    code?: string;
+    message?: string;
+    error?: { message?: string; code?: string; type?: string };
+  };
+  const e = err as ApiErrorLike;
+  const status = e?.status ? `HTTP ${e.status}` : "";
+  const apiMsg = e?.error?.message || e?.message || "";
+  const apiCode = e?.error?.code || e?.code || "";
+  const host = (() => {
+    try { return new URL(baseUrl).host; } catch { return baseUrl; }
+  })();
+  const parts = [
+    `Kimi (${host}) / model=${model}`,
+    status,
+    apiCode ? `code=${apiCode}` : "",
+    apiMsg,
+  ].filter(Boolean);
+  const wrapped = new Error(parts.join(" — "));
+  (wrapped as Error & { cause?: unknown }).cause = err;
+  return wrapped;
+}
+
 // Moonshot は .ai (国際版) と .cn (中国版) の2系統があり、APIキーは別物。
 // 環境変数 KIMI_BASE_URL が指定されればそれを優先。
 // 未指定なら .ai → .cn の順で /v1/models を叩いてキーが通る方を採用する。
@@ -95,14 +122,48 @@ export function getKimiClient(config: ProviderConfig): LLMClient {
     return KIMI_BASE_URLS[0];
   }
 
+  // モデルが response_format=json_object を拒否した履歴をプロセスメモリで保持。
+  // 一度拒否されたら、その後は最初から json_object を付けずに呼ぶ。
+  const modelsRejectingJsonMode = new Set<string>();
+
+  function isJsonModeUnsupportedError(err: unknown): boolean {
+    const e = err as { status?: number; error?: { message?: string }; message?: string };
+    if (e?.status !== 400) return false;
+    const msg = (e?.error?.message || e?.message || "").toLowerCase();
+    return (
+      msg.includes("response_format") ||
+      msg.includes("json_object") ||
+      msg.includes("json mode") ||
+      msg.includes("json schema") ||
+      msg.includes("not support")
+    );
+  }
+
   async function callOnce(baseUrl: string, prompt: string, opts: { temperature: number; json: boolean }) {
     const client = new OpenAI({ apiKey: config.apiKey, baseURL: baseUrl });
-    return client.chat.completions.create({
-      model: config.model,
-      messages: [{ role: "user", content: prompt }],
-      temperature: opts.temperature,
-      ...(opts.json ? { response_format: { type: "json_object" as const } } : {}),
-    });
+    const useJsonMode = opts.json && !modelsRejectingJsonMode.has(config.model);
+    try {
+      return await client.chat.completions.create({
+        model: config.model,
+        messages: [{ role: "user", content: prompt }],
+        temperature: opts.temperature,
+        ...(useJsonMode ? { response_format: { type: "json_object" as const } } : {}),
+      });
+    } catch (err) {
+      // json_object 非対応モデル（kimi-k2.6 など）なら、JSON指示込みのプロンプトのまま素のテキストで再試行。
+      if (useJsonMode && isJsonModeUnsupportedError(err)) {
+        modelsRejectingJsonMode.add(config.model);
+        console.warn(
+          `[kimiProvider] model=${config.model} rejected response_format=json_object on ${baseUrl}; retrying without it`
+        );
+        return await client.chat.completions.create({
+          model: config.model,
+          messages: [{ role: "user", content: prompt }],
+          temperature: opts.temperature,
+        });
+      }
+      throw err;
+    }
   }
 
   async function callWithFallback(prompt: string, opts: { temperature: number; json: boolean }) {
@@ -113,16 +174,25 @@ export function getKimiClient(config: ProviderConfig): LLMClient {
       return res;
     } catch (err) {
       // env で明示指定があればフォールバックしない
-      if (getConfiguredBaseUrl()) throw err;
+      if (getConfiguredBaseUrl()) throw describeKimiError(first, config.model, err);
       const other = KIMI_BASE_URLS.find((u) => u !== first);
-      if (!other) throw err;
+      if (!other) throw describeKimiError(first, config.model, err);
       console.warn(
         `[kimiProvider] ${first} failed, retrying on ${other}:`,
         err instanceof Error ? err.message : err
       );
-      const res = await callOnce(other, prompt, opts);
-      apiKeyToBaseUrl.set(config.apiKey, other);
-      return res;
+      try {
+        const res = await callOnce(other, prompt, opts);
+        apiKeyToBaseUrl.set(config.apiKey, other);
+        return res;
+      } catch (err2) {
+        // 両エンドポイント失敗。両方の原因を表示する（.ai/.cn どちらの問題か切り分けられる）。
+        const firstDetail = describeKimiError(first, config.model, err).message;
+        const secondDetail = describeKimiError(other, config.model, err2).message;
+        const combined = new Error(`${secondDetail} | (前段でも失敗) ${firstDetail}`);
+        (combined as Error & { cause?: unknown }).cause = err2;
+        throw combined;
+      }
     }
   }
 
