@@ -252,12 +252,24 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ learningMode: activeMode }),
       });
-      const data = await res.json();
+      // タイムアウト等で Vercel が非JSON（プレーンテキスト/HTML）のエラーを返すことがある。
+      // res.json() を直接呼ぶと「Unexpected token」で落ちるため、まずテキストで受けてから解析する。
+      const rawBody = await res.text();
+      let data: { error?: string; code?: string; learningCard?: LearningCardView; strictLearning?: StrictLearningOutput } = {};
+      try {
+        data = rawBody ? JSON.parse(rawBody) : {};
+      } catch {
+        const snippet = rawBody.trim().slice(0, 200);
+        if (res.status === 504 || /timed out|timeout|FUNCTION_INVOCATION_TIMEOUT/i.test(snippet)) {
+          throw new Error("生成がタイムアウトしました（処理が60秒を超過）。モデルを軽いものに変えるか、時間をおいて再試行してください。");
+        }
+        throw new Error(`サーバーエラー (HTTP ${res.status}): ${snippet || "応答が空です"}`);
+      }
       if (!res.ok) {
-        if ((data as { code?: string }).code === "GROK_TOKEN_EXPIRED") {
+        if (data.code === "GROK_TOKEN_EXPIRED") {
           setTokenExpired(true);
         }
-        throw new Error(data.error || "学習カードの生成に失敗しました");
+        throw new Error(data.error || `学習カードの生成に失敗しました (HTTP ${res.status})`);
       }
       setCard(data.learningCard || null);
       setStrictLearning(data.strictLearning || null);
