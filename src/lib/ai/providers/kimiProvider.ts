@@ -125,6 +125,17 @@ export function getKimiClient(config: ProviderConfig): LLMClient {
   // モデルが response_format=json_object を拒否した履歴をプロセスメモリで保持。
   // 一度拒否されたら、その後は最初から json_object を付けずに呼ぶ。
   const modelsRejectingJsonMode = new Set<string>();
+  // 同様に、temperature を指定すると拒否されるモデル（kimi-k2.X 系は temperature=1 固定）
+  const modelsRequiringFixedTemperature = new Set<string>();
+
+  // 仕様として最初から temperature を送らないモデル群（公式ドキュメントで判明している分）
+  // kimi-k2.6 / kimi-k2.5: only temperature=1 is allowed → 送らない方が事故が少ない
+  function modelRejectsCustomTemperature(model: string): boolean {
+    return (
+      modelsRequiringFixedTemperature.has(model) ||
+      /^kimi-k2\.\d+/.test(model) // kimi-k2.6, kimi-k2.5 など "k2.数字"系
+    );
+  }
 
   function isJsonModeUnsupportedError(err: unknown): boolean {
     const e = err as { status?: number; error?: { message?: string }; message?: string };
@@ -135,32 +146,58 @@ export function getKimiClient(config: ProviderConfig): LLMClient {
       msg.includes("json_object") ||
       msg.includes("json mode") ||
       msg.includes("json schema") ||
-      msg.includes("not support")
+      (msg.includes("not support") && !msg.includes("temperature"))
     );
+  }
+
+  function isTemperatureUnsupportedError(err: unknown): boolean {
+    const e = err as { status?: number; error?: { message?: string }; message?: string };
+    if (e?.status !== 400) return false;
+    const msg = (e?.error?.message || e?.message || "").toLowerCase();
+    return msg.includes("temperature");
+  }
+
+  // .cn にフォールバックする価値があるのは「キーが .ai では通らない＝認証エラー」のときだけ。
+  // 400 (パラメータエラー) や 404 (モデル無し) は .cn にしても直らないので無駄。
+  function isAuthErrorWorthFallback(err: unknown): boolean {
+    const e = err as { status?: number };
+    return e?.status === 401 || e?.status === 403;
   }
 
   async function callOnce(baseUrl: string, prompt: string, opts: { temperature: number; json: boolean }) {
     const client = new OpenAI({ apiKey: config.apiKey, baseURL: baseUrl });
     const useJsonMode = opts.json && !modelsRejectingJsonMode.has(config.model);
+    const sendTemperature = !modelRejectsCustomTemperature(config.model);
+
+    const baseParams = {
+      model: config.model,
+      messages: [{ role: "user" as const, content: prompt }],
+      ...(sendTemperature ? { temperature: opts.temperature } : {}),
+      ...(useJsonMode ? { response_format: { type: "json_object" as const } } : {}),
+    };
+
     try {
-      return await client.chat.completions.create({
-        model: config.model,
-        messages: [{ role: "user", content: prompt }],
-        temperature: opts.temperature,
-        ...(useJsonMode ? { response_format: { type: "json_object" as const } } : {}),
-      });
+      return await client.chat.completions.create(baseParams);
     } catch (err) {
-      // json_object 非対応モデル（kimi-k2.6 など）なら、JSON指示込みのプロンプトのまま素のテキストで再試行。
+      // temperature 非対応（kimi-k2.6 等）→ 学習し、temperatureを抜いて再試行
+      if (sendTemperature && isTemperatureUnsupportedError(err)) {
+        modelsRequiringFixedTemperature.add(config.model);
+        console.warn(
+          `[kimiProvider] model=${config.model} rejected custom temperature on ${baseUrl}; retrying without temperature`
+        );
+        const { temperature: _t, ...rest } = baseParams;
+        void _t;
+        return await client.chat.completions.create(rest);
+      }
+      // json_object 非対応モデル → JSON指示はプロンプトに残したまま素のテキストで再試行
       if (useJsonMode && isJsonModeUnsupportedError(err)) {
         modelsRejectingJsonMode.add(config.model);
         console.warn(
           `[kimiProvider] model=${config.model} rejected response_format=json_object on ${baseUrl}; retrying without it`
         );
-        return await client.chat.completions.create({
-          model: config.model,
-          messages: [{ role: "user", content: prompt }],
-          temperature: opts.temperature,
-        });
+        const { response_format: _rf, ...rest } = baseParams;
+        void _rf;
+        return await client.chat.completions.create(rest);
       }
       throw err;
     }
@@ -175,10 +212,12 @@ export function getKimiClient(config: ProviderConfig): LLMClient {
     } catch (err) {
       // env で明示指定があればフォールバックしない
       if (getConfiguredBaseUrl()) throw describeKimiError(first, config.model, err);
+      // 認証エラー以外（400/404 等）は .cn に切り替えても直らないので即throw
+      if (!isAuthErrorWorthFallback(err)) throw describeKimiError(first, config.model, err);
       const other = KIMI_BASE_URLS.find((u) => u !== first);
       if (!other) throw describeKimiError(first, config.model, err);
       console.warn(
-        `[kimiProvider] ${first} failed, retrying on ${other}:`,
+        `[kimiProvider] ${first} auth failed, retrying on ${other}:`,
         err instanceof Error ? err.message : err
       );
       try {
