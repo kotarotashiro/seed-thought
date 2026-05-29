@@ -3,8 +3,9 @@ import { prisma } from "@/lib/db/prisma";
 import { getAiProvider } from "@/lib/ai/provider";
 import type { ChatMessage } from "@/lib/ai/types";
 
-// LLM呼び出しを伴うため、Kimi等の遅いモデルでもデフォルト枠で打ち切られないよう引き上げる。
-export const maxDuration = 60;
+// LLM呼び出しを伴う。Vercel Hobby(Fluid Compute)上限の300秒まで引き上げ、
+// Kimi等の遅いモデルでも打ち切られないようにする。
+export const maxDuration = 300;
 
 export async function POST(request: Request) {
   try {

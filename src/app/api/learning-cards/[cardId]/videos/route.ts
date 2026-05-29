@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { submitVideoGeneration, pollVideoGeneration } from "@/lib/ai/grokVideoProvider";
 
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 // GET /api/learning-cards/[cardId]/videos — list videos for this card
 export async function GET(

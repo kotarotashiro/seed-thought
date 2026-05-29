@@ -6,8 +6,9 @@ import { createFallbackOutput } from "@/lib/ai/fallback";
 import type { PostClassificationResult } from "@/lib/ai/types";
 import { buildPostTextWithThread } from "@/lib/posts/threadText";
 
-// アウトプット生成は1回のLLM呼び出しだが、Kimi等の遅いモデルではデフォルト枠を超えるため引き上げる。
-export const maxDuration = 60;
+// アウトプット生成は1回のLLM呼び出し。Vercel Hobby(Fluid Compute)上限の300秒まで
+// 引き上げ、Kimi等の遅いモデルでも打ち切られないようにする。
+export const maxDuration = 300;
 
 const VALID_OUTPUT_TYPES = [
   "x",

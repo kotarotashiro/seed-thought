@@ -3,7 +3,7 @@ import { enrichPendingPosts } from "@/lib/posts/enrich";
 
 // Vercel Cron: retry failed/pending URL enrichments every hour.
 // Manual test: curl /api/cron/enrich -H "Authorization: Bearer $CRON_SECRET"
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 function isAuthorized(request: Request): boolean {
   const secret = process.env.CRON_SECRET;

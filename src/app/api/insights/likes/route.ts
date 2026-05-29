@@ -2,8 +2,9 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { getAiProvider } from "@/lib/ai/provider";
 
-// 傾向分析のLLM呼び出しが、Kimi等の遅いモデルでもデフォルト枠で打ち切られないよう引き上げる。
-export const maxDuration = 60;
+// 傾向分析のLLM呼び出し。Vercel Hobby(Fluid Compute)上限の300秒まで引き上げ、
+// Kimi等の遅いモデルでも打ち切られないようにする。
+export const maxDuration = 300;
 
 const CACHE_KEY = "insights.likes.cache";
 
