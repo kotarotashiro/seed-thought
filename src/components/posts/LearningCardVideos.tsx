@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Film, Loader2, RefreshCw, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { useConfirm } from "@/components/ui/DialogProvider";
 
 interface CardVideo {
   id: string;
@@ -24,6 +25,7 @@ const STATUS_LABEL: Record<CardVideo["status"], string> = {
 };
 
 export function LearningCardVideos({ cardId }: { cardId: string }) {
+  const confirm = useConfirm();
   const [videos, setVideos] = useState<CardVideo[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -91,7 +93,12 @@ export function LearningCardVideos({ cardId }: { cardId: string }) {
   }, [videos, cardId]);
 
   const deleteVideo = async (videoId: string) => {
-    if (!window.confirm("この動画を削除しますか？")) return;
+    const ok = await confirm({
+      message: "この動画を削除しますか？",
+      confirmLabel: "削除する",
+      variant: "danger",
+    });
+    if (!ok) return;
     setDeleting(videoId);
     try {
       const res = await fetch(

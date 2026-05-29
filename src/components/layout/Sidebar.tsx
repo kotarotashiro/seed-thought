@@ -27,7 +27,7 @@ const menuItems = [
   { href: "/knowhow", label: "学びメモ", icon: BookOpen },
   { href: "/collections", label: "コレクション", icon: Layers },
   { href: "/search", label: "メモを検索", icon: Search },
-  { href: "/chat", label: "メモに質問", icon: MessageSquare },
+  { href: "/chat", label: "投稿に質問", icon: MessageSquare },
   { href: "/insights", label: "保存傾向", icon: TrendingUp },
   { href: "/drafts", label: "X下書き", icon: FileText },
   { href: "/posts/new", label: "投稿を追加", icon: PenSquare },
@@ -36,9 +36,14 @@ const menuItems = [
   { href: "/settings", label: "設定", icon: Settings },
 ];
 
-export function Sidebar() {
+export function Sidebar({
+  collapsed,
+  onToggle,
+}: {
+  collapsed: boolean;
+  onToggle: () => void;
+}) {
   const pathname = usePathname();
-  const [collapsed, setCollapsed] = useState(false);
   const [profile, setProfile] = useState({
     name: "そら",
     role: "個人クリエイター",
@@ -151,7 +156,7 @@ export function Sidebar() {
 
       {/* Collapse Button */}
       <button
-        onClick={() => setCollapsed(!collapsed)}
+        onClick={onToggle}
         className="absolute -right-3 top-8 w-6 h-6 rounded-full bg-white border border-border shadow-sm flex items-center justify-center hover:bg-border-light transition-colors"
       >
         <ChevronLeft

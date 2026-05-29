@@ -5,6 +5,7 @@ import { useSafeBack } from "@/hooks/useSafeBack";
 import Link from "next/link";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
+import { useConfirm } from "@/components/ui/DialogProvider";
 import { PostTypeBadge, Badge, LearningStatusBadge } from "@/components/ui/Badge";
 import { PostMediaGrid, parsePostMedia } from "@/components/posts/PostMediaGrid";
 import { LinkifiedText } from "@/components/ui/LinkifiedText";
@@ -25,6 +26,7 @@ const X_ARTICLE_RE = /(?:x|twitter)\.com\/i\/article\//i;
 export default function ConfirmPage({ params }: { params: Promise<{ postId: string }> }) {
   const { postId } = use(params);
   const safeBack = useSafeBack();
+  const confirm = useConfirm();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [post, setPost] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -292,7 +294,12 @@ export default function ConfirmPage({ params }: { params: Promise<{ postId: stri
 
   const handleDeleteSelectedThreads = async () => {
     if (selectedThreadIds.length === 0) return;
-    if (!confirm(`選択したツリー投稿 ${selectedThreadIds.length}件を削除しますか？`)) return;
+    const ok = await confirm({
+      message: `選択したツリー投稿 ${selectedThreadIds.length}件を削除しますか？`,
+      confirmLabel: "削除する",
+      variant: "danger",
+    });
+    if (!ok) return;
 
     setDeletingThread(true);
     setThreadMessage(null);
@@ -354,9 +361,9 @@ export default function ConfirmPage({ params }: { params: Promise<{ postId: stri
 
       {/* Title */}
       <div>
-        <h1 className="mb-2 text-xl font-bold text-text sm:text-2xl">この投稿を学ぶ？</h1>
+        <h1 className="mb-2 text-xl font-bold text-text sm:text-2xl">投稿の詳細</h1>
         <p className="text-sm text-text-secondary">
-          始める前に、投稿の内容を確認します。
+          内容を確認し、必要なら情報を補ってから学習カードを生成できます。
         </p>
       </div>
 

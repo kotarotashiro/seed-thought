@@ -5,6 +5,7 @@ import { MessageSquare, SendHorizonal, Sparkles, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { MarkdownText } from "@/components/ui/MarkdownText";
+import { useConfirm } from "@/components/ui/DialogProvider";
 
 interface ChatMessage {
   role: "user" | "assistant";
@@ -21,6 +22,7 @@ const SUGGESTIONS = [
 ];
 
 export default function ChatPage() {
+  const confirm = useConfirm();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
@@ -85,8 +87,13 @@ export default function ChatPage() {
     }
   };
 
-  const clear = () => {
-    if (!confirm("会話履歴をすべて削除しますか？")) return;
+  const clear = async () => {
+    const ok = await confirm({
+      message: "会話履歴をすべて削除しますか？",
+      confirmLabel: "削除する",
+      variant: "danger",
+    });
+    if (!ok) return;
     setMessages([]);
   };
 
@@ -98,9 +105,9 @@ export default function ChatPage() {
             <MessageSquare className="h-5 w-5 text-accent" />
           </div>
           <div>
-            <h1 className="text-xl font-bold text-text sm:text-2xl">メモに質問</h1>
+            <h1 className="text-xl font-bold text-text sm:text-2xl">投稿に質問</h1>
             <p className="mt-1 text-xs text-text-secondary">
-              学びメモをもとに質問できます
+              保存した投稿をもとに質問できます
             </p>
           </div>
         </div>
@@ -123,7 +130,7 @@ export default function ChatPage() {
                 <Sparkles className="h-6 w-6 text-accent" />
               </div>
               <p className="text-sm font-semibold text-text">
-                学びメモに質問してみましょう
+                保存した投稿に質問してみましょう
               </p>
               <p className="mt-1 max-w-md text-xs text-text-secondary">
                 直近30件の保存投稿を参考に、AIが回答します。出典の投稿番号付きで返ってきます。
@@ -187,7 +194,7 @@ export default function ChatPage() {
                 send(input);
               }
             }}
-            placeholder="学びメモに質問する… (Ctrl/Cmd + Enter で送信)"
+            placeholder="保存した投稿に質問する… (Ctrl/Cmd + Enter で送信)"
             rows={2}
             className="flex-1 resize-none rounded-xl border border-border bg-white px-3 py-2 text-sm text-text placeholder:text-text-muted focus:border-accent focus:outline-none"
           />

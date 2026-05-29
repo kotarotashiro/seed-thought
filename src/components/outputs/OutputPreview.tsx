@@ -4,6 +4,7 @@ import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Copy, Check, ChevronDown, ChevronUp, ExternalLink, Send } from "lucide-react";
 import { useState } from "react";
+import { useConfirm } from "@/components/ui/DialogProvider";
 
 interface OutputPreviewProps {
   title: string;
@@ -30,6 +31,7 @@ function SeminarSection({ label, children }: { label: string; children: React.Re
 }
 
 export function OutputPreview({ title, content, contentJson, outputType }: OutputPreviewProps) {
+  const confirm = useConfirm();
   const [copied, setCopied] = useState(false);
   const [posting, setPosting] = useState(false);
   const [postedUrl, setPostedUrl] = useState<string | null>(null);
@@ -42,9 +44,12 @@ export function OutputPreview({ title, content, contentJson, outputType }: Outpu
   };
 
   const handlePostToX = async () => {
-    if (!confirm("Xに投稿します。続行しますか？\n（280字を超える場合は自動でスレッド分割されます）")) {
-      return;
-    }
+    const ok = await confirm({
+      title: "Xに投稿",
+      message: "Xに投稿します。続行しますか？\n（280字を超える場合は自動でスレッド分割されます）",
+      confirmLabel: "投稿する",
+    });
+    if (!ok) return;
     setPosting(true);
     setPostError(null);
     try {

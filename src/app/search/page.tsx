@@ -180,7 +180,7 @@ export default function SearchPage() {
                     </>
                   )}
                   <span className="text-xs font-medium text-purple-600 bg-purple-50 px-2 py-0.5 rounded-full">
-                    関連度 {item.relevanceScore}
+                    関連度 {item.relevanceScore}%
                   </span>
                 </div>
                 {item.post.sourceUrl && (
