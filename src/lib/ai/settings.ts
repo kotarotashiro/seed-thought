@@ -322,7 +322,11 @@ export async function saveAiSettings(input: {
       : stored.defaultProvider,
     defaultModel: input.defaultModel?.trim() || stored.defaultModel,
     apiKeys: { ...(stored.apiKeys ?? {}) },
-    taskAssignments: { ...(stored.taskAssignments ?? {}) },
+    // taskAssignments が渡された場合は「望ましい全体像」として丸ごと置換する
+    // （クライアントは default 工程をキーごと省いて送るため、マージだと
+    // 「すべてデフォルト」=空オブジェクトを送っても旧割り当てが消えない）。
+    // 渡されなければ既存を維持。
+    taskAssignments: input.taskAssignments ? {} : { ...(stored.taskAssignments ?? {}) },
   };
 
   // APIキーの更新
