@@ -5,6 +5,7 @@ import Link from "next/link";
 import { PostFilters } from "@/components/posts/PostFilters";
 import { PostCard } from "@/components/posts/PostCard";
 import { Button } from "@/components/ui/Button";
+import { useConfirm } from "@/components/ui/DialogProvider";
 import { Archive, Trash2, CheckSquare, Sparkles } from "lucide-react";
 
 interface Author {
@@ -61,6 +62,7 @@ function buildParams(opts: {
 }
 
 export default function PostsPage() {
+  const confirm = useConfirm();
   const [posts, setPosts] = useState<PostListItem[]>([]);
   const [genres, setGenres] = useState<string[]>([]);
   const [authors, setAuthors] = useState<Author[]>([]);
@@ -180,7 +182,12 @@ export default function PostsPage() {
   }, [searchQuery, selectedGenre, selectedPostType, selectedSavedType, selectedDigestStatus, selectedSort, selectedAuthor, activeTab]);
 
   const handleDelete = async (postId: string) => {
-    if (!confirm("この投稿を削除しますか？")) return;
+    const ok = await confirm({
+      message: "この投稿を削除しますか？",
+      confirmLabel: "削除する",
+      variant: "danger",
+    });
+    if (!ok) return;
     try {
       await fetch(`/api/posts/${postId}`, { method: "DELETE" });
       reloadPosts();
@@ -208,7 +215,12 @@ export default function PostsPage() {
 
   const handleBulkDelete = async () => {
     if (selectedIds.size === 0) return;
-    if (!confirm(`選択した${selectedIds.size}件の投稿を削除しますか？`)) return;
+    const ok = await confirm({
+      message: `選択した${selectedIds.size}件の投稿を削除しますか？`,
+      confirmLabel: "削除する",
+      variant: "danger",
+    });
+    if (!ok) return;
     setBulkDeleting(true);
     try {
       await fetch("/api/posts", {
@@ -235,7 +247,7 @@ export default function PostsPage() {
           </div>
           <div>
             <h1 className="text-2xl font-bold text-text">保存した投稿</h1>
-            <p className="text-sm text-text-secondary">{posts.length}件の投稿</p>
+            <p className="text-sm text-text-secondary">{posts.length}件を表示中</p>
           </div>
         </div>
         <div className="flex gap-2 sm:flex-shrink-0">
@@ -336,7 +348,7 @@ export default function PostsPage() {
               <Sparkles className="w-12 h-12 text-text-muted mx-auto mb-3" />
               <h3 className="text-lg font-semibold text-text mb-2">おすすめはまだありません</h3>
               <p className="text-sm text-text-secondary mb-4">
-                GROK_API_KEYを設定すると、X自動同期のたびにAIがあなたの興味に合った投稿をおすすめします。
+                投稿が増えると、AIがあなたの興味に合った投稿を自動でおすすめします。
               </p>
             </>
           ) : (

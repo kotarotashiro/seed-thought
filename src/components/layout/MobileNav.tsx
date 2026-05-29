@@ -36,7 +36,7 @@ const drawerItems = [
   { href: "/knowhow", label: "学びメモ", icon: BookOpen },
   { href: "/collections", label: "コレクション", icon: Layers },
   { href: "/search", label: "メモを検索", icon: Search },
-  { href: "/chat", label: "メモに質問", icon: MessageSquare },
+  { href: "/chat", label: "投稿に質問", icon: MessageSquare },
   { href: "/insights", label: "保存傾向", icon: TrendingUp },
   { href: "/drafts", label: "X下書き", icon: FileText },
   { href: "/posts/new", label: "投稿を追加", icon: PenSquare },

@@ -9,7 +9,7 @@ export async function GET() {
       orderBy: { createdAt: "desc" },
       include: {
         learningCard: {
-          select: { id: true, title: true, summary: true },
+          select: { id: true, sourcePostId: true, title: true, summary: true },
         },
       },
     });

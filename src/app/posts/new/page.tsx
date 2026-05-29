@@ -328,7 +328,7 @@ export default function NewPostPage() {
           <div className="space-y-5">
             <p className="text-sm text-text-secondary">
               スクリーンショットや資料の写真をアップロードすると、<br />
-              Grok 4.3 Vision が内容を解析して投稿本文に転写します。
+              AIが画像の内容を解析して投稿本文に転写します。
             </p>
             {error && <p className="text-sm text-danger">{error}</p>}
             <input

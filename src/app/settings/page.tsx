@@ -4,7 +4,6 @@ import { useEffect, useState, useCallback } from "react";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
-import { Select } from "@/components/ui/Select";
 import {
   AlertCircle,
   CheckCircle,
@@ -67,6 +66,10 @@ const roleOptions = [
 const themeOptions = [
   "AI活用", "Instagram", "公式LINE", "X運用", "note",
   "チラシ", "セミナー", "マーケティング", "導線設計", "業務効率化",
+];
+
+const outputChannelOptions = [
+  "X", "Instagram", "note", "ブログ", "YouTube", "公式LINE",
 ];
 
 const toneOptions = [
@@ -547,6 +550,8 @@ export default function SettingsPage() {
   const [profile, setProfile] = useState<ProfileForm>({
     name: "", role: "", themes: [], outputChannels: [], tone: "", knowledge: "",
   });
+  const [customTheme, setCustomTheme] = useState("");
+  const [customChannel, setCustomChannel] = useState("");
   const [notionApiKey, setNotionApiKey] = useState("");
   const [notionDatabaseId, setNotionDatabaseId] = useState("");
   const [notionHasApiKey, setNotionHasApiKey] = useState(false);
@@ -832,16 +837,25 @@ export default function SettingsPage() {
                     className="w-full rounded-xl border border-border bg-white px-4 py-3 text-sm text-text outline-none focus:border-accent"
                   />
                 </label>
-                <Select
-                  label="役割"
-                  value={profile.role}
-                  onChange={(e) => setProfile((c) => ({ ...c, role: e.target.value }))}
-                  options={roleOptions.map((value) => ({ value, label: value }))}
-                />
+                <label className="block">
+                  <span className="block text-sm font-medium text-text mb-1">役割</span>
+                  <input
+                    list="role-options"
+                    value={profile.role}
+                    onChange={(e) => setProfile((c) => ({ ...c, role: e.target.value }))}
+                    placeholder="例）AI活用を発信する個人クリエイター"
+                    className="w-full rounded-xl border border-border bg-white px-4 py-3 text-sm text-text outline-none focus:border-accent"
+                  />
+                  <datalist id="role-options">
+                    {roleOptions.map((value) => (
+                      <option key={value} value={value} />
+                    ))}
+                  </datalist>
+                </label>
                 <div>
                   <p className="mb-2 text-sm font-medium text-text">テーマ</p>
                   <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                    {themeOptions.map((theme) => (
+                    {[...new Set([...themeOptions, ...profile.themes])].map((theme) => (
                       <label
                         key={theme}
                         className="flex items-center gap-2 rounded-xl border border-border bg-white px-3 py-2 text-sm text-text"
@@ -861,13 +875,90 @@ export default function SettingsPage() {
                       </label>
                     ))}
                   </div>
+                  <div className="mt-2 flex gap-2">
+                    <input
+                      value={customTheme}
+                      onChange={(e) => setCustomTheme(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          const v = customTheme.trim();
+                          if (v) {
+                            setProfile((c) => ({
+                              ...c,
+                              themes: c.themes.includes(v) ? c.themes : [...c.themes, v],
+                            }));
+                            setCustomTheme("");
+                          }
+                        }
+                      }}
+                      placeholder="その他のテーマを追加（Enter）"
+                      className="flex-1 rounded-xl border border-border bg-white px-3 py-2 text-sm text-text outline-none focus:border-accent"
+                    />
+                  </div>
                 </div>
-                <Select
-                  label="トーン"
-                  value={profile.tone}
-                  onChange={(e) => setProfile((c) => ({ ...c, tone: e.target.value }))}
-                  options={toneOptions.map((value) => ({ value, label: value }))}
-                />
+                <div>
+                  <p className="mb-2 text-sm font-medium text-text">発信チャンネル</p>
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    {[...new Set([...outputChannelOptions, ...profile.outputChannels])].map((channel) => (
+                      <label
+                        key={channel}
+                        className="flex items-center gap-2 rounded-xl border border-border bg-white px-3 py-2 text-sm text-text"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={profile.outputChannels.includes(channel)}
+                          onChange={() =>
+                            setProfile((c) => ({
+                              ...c,
+                              outputChannels: toggleListValue(c.outputChannels, channel),
+                            }))
+                          }
+                          className="h-4 w-4 accent-accent"
+                        />
+                        {channel}
+                      </label>
+                    ))}
+                  </div>
+                  <div className="mt-2 flex gap-2">
+                    <input
+                      value={customChannel}
+                      onChange={(e) => setCustomChannel(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          const v = customChannel.trim();
+                          if (v) {
+                            setProfile((c) => ({
+                              ...c,
+                              outputChannels: c.outputChannels.includes(v)
+                                ? c.outputChannels
+                                : [...c.outputChannels, v],
+                            }));
+                            setCustomChannel("");
+                          }
+                        }
+                      }}
+                      placeholder="その他のチャンネルを追加（Enter）"
+                      className="flex-1 rounded-xl border border-border bg-white px-3 py-2 text-sm text-text outline-none focus:border-accent"
+                    />
+                  </div>
+                </div>
+                <label className="block">
+                  <span className="block text-sm font-medium text-text mb-1">トーン</span>
+                  <input
+                    list="tone-options"
+                    value={profile.tone}
+                    onChange={(e) => setProfile((c) => ({ ...c, tone: e.target.value }))}
+                    placeholder="例）やさしく、実用的で、行動につながる文章"
+                    className="w-full rounded-xl border border-border bg-white px-4 py-3 text-sm text-text outline-none focus:border-accent"
+                  />
+                  <datalist id="tone-options">
+                    {toneOptions.map((value) => (
+                      <option key={value} value={value} />
+                    ))}
+                  </datalist>
+                </label>
                 <label className="block">
                   <span className="block text-sm font-medium text-text mb-1">
                     ナレッジ・発信コンテキスト

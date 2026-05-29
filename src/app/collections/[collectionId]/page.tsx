@@ -19,6 +19,7 @@ import {
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
+import { useAlert, useConfirm } from "@/components/ui/DialogProvider";
 
 type OutputKind = "seminar" | "mini_course" | "note" | "newsletter";
 
@@ -79,6 +80,8 @@ export default function CollectionDetailPage({
 }) {
   const { collectionId } = use(params);
   const router = useRouter();
+  const confirm = useConfirm();
+  const alert = useAlert();
   const [collection, setCollection] = useState<CollectionDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [outputKind, setOutputKind] = useState<OutputKind>("seminar");
@@ -162,7 +165,7 @@ export default function CollectionDetailPage({
 
   const saveEdit = async () => {
     if (!editTitle.trim()) {
-      alert("タイトルを入力してください");
+      await alert("タイトルを入力してください");
       return;
     }
     setSaving(true);
@@ -190,14 +193,19 @@ export default function CollectionDetailPage({
       );
       setEditing(false);
     } catch (e) {
-      alert((e as Error).message);
+      await alert((e as Error).message);
     } finally {
       setSaving(false);
     }
   };
 
   const remove = async () => {
-    if (!confirm("このコレクションを削除しますか？")) return;
+    const ok = await confirm({
+      message: "このコレクションを削除しますか？",
+      confirmLabel: "削除する",
+      variant: "danger",
+    });
+    if (!ok) return;
     try {
       await fetch(`/api/collections/${collectionId}`, { method: "DELETE" });
       router.push("/collections");

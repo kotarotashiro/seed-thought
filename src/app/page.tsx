@@ -13,20 +13,24 @@ export default function HomePage() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [posts, setPosts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
 
   const loadRecommendations = async (showLoading = true) => {
     if (showLoading) setLoading(true);
+    setLoadError(false);
     try {
       const params = new URLSearchParams({ mode });
       if (mode === "genre" && genre) params.set("genre", genre);
       if (savedType) params.set("savedType", savedType);
 
       const res = await fetch(`/api/recommendations?${params}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       setPosts(data.posts || []);
       setGenres(data.genres || []);
     } catch (error) {
       console.error("Failed to fetch recommendations:", error);
+      setLoadError(true);
     } finally {
       setLoading(false);
     }
@@ -36,18 +40,21 @@ export default function HomePage() {
     let cancelled = false;
 
     async function fetchInitialRecommendations() {
+      setLoadError(false);
       try {
         const params = new URLSearchParams({ mode });
         if (mode === "genre" && genre) params.set("genre", genre);
         if (savedType) params.set("savedType", savedType);
 
         const res = await fetch(`/api/recommendations?${params}`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
         if (cancelled) return;
         setPosts(data.posts || []);
         setGenres(data.genres || []);
       } catch (error) {
         console.error("Failed to fetch recommendations:", error);
+        if (!cancelled) setLoadError(true);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -72,7 +79,13 @@ export default function HomePage() {
           </div>
         </div>
         <p className="mt-2 text-sm text-text-secondary sm:ml-[52px]">
-          まだ学んでいない投稿の中から、おすすめの3件を選びました。
+          {loading
+            ? "おすすめを選んでいます…"
+            : loadError
+              ? "おすすめの取得に失敗しました。"
+              : posts.length > 0
+                ? `あなたの興味に合わせて${posts.length}件をピックアップしました。`
+                : "おすすめできる投稿がまだありません。"}
         </p>
       </div>
 
@@ -111,6 +124,24 @@ export default function HomePage() {
               <div className="h-9 bg-border-light rounded-xl" />
             </div>
           ))}
+        </div>
+      ) : loadError ? (
+        <div className="text-center py-16">
+          <div className="w-16 h-16 rounded-2xl bg-danger-light flex items-center justify-center mx-auto mb-4">
+            <Sprout className="w-8 h-8 text-danger" />
+          </div>
+          <h3 className="text-lg font-semibold text-text mb-2">
+            おすすめを読み込めませんでした
+          </h3>
+          <p className="text-sm text-text-secondary mb-4">
+            通信エラーが発生した可能性があります。時間をおいて再試行してください。
+          </p>
+          <button
+            onClick={() => loadRecommendations()}
+            className="rounded-xl bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90"
+          >
+            再試行
+          </button>
         </div>
       ) : posts.length === 0 ? (
         <div className="text-center py-16">

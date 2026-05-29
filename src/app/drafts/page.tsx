@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { useAlert, useConfirm } from "@/components/ui/DialogProvider";
 
 interface Draft {
   id: string;
@@ -21,10 +22,12 @@ interface Draft {
   status: "pending" | "approved" | "rejected" | "posted";
   postedUrl: string | null;
   createdAt: string;
-  learningCard: { id: string; title: string; summary: string } | null;
+  learningCard: { id: string; sourcePostId: string; title: string; summary: string } | null;
 }
 
 export default function DraftsPage() {
+  const confirm = useConfirm();
+  const alert = useAlert();
   const [drafts, setDrafts] = useState<Draft[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -89,13 +92,17 @@ export default function DraftsPage() {
   };
 
   const postToX = async (draftId: string) => {
-    if (!confirm("このX投稿を今すぐ送信しますか？")) return;
+    const ok = await confirm({
+      message: "このX投稿を今すぐ送信しますか？",
+      confirmLabel: "送信する",
+    });
+    if (!ok) return;
     setActionId(draftId);
     try {
       const res = await fetch(`/api/drafts/${draftId}`, { method: "POST" });
       const data = await res.json() as { ok?: boolean; url?: string | null; error?: string };
       if (!res.ok) {
-        alert(data.error || "投稿に失敗しました");
+        await alert(data.error || "投稿に失敗しました");
         return;
       }
       setDrafts((prev) => prev.filter((d) => d.id !== draftId));
@@ -106,7 +113,12 @@ export default function DraftsPage() {
   };
 
   const deleteDraft = async (draftId: string) => {
-    if (!confirm("この下書きを削除しますか？")) return;
+    const ok = await confirm({
+      message: "この下書きを削除しますか？",
+      confirmLabel: "削除する",
+      variant: "danger",
+    });
+    if (!ok) return;
     setActionId(draftId);
     try {
       await fetch(`/api/drafts/${draftId}`, { method: "DELETE" });
@@ -156,7 +168,7 @@ export default function DraftsPage() {
                     元カード
                   </span>
                   <Link
-                    href={`/posts/${draft.learningCard.id}/learning`}
+                    href={`/posts/${draft.learningCard.sourcePostId}/learning`}
                     className="text-xs text-text-secondary hover:underline"
                   >
                     {draft.learningCard.title}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -12,6 +12,7 @@ import {
   ExternalLink,
   FileText,
   Layers,
+  Loader2,
   Search,
   Square,
   Trash2,
@@ -19,6 +20,7 @@ import {
 import { Badge, LearningStatusBadge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { useAlert, useConfirm } from "@/components/ui/DialogProvider";
 
 interface LearningCardItem {
   id: string;
@@ -51,22 +53,49 @@ function formatDate(value: string) {
 
 export default function KnowhowPage() {
   const router = useRouter();
+  const confirm = useConfirm();
   const [cards, setCards] = useState<LearningCardItem[]>([]);
+  const [categories, setCategories] = useState<string[]>([]);
+  const [total, setTotal] = useState<number | null>(null);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectMode, setSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [deleting, setDeleting] = useState(false);
+  const sentinelRef = useRef<HTMLDivElement>(null);
 
+  const buildParams = useCallback(
+    (extra?: { cursor?: string }) => {
+      const params = new URLSearchParams();
+      if (searchQuery.trim()) params.set("search", searchQuery.trim());
+      if (selectedCategory) params.set("category", selectedCategory);
+      if (extra?.cursor) params.set("cursor", extra.cursor);
+      return params;
+    },
+    [searchQuery, selectedCategory]
+  );
+
+  // Fetch the first page whenever filters change.
   useEffect(() => {
     let cancelled = false;
 
-    async function loadLearningCards() {
+    async function fetchFirstPage() {
+      if (!cancelled) {
+        setLoading(true);
+        setCards([]);
+        setNextCursor(null);
+      }
       try {
-        const res = await fetch("/api/learning-cards");
+        const res = await fetch(`/api/learning-cards?${buildParams()}`);
         const data = await res.json();
-        if (!cancelled) setCards(data.learningCards || []);
+        if (cancelled) return;
+        setCards(data.learningCards || []);
+        setNextCursor(data.nextCursor ?? null);
+        if (typeof data.total === "number") setTotal(data.total);
+        if (Array.isArray(data.categories)) setCategories(data.categories);
       } catch (error) {
         console.error("Failed to fetch learning cards:", error);
       } finally {
@@ -74,35 +103,46 @@ export default function KnowhowPage() {
       }
     }
 
-    loadLearningCards();
+    fetchFirstPage();
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [buildParams]);
 
-  const categories = useMemo(() => {
-    return Array.from(
-      new Set(cards.map((card) => card.sourcePost.classification?.primaryCategory).filter(Boolean))
-    ) as string[];
-  }, [cards]);
+  const loadMore = useCallback(
+    async (cursor: string) => {
+      if (loadingMore) return;
+      setLoadingMore(true);
+      try {
+        const res = await fetch(`/api/learning-cards?${buildParams({ cursor })}`);
+        const data = await res.json();
+        setCards((prev) => [...prev, ...(data.learningCards || [])]);
+        setNextCursor(data.nextCursor ?? null);
+      } catch (error) {
+        console.error("Failed to load more learning cards:", error);
+      } finally {
+        setLoadingMore(false);
+      }
+    },
+    [loadingMore, buildParams]
+  );
 
-  const filteredCards = useMemo(() => {
-    const query = searchQuery.trim().toLowerCase();
-    return cards.filter((card) => {
-      const matchesCategory =
-        !selectedCategory || card.sourcePost.classification?.primaryCategory === selectedCategory;
-      const matchesQuery =
-        !query ||
-        [card.title, card.summary, card.coreInsight, card.userMemo || "", card.sourcePost.text]
-          .join("\n")
-          .toLowerCase()
-          .includes(query);
-      return matchesCategory && matchesQuery;
-    });
-  }, [cards, searchQuery, selectedCategory]);
+  useEffect(() => {
+    if (!nextCursor || !sentinelRef.current) return;
+    const el = sentinelRef.current;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && nextCursor) loadMore(nextCursor);
+      },
+      { rootMargin: "200px" }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [nextCursor, loadMore]);
 
+  const hasActiveFilter = Boolean(searchQuery.trim() || selectedCategory);
   const allFilteredSelected =
-    filteredCards.length > 0 && filteredCards.every((c) => selectedIds.has(c.id));
+    cards.length > 0 && cards.every((c) => selectedIds.has(c.id));
 
   function toggleSelectMode() {
     setSelectMode((v) => !v);
@@ -122,7 +162,7 @@ export default function KnowhowPage() {
     if (allFilteredSelected) {
       setSelectedIds(new Set());
     } else {
-      setSelectedIds(new Set(filteredCards.map((c) => c.id)));
+      setSelectedIds(new Set(cards.map((c) => c.id)));
     }
   }
 
@@ -139,7 +179,8 @@ export default function KnowhowPage() {
       ids.length === 1
         ? "この学習カードを削除しますか？"
         : `選択した${ids.length}件の学習カードを削除しますか？`;
-    if (!confirm(msg)) return;
+    const ok = await confirm({ message: msg, confirmLabel: "削除する", variant: "danger" });
+    if (!ok) return;
     setDeleting(true);
     try {
       await fetch("/api/learning-cards", {
@@ -148,6 +189,7 @@ export default function KnowhowPage() {
         body: JSON.stringify({ ids }),
       });
       setCards((prev) => prev.filter((c) => !ids.includes(c.id)));
+      setTotal((prev) => (prev === null ? prev : Math.max(0, prev - ids.length)));
       setSelectedIds((prev) => {
         const next = new Set(prev);
         ids.forEach((id) => next.delete(id));
@@ -169,7 +211,9 @@ export default function KnowhowPage() {
           </div>
           <div>
             <h1 className="text-2xl font-bold text-text">学びメモ</h1>
-            <p className="text-sm text-text-secondary">{cards.length}件のメモ</p>
+            <p className="text-sm text-text-secondary">
+              {total !== null ? `${total}件のメモ` : `${cards.length}件のメモ`}
+            </p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -258,6 +302,10 @@ export default function KnowhowPage() {
             </Card>
           ))}
         </div>
+      ) : cards.length === 0 && hasActiveFilter ? (
+        <div className="text-center py-14 bg-white rounded-2xl border border-border">
+          <p className="text-sm text-text-secondary">該当するメモが見つかりませんでした</p>
+        </div>
       ) : cards.length === 0 ? (
         <div className="text-center py-16 bg-white rounded-2xl border border-border">
           <BookOpen className="w-12 h-12 text-text-muted mx-auto mb-3" />
@@ -269,13 +317,9 @@ export default function KnowhowPage() {
             <Button>保存した投稿を見る</Button>
           </Link>
         </div>
-      ) : filteredCards.length === 0 ? (
-        <div className="text-center py-14 bg-white rounded-2xl border border-border">
-          <p className="text-sm text-text-secondary">該当するメモが見つかりませんでした</p>
-        </div>
       ) : (
         <div className="grid gap-4 lg:grid-cols-2">
-          {filteredCards.map((card) => {
+          {cards.map((card) => {
             const category = card.sourcePost.classification?.primaryCategory || "未分類";
             const isSelected = selectedIds.has(card.id);
             return (
@@ -372,16 +416,25 @@ export default function KnowhowPage() {
           })}
         </div>
       )}
+
+      {!loading && nextCursor && (
+        <div ref={sentinelRef} className="flex justify-center py-6">
+          {loadingMore && <Loader2 className="h-5 w-5 animate-spin text-text-muted" />}
+        </div>
+      )}
     </div>
   );
 }
 
 function ExportButton({ ids, format }: { ids: string[]; format: "zip" | "bundle" }) {
+  const confirm = useConfirm();
+  const alert = useAlert();
   const [busy, setBusy] = useState(false);
 
   const exportNow = async () => {
     if (ids.length === 0) {
-      if (!confirm("選択がないため、保存済みカード全件を書き出します。続行しますか？")) return;
+      const ok = await confirm("選択がないため、保存済みカード全件を書き出します。続行しますか？");
+      if (!ok) return;
     }
     setBusy(true);
     try {
@@ -404,7 +457,7 @@ function ExportButton({ ids, format }: { ids: string[]; format: "zip" | "bundle"
       a.click();
       URL.revokeObjectURL(url);
     } catch (e) {
-      alert((e as Error).message);
+      await alert((e as Error).message);
     } finally {
       setBusy(false);
     }

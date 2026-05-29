@@ -5,6 +5,7 @@ import { useSafeBack } from "@/hooks/useSafeBack";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Badge, LearningStatusBadge } from "@/components/ui/Badge";
+import { useConfirm } from "@/components/ui/DialogProvider";
 import { PostMediaGrid, parsePostMedia } from "@/components/posts/PostMediaGrid";
 import { LearningCardImages } from "@/components/posts/LearningCardImages";
 import { LearningCardVideos } from "@/components/posts/LearningCardVideos";
@@ -43,11 +44,11 @@ import {
 } from "lucide-react";
 
 const PROGRESS_STEPS = [
-  "① 投稿とツリーを読み込み中...",
-  "② 構造を抽出中...",
-  "③ 手順を生成中...",
-  "④ マニュアル化中...",
-  "⑤ 厳密学習を構造化中...",
+  "投稿とツリーの読み込み",
+  "構造の抽出",
+  "手順の生成",
+  "マニュアル化",
+  "厳密学習の構造化",
 ] as const;
 
 const ARTICLE_PREVIEW_CHARS = 240;
@@ -139,6 +140,7 @@ function CollapsibleHeader({
 export default function PostLearningPage({ params }: { params: Promise<{ postId: string }> }) {
   const { postId } = use(params);
   const safeBack = useSafeBack();
+  const confirm = useConfirm();
   const [post, setPost] = useState<PostView | null>(null);
   const [card, setCard] = useState<LearningCardView | null>(null);
   const [loading, setLoading] = useState(true);
@@ -169,9 +171,6 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
   // Delete state
   const [deleting, setDeleting] = useState(false);
 
-  // Pseudo-progress state for generation
-  const [progressStep, setProgressStep] = useState(0);
-
   const [articleExpanded, setArticleExpanded] = useState(false);
   const [postExpanded, setPostExpanded] = useState(false);
 
@@ -182,14 +181,6 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
   const [diagramOpen, setDiagramOpen] = useState(false);
 
   const article = useMemo(() => (post ? parseArticleContent(post.urlCardJson) : null), [post]);
-
-  useEffect(() => {
-    if (!generating) return;
-    const interval = setInterval(() => {
-      setProgressStep((prev) => Math.min(prev + 1, PROGRESS_STEPS.length - 1));
-    }, 4000);
-    return () => clearInterval(interval);
-  }, [generating]);
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -250,7 +241,6 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
   const handleGenerate = async (mode?: "content" | "format") => {
     const activeMode = mode ?? learningMode;
     if (mode !== undefined) setLearningMode(mode);
-    setProgressStep(0);
     setGenerating(true);
     setError(null);
     setMessage(null);
@@ -284,10 +274,14 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
     }
   };
 
-  const handleModeToggle = (newMode: "content" | "format") => {
+  const handleModeToggle = async (newMode: "content" | "format") => {
     if (newMode === learningMode) return;
     if (card) {
-      if (!confirm(`「${newMode === "content" ? "内容モード" : "型モード"}」に切り替えて再生成しますか？`)) return;
+      const ok = await confirm({
+        message: `「${newMode === "content" ? "内容モード" : "型モード"}」に切り替えて再生成しますか？`,
+        confirmLabel: "再生成する",
+      });
+      if (!ok) return;
       void handleGenerate(newMode);
     } else {
       setLearningMode(newMode);
@@ -351,7 +345,12 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
 
   const handleDelete = async () => {
     if (!card) return;
-    if (!confirm("この学習カードを削除しますか？削除後はそのままこのページで再生成できます。")) return;
+    const ok = await confirm({
+      message: "この学習カードを削除しますか？削除後はそのままこのページで再生成できます。",
+      confirmLabel: "削除する",
+      variant: "danger",
+    });
+    if (!ok) return;
     setDeleting(true);
     setError(null);
     setMessage(null);
@@ -644,31 +643,25 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
         <Card>
           {generating ? (
             <div>
-              <h2 className="mb-4 text-base font-bold text-text">学習カードを生成しています…</h2>
-              <div className="space-y-3">
-                {PROGRESS_STEPS.map((step, i) => (
+              <div className="mb-4 flex items-center gap-3">
+                <Loader2 className="h-5 w-5 flex-shrink-0 animate-spin text-accent" />
+                <h2 className="text-base font-bold text-text">学習カードを生成しています…</h2>
+              </div>
+              <p className="mb-3 text-xs font-medium text-text-muted">AIが行う処理</p>
+              <div className="space-y-2">
+                {PROGRESS_STEPS.map((step) => (
                   <div
                     key={step}
-                    className={`flex items-center gap-3 text-sm ${
-                      i < progressStep
-                        ? "text-success"
-                        : i === progressStep
-                        ? "font-medium text-text"
-                        : "text-text-muted"
-                    }`}
+                    className="flex items-center gap-3 text-sm text-text-secondary"
                   >
-                    {i < progressStep ? (
-                      <CheckCircle2 className="h-4 w-4 flex-shrink-0 text-success" />
-                    ) : i === progressStep ? (
-                      <Loader2 className="h-4 w-4 flex-shrink-0 animate-spin text-accent" />
-                    ) : (
-                      <div className="h-4 w-4 flex-shrink-0 rounded-full border-2 border-border-light" />
-                    )}
+                    <div className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-border" />
                     {step}
                   </div>
                 ))}
               </div>
-              <p className="mt-4 text-xs text-text-muted">平均30秒前後かかります</p>
+              <p className="mt-4 text-xs text-text-muted">
+                内容量により30秒〜数分かかることがあります。完了までこのままお待ちください。
+              </p>
             </div>
           ) : tokenExpired ? (
             <div className="space-y-4">

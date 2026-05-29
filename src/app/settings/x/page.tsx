@@ -5,6 +5,7 @@ import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Select } from "@/components/ui/Select";
 import { Badge } from "@/components/ui/Badge";
+import { useConfirm } from "@/components/ui/DialogProvider";
 import {
   Link2,
   CheckCircle,
@@ -37,7 +38,7 @@ function getMissingSyncScopes(syncType: string, scopes: string[]): string[] {
 
 function toSyncErrorMessage(message: string): string {
   if (message.includes("403") || message.toLowerCase().includes("forbidden")) {
-    return "X API権限が不足しています。いいね同期には like.read、ブックマーク同期には bookmark.read が必要です。X Developer PortalとVercelの X_SCOPES を更新後、接続解除して再接続してください。";
+    return "X連携の権限が不足しています。一度接続を解除し、いいね・ブックマークの読み取りを許可して再接続してください。";
   }
   return message;
 }
@@ -71,6 +72,7 @@ function getPostedDateRange(preset: string): { from: string; to: string } | null
 }
 
 export default function XSettingsPage() {
+  const confirm = useConfirm();
   const [xStatus, setXStatus] = useState<{
     connected: boolean;
     account: {
@@ -183,7 +185,12 @@ export default function XSettingsPage() {
   };
 
   const handleDisconnect = async () => {
-    if (!confirm("Xアカウントの接続を解除しますか？")) return;
+    const ok = await confirm({
+      message: "Xアカウントの接続を解除しますか？",
+      confirmLabel: "解除する",
+      variant: "danger",
+    });
+    if (!ok) return;
     try {
       await fetch("/api/x/status", { method: "DELETE" });
       loadStatus();
@@ -198,7 +205,12 @@ export default function XSettingsPage() {
   };
 
   const handleGrokDisconnect = async () => {
-    if (!confirm("Grok OAuthの接続を解除しますか？")) return;
+    const ok = await confirm({
+      message: "Grok OAuthの接続を解除しますか？",
+      confirmLabel: "解除する",
+      variant: "danger",
+    });
+    if (!ok) return;
     try {
       await fetch("/api/grok/disconnect", { method: "DELETE" });
       loadStatus();
@@ -451,9 +463,8 @@ export default function XSettingsPage() {
               <div className="rounded-xl border border-warning/20 bg-warning-light px-4 py-3">
                 <p className="text-sm font-medium text-warning">同期権限が不足しています</p>
                 <p className="mt-1 text-sm text-text-secondary">
-                  現在のX接続には {missingSyncScopes.join(" / ")} が含まれていません。
-                  X Developer PortalとVercelの X_SCOPES に必要な権限を追加し、
-                  接続解除後に再接続してください。
+                  現在のX接続には {missingSyncScopes.join(" / ")} の読み取り権限が含まれていません。
+                  一度接続を解除し、再接続時に該当の権限を許可してください。
                 </p>
                 <p className="mt-2 text-xs text-text-muted break-all">
                   現在の接続スコープ: {accountScopes.join(" ") || "取得できません"}

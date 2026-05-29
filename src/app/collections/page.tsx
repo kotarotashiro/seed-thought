@@ -6,6 +6,7 @@ import { ArrowRight, ArrowUpDown, Layers, Plus, Search, Sparkles, Wand2 } from "
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
+import { useAlert } from "@/components/ui/DialogProvider";
 
 interface CollectionListItem {
   id: string;
@@ -41,6 +42,7 @@ const SORT_LABELS: Record<SortKey, string> = {
 };
 
 export default function CollectionsPage() {
+  const alert = useAlert();
   const [collections, setCollections] = useState<CollectionListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
@@ -158,11 +160,11 @@ export default function CollectionsPage() {
 
   const create = async () => {
     if (!title.trim()) {
-      alert("タイトルを入力してください");
+      await alert("タイトルを入力してください");
       return;
     }
     if (selectedIds.length === 0) {
-      alert("学習カードを1つ以上選んでください");
+      await alert("学習カードを1つ以上選んでください");
       return;
     }
     setCreating(true);
@@ -186,7 +188,7 @@ export default function CollectionsPage() {
       setSelectedIds([]);
       setShowForm(false);
     } catch (e) {
-      alert((e as Error).message);
+      await alert((e as Error).message);
     } finally {
       setCreating(false);
     }

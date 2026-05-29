@@ -13,6 +13,7 @@ import {
   ZoomIn,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { useConfirm } from "@/components/ui/DialogProvider";
 import {
   IMAGE_PROVIDER_OPTIONS,
   DEFAULT_IMAGE_MODEL,
@@ -37,6 +38,7 @@ export function LearningCardImages({
   explanationPrompt: string;
   diagramPrompt: string;
 }) {
+  const confirm = useConfirm();
   const [images, setImages] = useState<CardImage[]>([]);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState<string | null>(null);
@@ -113,7 +115,12 @@ export function LearningCardImages({
   };
 
   const remove = async (imageId: string) => {
-    if (!confirm("この画像を削除しますか？")) return;
+    const ok = await confirm({
+      message: "この画像を削除しますか？",
+      confirmLabel: "削除する",
+      variant: "danger",
+    });
+    if (!ok) return;
     try {
       await fetch(`/api/learning-cards/${cardId}/images/${imageId}`, {
         method: "DELETE",
