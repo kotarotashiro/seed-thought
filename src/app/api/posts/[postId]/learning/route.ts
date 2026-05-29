@@ -3,111 +3,12 @@ import { prisma } from "@/lib/db/prisma";
 import { getAiProvider } from "@/lib/ai/provider";
 import type { SourcePostForLearning } from "@/lib/ai/types";
 import { getUserFacingError } from "@/lib/api/errors";
-import { buildPostTextWithThread } from "@/lib/posts/threadText";
-import { resolveArticleForAi } from "@/lib/posts/articleContent";
+import { getPostForLearning, buildSourcePost } from "@/lib/posts/learningSource";
 import { XaiTokenExpiredError } from "@/lib/xai/oauth";
 
-// 学習カード生成＋厳密学習を2並列でLLM呼び出しするため、デフォルト枠では足りない。
-// Kimi など遅いモデルでも完走できるよう上限を引き上げる。
+// 学習カード生成（LLM 1回）。厳密学習は別ルート（./strict）で生成するため、
+// このルートは1呼び出しで完結し、遅いモデルでも60秒枠に収まりやすい。
 export const maxDuration = 60;
-
-type RawMediaItem = {
-  type?: unknown;
-  url?: unknown;
-  previewUrl?: unknown;
-  thumbnailUrl?: unknown;
-  altText?: unknown;
-};
-
-function parseTags(tagsJson?: string | null): string[] {
-  if (!tagsJson) return [];
-  try {
-    const tags = JSON.parse(tagsJson);
-    return Array.isArray(tags) ? tags.filter((tag): tag is string => typeof tag === "string") : [];
-  } catch {
-    return [];
-  }
-}
-
-function parseMedia(mediaJson?: string | null): SourcePostForLearning["media"] {
-  if (!mediaJson) return [];
-  try {
-    const media = JSON.parse(mediaJson);
-    if (!Array.isArray(media)) return [];
-
-    const parsed: SourcePostForLearning["media"] = [];
-    media.forEach((item: RawMediaItem) => {
-      if (!item || typeof item !== "object") return;
-      const type =
-        item.type === "photo"
-          ? "image"
-          : item.type === "video"
-          ? "video"
-          : item.type === "animated_gif"
-          ? "gif"
-          : null;
-      const url = typeof item.url === "string" ? item.url : null;
-      const thumbnailUrl =
-        typeof item.previewUrl === "string"
-          ? item.previewUrl
-          : typeof item.thumbnailUrl === "string"
-          ? item.thumbnailUrl
-          : undefined;
-
-      if (!type || (!url && !thumbnailUrl)) return;
-      parsed.push({
-        type,
-        url: url || thumbnailUrl || "",
-        thumbnailUrl,
-        altText: typeof item.altText === "string" ? item.altText : undefined,
-      });
-    });
-    return parsed;
-  } catch {
-    return [];
-  }
-}
-
-async function getPostForLearning(postId: string) {
-  return prisma.post.findUnique({
-    where: { id: postId },
-    include: {
-      classification: true,
-      threadPosts: { orderBy: { threadOrder: "asc" } },
-      learningCard: true,
-    },
-  });
-}
-
-async function buildSourcePost(
-  post: NonNullable<Awaited<ReturnType<typeof getPostForLearning>>>
-): Promise<Omit<SourcePostForLearning, "learningMode">> {
-  const threadMedia = post.threadPosts.flatMap((threadPost) => parseMedia(threadPost.mediaJson));
-
-  const { title: articleTitle, description: articleDescription } = await resolveArticleForAi(
-    post.urlCardJson,
-    post.text,
-  );
-
-  return {
-    id: post.id,
-    authorName: post.authorName || "手動追加",
-    authorHandle: post.authorUsername || "",
-    text: buildPostTextWithThread(post),
-    translatedText: post.translatedText || undefined,
-    postUrl: post.sourceUrl || "",
-    postedAt: post.postedAt?.toISOString(),
-    media: [...parseMedia(post.mediaJson), ...threadMedia],
-    tags: parseTags(post.classification?.tagsJson),
-    genre: post.classification?.primaryCategory,
-    type: post.classification?.postType,
-    existingSummary: post.classification?.summary,
-    userMemo: post.learningCard?.userMemo || undefined,
-    articleTitle,
-    articleDescription,
-    videoTranscript: post.videoTranscriptText || undefined,
-  };
-}
 
 export async function GET(
   request: Request,
@@ -151,39 +52,10 @@ export async function POST(
     const source = await buildSourcePost(post);
     const sourceWithMode: SourcePostForLearning = { ...source, learningMode };
 
-    // 学習カード生成は必須。厳密学習は失敗しても継続（片方失敗で全部落とさない）。
-    const [learningResult, strictResult] = await Promise.allSettled([
-      getAiProvider().generateLearningCard(sourceWithMode),
-      getAiProvider().generateStrictLearning({
-        postText: sourceWithMode.text,
-        classification: {
-          primaryCategory: post.classification?.primaryCategory || "",
-          summary: post.classification?.summary || "",
-        },
-        articleTitle: sourceWithMode.articleTitle,
-        articleDescription: sourceWithMode.articleDescription,
-        userMemo: post.learningCard?.userMemo ?? null,
-      }),
-    ]);
-
-    if (learningResult.status === "rejected") {
-      console.error("[learning route] generateLearningCard failed:", learningResult.reason);
-      throw learningResult.reason;
-    }
-    const learningOutput = learningResult.value;
-
-    let strictLearningOutput = null;
-    if (strictResult.status === "fulfilled") {
-      strictLearningOutput = strictResult.value;
-    } else {
-      console.error(
-        "[learning route] generateStrictLearning failed (non-fatal):",
-        strictResult.reason
-      );
-    }
-
+    const learningOutput = await getAiProvider().generateLearningCard(sourceWithMode);
     const draftOutput = { ...learningOutput, sourcePostId: post.id, status: "draft" as const };
 
+    // 学習カードを再生成したら厳密学習は古くなるため null に戻し、クライアント側で別途再生成させる。
     const learningCard = await prisma.learningCard.upsert({
       where: { sourcePostId: post.id },
       create: {
@@ -198,7 +70,7 @@ export async function POST(
         userMemo: draftOutput.userLearningMemo,
         status: "draft",
         learningMode,
-        strictLearningJson: JSON.stringify(strictLearningOutput),
+        strictLearningJson: null,
       },
       update: {
         title: draftOutput.title,
@@ -211,12 +83,12 @@ export async function POST(
         userMemo: draftOutput.userLearningMemo,
         status: "draft",
         learningMode,
-        strictLearningJson: JSON.stringify(strictLearningOutput),
+        strictLearningJson: null,
       },
     });
 
     return NextResponse.json(
-      { learningCard, output: draftOutput, strictLearning: strictLearningOutput },
+      { learningCard, output: draftOutput, strictLearning: null },
       { status: 201 }
     );
   } catch (error) {

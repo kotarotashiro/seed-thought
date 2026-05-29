@@ -153,6 +153,9 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
 
   const [learningMode, setLearningMode] = useState<"content" | "format">("content");
   const [strictLearning, setStrictLearning] = useState<StrictLearningOutput | null>(null);
+  const [strictGenerating, setStrictGenerating] = useState(false);
+  const [strictError, setStrictError] = useState<string | null>(null);
+  const strictAutoTriedRef = useRef(false);
   const [tokenExpired, setTokenExpired] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -272,17 +275,51 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
         throw new Error(data.error || `学習カードの生成に失敗しました (HTTP ${res.status})`);
       }
       setCard(data.learningCard || null);
-      setStrictLearning(data.strictLearning || null);
+      // 厳密学習はこのレスポンスには含まれない（別ルートで生成）。状態をリセットして後追い生成する。
+      setStrictLearning(null);
+      setStrictError(null);
+      strictAutoTriedRef.current = false;
       setMemo(data.learningCard?.userMemo || "");
       if (data.learningCard?.id) {
         void loadOutputHistory(data.learningCard.id);
       }
       setMessage("学習カードを作成しました");
+      // 学習カード完成後、厳密学習を別リクエストで生成（UIをブロックしない）。
+      void generateStrict();
     } catch (generateError) {
       console.error("Failed to generate learning card:", generateError);
       setError(generateError instanceof Error ? generateError.message : "学習カードの生成に失敗しました");
     } finally {
       setGenerating(false);
+    }
+  };
+
+  const generateStrict = async () => {
+    strictAutoTriedRef.current = true;
+    setStrictGenerating(true);
+    setStrictError(null);
+    try {
+      const res = await fetch(`/api/posts/${postId}/learning/strict`, { method: "POST" });
+      const rawBody = await res.text();
+      let data: { error?: string; code?: string; strictLearning?: StrictLearningOutput } = {};
+      try {
+        data = rawBody ? JSON.parse(rawBody) : {};
+      } catch {
+        const snippet = rawBody.trim().slice(0, 200);
+        if (res.status === 504 || /timed out|timeout|FUNCTION_INVOCATION_TIMEOUT/i.test(snippet)) {
+          throw new Error("厳密学習の生成がタイムアウトしました（60秒超過）。再試行してください。");
+        }
+        throw new Error(`サーバーエラー (HTTP ${res.status}): ${snippet || "応答が空です"}`);
+      }
+      if (!res.ok) {
+        throw new Error(data.error || `厳密学習の生成に失敗しました (HTTP ${res.status})`);
+      }
+      setStrictLearning(data.strictLearning || null);
+    } catch (strictErr) {
+      console.error("Failed to generate strict learning:", strictErr);
+      setStrictError(strictErr instanceof Error ? strictErr.message : "厳密学習の生成に失敗しました");
+    } finally {
+      setStrictGenerating(false);
     }
   };
 
@@ -310,6 +347,18 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
     void handleGenerate();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading, post, card, generating]);
+
+  // 学習カードは存在するが厳密学習が未生成の場合、別ルートで後追い生成する。
+  useEffect(() => {
+    if (loading) return;
+    if (!card) return;
+    if (strictLearning) return;
+    if (strictGenerating) return;
+    if (generating) return;
+    if (strictAutoTriedRef.current) return;
+    void generateStrict();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, card, strictLearning, strictGenerating, generating]);
 
   const handleSave = async () => {
     if (!card) return;
@@ -375,6 +424,8 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
       autoGenerateTriedRef.current = true;
       setCard(null);
       setStrictLearning(null);
+      setStrictError(null);
+      strictAutoTriedRef.current = false;
       setLearningMode("content");
       setMemo("");
       setSelectedOutput(null);
@@ -1078,15 +1129,32 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
                       </div>
                     </div>
                   </div>
+                ) : strictGenerating ? (
+                  <div className="flex flex-col items-center gap-3 py-8">
+                    <Loader2 className="h-5 w-5 animate-spin text-accent" />
+                    <p className="text-center text-sm text-text-secondary">
+                      厳密学習を生成しています…<br />
+                      内容量により30秒ほどかかることがあります。
+                    </p>
+                  </div>
+                ) : strictError ? (
+                  <div className="flex flex-col items-center gap-4 py-8">
+                    <p className="whitespace-pre-wrap break-words rounded-lg border border-danger/30 bg-danger-light px-3 py-2 text-center text-xs text-danger">
+                      {strictError}
+                    </p>
+                    <Button onClick={() => void generateStrict()} loading={strictGenerating} loadingLabel="生成中...">
+                      <Sparkles className="mr-1.5 h-4 w-4" />
+                      厳密学習を再生成
+                    </Button>
+                  </div>
                 ) : (
                   <div className="flex flex-col items-center gap-4 py-8">
                     <p className="text-center text-sm text-text-secondary">
-                      厳密学習はまだ生成されていません。<br />
-                      学習カードを再生成すると同時に生成されます。
+                      厳密学習はまだ生成されていません。
                     </p>
-                    <Button onClick={() => void handleGenerate()} loading={generating} loadingLabel="生成中...">
+                    <Button onClick={() => void generateStrict()} loading={strictGenerating} loadingLabel="生成中...">
                       <Sparkles className="mr-1.5 h-4 w-4" />
-                      学習カードを再生成
+                      厳密学習を生成
                     </Button>
                   </div>
                 )}
