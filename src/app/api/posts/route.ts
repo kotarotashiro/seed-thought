@@ -4,6 +4,9 @@ import { getAiProvider } from "@/lib/ai/provider";
 import type { Prisma } from "@/generated/prisma/client";
 import { createFallbackClassification } from "@/lib/ai/fallback";
 
+// 投稿分類・翻訳のLLM呼び出しが、Kimi等の遅いモデルでもデフォルト枠で打ち切られないよう引き上げる。
+export const maxDuration = 60;
+
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS, DELETE",

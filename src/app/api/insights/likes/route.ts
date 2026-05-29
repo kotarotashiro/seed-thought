@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { getAiProvider } from "@/lib/ai/provider";
 
+// 傾向分析のLLM呼び出しが、Kimi等の遅いモデルでもデフォルト枠で打ち切られないよう引き上げる。
+export const maxDuration = 60;
+
 const CACHE_KEY = "insights.likes.cache";
 
 export async function GET(request: Request) {
