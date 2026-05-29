@@ -8,8 +8,9 @@ import {
 import { needsJapaneseTranslation } from "@/lib/text/language";
 import { resolveArticleForAi } from "@/lib/posts/articleContent";
 
-// 投稿分類・翻訳のLLM呼び出しが、Kimi等の遅いモデルでもデフォルト枠で打ち切られないよう引き上げる。
-export const maxDuration = 60;
+// 投稿分類・翻訳のLLM呼び出し。Vercel Hobby(Fluid Compute)上限の300秒まで引き上げ、
+// Kimi等の遅いモデルでも打ち切られないようにする。
+export const maxDuration = 300;
 
 // GET /api/posts/[postId]
 export async function GET(

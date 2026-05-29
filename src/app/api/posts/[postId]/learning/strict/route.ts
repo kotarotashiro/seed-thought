@@ -5,10 +5,10 @@ import { getUserFacingError } from "@/lib/api/errors";
 import { getPostForLearning, buildSourcePost } from "@/lib/posts/learningSource";
 import { XaiTokenExpiredError } from "@/lib/xai/oauth";
 
-// 厳密学習生成（LLM 1回）。学習カードとは別ルートに分離し、各リクエストを
-// 60秒枠に収める。学習カードが先に存在している前提で、生成後に
-// learningCard.strictLearningJson を更新する。
-export const maxDuration = 60;
+// 厳密学習生成（LLM 1回）。学習カードとは別ルートに分離。学習カードが先に
+// 存在している前提で、生成後に learningCard.strictLearningJson を更新する。
+// Vercel Hobby(Fluid Compute)の上限300秒まで引き上げ、遅いモデルでも打ち切らない。
+export const maxDuration = 300;
 
 export async function POST(
   request: Request,

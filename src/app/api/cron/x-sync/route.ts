@@ -8,7 +8,7 @@ import { refreshStoredXaiTokens } from "@/lib/xai/refresh";
 
 // Vercel Cron: runs every 30 minutes via GET.
 // Manual test: curl /api/cron/x-sync -H "Authorization: Bearer $CRON_SECRET"
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 function isAuthorized(request: Request): boolean {
   const secret = process.env.CRON_SECRET;

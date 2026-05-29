@@ -6,9 +6,10 @@ import { getUserFacingError } from "@/lib/api/errors";
 import { getPostForLearning, buildSourcePost } from "@/lib/posts/learningSource";
 import { XaiTokenExpiredError } from "@/lib/xai/oauth";
 
-// 学習カード生成（LLM 1回）。厳密学習は別ルート（./strict）で生成するため、
-// このルートは1呼び出しで完結し、遅いモデルでも60秒枠に収まりやすい。
-export const maxDuration = 60;
+// 学習カード生成（LLM 1回）。厳密学習は別ルート（./strict）で生成する。
+// Vercel Hobby(Fluid Compute)の上限は300秒。Kimi k2.6は1回で約150秒かかるため
+// 上限まで引き上げて打ち切りを防ぐ。
+export const maxDuration = 300;
 
 export async function GET(
   request: Request,

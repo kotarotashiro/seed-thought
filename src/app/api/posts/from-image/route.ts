@@ -3,7 +3,7 @@ import { getAuthHeader } from "@/lib/xai/client";
 
 const XAI_CHAT_URL = "https://api.x.ai/v1/chat/completions";
 
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 export async function POST(request: Request) {
   try {

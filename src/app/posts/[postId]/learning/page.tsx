@@ -264,7 +264,7 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
       } catch {
         const snippet = rawBody.trim().slice(0, 200);
         if (res.status === 504 || /timed out|timeout|FUNCTION_INVOCATION_TIMEOUT/i.test(snippet)) {
-          throw new Error("生成がタイムアウトしました（処理が60秒を超過）。モデルを軽いものに変えるか、時間をおいて再試行してください。");
+          throw new Error("生成がタイムアウトしました（処理が5分を超過）。モデルを軽いものに変えるか、時間をおいて再試行してください。");
         }
         throw new Error(`サーバーエラー (HTTP ${res.status}): ${snippet || "応答が空です"}`);
       }
@@ -307,7 +307,7 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
       } catch {
         const snippet = rawBody.trim().slice(0, 200);
         if (res.status === 504 || /timed out|timeout|FUNCTION_INVOCATION_TIMEOUT/i.test(snippet)) {
-          throw new Error("厳密学習の生成がタイムアウトしました（60秒超過）。再試行してください。");
+          throw new Error("厳密学習の生成がタイムアウトしました（5分超過）。再試行してください。");
         }
         throw new Error(`サーバーエラー (HTTP ${res.status}): ${snippet || "応答が空です"}`);
       }
