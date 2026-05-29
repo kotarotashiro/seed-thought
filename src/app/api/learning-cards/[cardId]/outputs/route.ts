@@ -6,6 +6,9 @@ import { createFallbackOutput } from "@/lib/ai/fallback";
 import type { PostClassificationResult } from "@/lib/ai/types";
 import { buildPostTextWithThread } from "@/lib/posts/threadText";
 
+// アウトプット生成は1回のLLM呼び出しだが、Kimi等の遅いモデルではデフォルト枠を超えるため引き上げる。
+export const maxDuration = 60;
+
 const VALID_OUTPUT_TYPES = [
   "x",
   "instagram",

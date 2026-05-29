@@ -7,6 +7,10 @@ import { buildPostTextWithThread } from "@/lib/posts/threadText";
 import { resolveArticleForAi } from "@/lib/posts/articleContent";
 import { XaiTokenExpiredError } from "@/lib/xai/oauth";
 
+// 学習カード生成＋厳密学習を2並列でLLM呼び出しするため、デフォルト枠では足りない。
+// Kimi など遅いモデルでも完走できるよう上限を引き上げる。
+export const maxDuration = 60;
+
 type RawMediaItem = {
   type?: unknown;
   url?: unknown;

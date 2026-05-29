@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { getAiProvider } from "@/lib/ai/provider";
 
+// LLM呼び出しを伴うため、Kimi等の遅いモデルでもデフォルト枠で打ち切られないよう引き上げる。
+export const maxDuration = 60;
+
 export async function POST(request: Request) {
   try {
     const body = await request.json();
