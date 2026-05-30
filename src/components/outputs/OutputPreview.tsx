@@ -512,6 +512,22 @@ export function OutputPreview({ title, content, contentJson, outputType }: Outpu
         </div>
       )}
 
+      {/* Short video segments preview */}
+      {outputType === "short_video" && contentJson && "segments" in contentJson && (
+        <div className="mt-4 space-y-3">
+          <p className="text-sm font-medium text-text">台本（テロップ付き）:</p>
+          {(contentJson.segments as Array<{ time: string; role: string; narration: string; telop?: string }>).map((seg, i) => (
+            <div key={i} className="bg-border-light rounded-xl p-3">
+              <p className="text-xs text-text-muted mb-1">{seg.time}{seg.role ? ` ・ ${seg.role}` : ""}</p>
+              <p className="text-sm text-text">{seg.narration}</p>
+              {seg.telop && (
+                <p className="mt-1 inline-block rounded bg-text/80 px-2 py-0.5 text-xs font-bold text-white">{seg.telop}</p>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* Instagram carousel slides preview */}
       {outputType === "instagram" && contentJson && "slides" in contentJson && (
         <div className="mt-4 space-y-3">

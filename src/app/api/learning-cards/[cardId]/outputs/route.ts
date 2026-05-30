@@ -13,6 +13,7 @@ export const maxDuration = 300;
 const VALID_OUTPUT_TYPES = [
   "x",
   "instagram",
+  "short_video",
   "note",
   "markdown_log",
   "seminar",

@@ -40,29 +40,56 @@ export interface SourcePostForLearning {
   learningMode?: "content" | "format";
 }
 
+/**
+ * ① 投稿の中身そのものを忠実に転写したもの。
+ * 抽象化・批評はせず、「この通りやれば同じ結果」になる粒度で中身だけを残す。
+ * format に応じて items / verbatim を使い分ける。
+ */
+export interface LearningCapture {
+  /** list=要素列挙 / steps=手順 / claims=主張 / template=プロンプト等の原文 / narrative=地の文 */
+  format: "list" | "steps" | "claims" | "template" | "narrative";
+  /** 中身を一言で表す見出し（例: コンバートするヒーローの10要素） */
+  headline: string;
+  items: { label: string; body: string; detail?: string }[];
+  /** format=template のときのみ：テンプレ/プロンプトの原文 */
+  verbatim?: string | null;
+  /** format=template のときのみ：使うときの手順 */
+  usage?: string | null;
+}
+
+/**
+ * ③ 初心者ゾーン：独立セクション。
+ * 「初心者はここで詰まる」先回りと、やさしい用語解説。
+ */
+export interface BeginnerZone {
+  stumblingPoints: { point: string; explanation: string }[];
+  glossary: { term: string; explanation: string }[];
+}
+
 export interface LearningOutput {
   sourcePostId: string;
   title: string;
+  /** 一言でいうと（オリエンテーション・短く） */
   summary: string;
+  /** 投稿者が本当に伝えたかったこと */
   originalIntent: string;
-  whatIsInteresting: string;
-  coreInsight: string;
-  structure: {
-    label: string;
-    description: string;
-  }[];
+  /** なぜあなたが見る価値があるか */
+  whyForYou?: string;
+  /** ① 投稿の中身そのもの（忠実転写） */
+  capture?: LearningCapture;
   steps: {
     title: string;
     description: string;
     actions: string[];
   }[];
-  manual: string;
   applicationIdeas: {
     title: string;
     description: string;
   }[];
   tips: string[];
   useCases: string[];
+  /** ③ 初心者ゾーン */
+  beginnerZone?: BeginnerZone;
   diagramStructure: {
     title: string;
     sections: {
@@ -75,6 +102,15 @@ export interface LearningOutput {
   userLearningMemo: string;
   backgroundContext?: BackgroundContext | null;
   status: "draft" | "saved";
+
+  // --- legacy（旧カード互換。新規生成では使わない） ---
+  whatIsInteresting?: string;
+  coreInsight?: string;
+  structure?: {
+    label: string;
+    description: string;
+  }[];
+  manual?: string;
 }
 
 /**
@@ -109,6 +145,7 @@ export interface PostClassificationResult {
 export type OutputType =
   | "x"
   | "instagram"
+  | "short_video"
   | "note"
   | "markdown_log"
   | "seminar"

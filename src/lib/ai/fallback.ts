@@ -317,6 +317,21 @@ export function createFallbackOutput(input: {
     };
   }
 
+  if (input.outputType === "short_video") {
+    return {
+      title: "ショート動画台本の下書き",
+      content: `【0〜3秒｜フック】\nナレーション: ${trimJapanese(summary, 40)}\nテロップ: ${input.classification.primaryCategory}、これ見て\n\n【3〜18秒｜共感→本質】\nナレーション: ${input.classification.recommendReason}\n\n【18〜40秒｜解決策→ベネフィット】\nナレーション: ${input.userFinalNote || "保存した投稿を、自分の仕事に置き換える形に言い換えてみる。"}\n\n【最後｜CTA】\nナレーション: あとで使えるので保存しておいてください。`,
+      contentJson: {
+        segments: [
+          { time: "0〜3秒", role: "フック", narration: trimJapanese(summary, 40), telop: "これ見て" },
+          { time: "3〜18秒", role: "共感→本質", narration: input.classification.recommendReason, telop: "問題はそこじゃない" },
+          { time: "18〜40秒", role: "解決策→ベネフィット", narration: input.userFinalNote || "自分の仕事に置き換える", telop: "置き換えるだけ" },
+          { time: "最後", role: "CTA", narration: "保存しておいてください", telop: "保存推奨" },
+        ],
+      },
+    };
+  }
+
   if (input.outputType === "strict_learning") {
     const fallback = createFallbackStrictLearning({
       postText: input.postText,

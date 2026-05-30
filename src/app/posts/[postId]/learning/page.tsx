@@ -22,15 +22,15 @@ import {
   CheckCircle2,
   ChevronDown,
   ChevronUp,
+  ClipboardList,
   Clock,
   Copy,
   ExternalLink,
-  FileText,
   Film,
   GitBranch,
+  GraduationCap,
   Image as ImageIcon,
   Languages,
-  Layers,
   Library,
   Lightbulb,
   ListChecks,
@@ -45,15 +45,15 @@ import {
 
 const PROGRESS_STEPS = [
   "投稿とツリーの読み込み",
-  "構造の抽出",
-  "手順の生成",
-  "マニュアル化",
-  "厳密学習の構造化",
+  "中身の忠実な抽出",
+  "実践手順の生成",
+  "初心者向けの補足",
+  "背景・周辺情報の収集",
 ] as const;
 
 const ARTICLE_PREVIEW_CHARS = 240;
 
-const OUTPUT_TYPES = ["x", "instagram", "note", "markdown_log", "seminar"] as const;
+const OUTPUT_TYPES = ["x", "instagram", "short_video", "note", "seminar"] as const;
 
 interface LearningCardView {
   id: string;
@@ -178,8 +178,6 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
   const [postExpanded, setPostExpanded] = useState(false);
 
   // Collapsible section states (secondary content starts closed)
-  const [structureOpen, setStructureOpen] = useState(false);
-  const [manualOpen, setManualOpen] = useState(false);
   const [strictOpen, setStrictOpen] = useState(false);
   const [diagramOpen, setDiagramOpen] = useState(false);
 
@@ -284,8 +282,7 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
         void loadOutputHistory(data.learningCard.id);
       }
       setMessage("学習カードを作成しました");
-      // 学習カード完成後、厳密学習を別リクエストで生成（UIをブロックしない）。
-      void generateStrict();
+      // 「本質を絞る」(深掘り)はオンデマンド。ユーザーがボタンを押したときだけ生成する。
     } catch (generateError) {
       console.error("Failed to generate learning card:", generateError);
       setError(generateError instanceof Error ? generateError.message : "学習カードの生成に失敗しました");
@@ -307,17 +304,17 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
       } catch {
         const snippet = rawBody.trim().slice(0, 200);
         if (res.status === 504 || /timed out|timeout|FUNCTION_INVOCATION_TIMEOUT/i.test(snippet)) {
-          throw new Error("厳密学習の生成がタイムアウトしました（5分超過）。再試行してください。");
+          throw new Error("「本質を絞る」の生成がタイムアウトしました（5分超過）。再試行してください。");
         }
         throw new Error(`サーバーエラー (HTTP ${res.status}): ${snippet || "応答が空です"}`);
       }
       if (!res.ok) {
-        throw new Error(data.error || `厳密学習の生成に失敗しました (HTTP ${res.status})`);
+        throw new Error(data.error || `「本質を絞る」の生成に失敗しました (HTTP ${res.status})`);
       }
       setStrictLearning(data.strictLearning || null);
     } catch (strictErr) {
       console.error("Failed to generate strict learning:", strictErr);
-      setStrictError(strictErr instanceof Error ? strictErr.message : "厳密学習の生成に失敗しました");
+      setStrictError(strictErr instanceof Error ? strictErr.message : "「本質を絞る」の生成に失敗しました");
     } finally {
       setStrictGenerating(false);
     }
@@ -347,18 +344,6 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
     void handleGenerate();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading, post, card, generating]);
-
-  // 学習カードは存在するが厳密学習が未生成の場合、別ルートで後追い生成する。
-  useEffect(() => {
-    if (loading) return;
-    if (!card) return;
-    if (strictLearning) return;
-    if (strictGenerating) return;
-    if (generating) return;
-    if (strictAutoTriedRef.current) return;
-    void generateStrict();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loading, card, strictLearning, strictGenerating, generating]);
 
   const handleSave = async () => {
     if (!card) return;
@@ -779,9 +764,9 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
             </p>
           )}
 
-          {/* 要約 */}
+          {/* 要約（オリエンテーション） */}
           <Card>
-            <SectionHeader icon={Sparkles} title="要約" />
+            <SectionHeader icon={Sparkles} title="一言でいうと" />
             {output.title && (
               <p className="mb-4 text-base font-semibold text-text">{output.title}</p>
             )}
@@ -789,22 +774,74 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
               <p className="whitespace-pre-wrap text-sm leading-relaxed text-text">{output.summary}</p>
               <div className="grid gap-3 sm:grid-cols-2">
                 <div className="rounded-xl bg-accent-subtle px-4 py-3">
-                  <p className="mb-1 text-xs font-medium text-accent">本質</p>
+                  <p className="mb-1 text-xs font-medium text-accent">投稿者の狙い</p>
                   <p className="text-sm leading-relaxed text-text">{output.originalIntent}</p>
                 </div>
-                <div className="rounded-xl bg-border-light px-4 py-3">
-                  <p className="mb-1 text-xs font-medium text-text-muted">面白さ</p>
-                  <p className="text-sm leading-relaxed text-text">{output.whatIsInteresting}</p>
-                </div>
-              </div>
-              <div>
-                <p className="mb-2 text-sm font-medium text-text">中心洞察</p>
-                <p className="rounded-xl border border-border px-4 py-3 text-sm leading-relaxed text-text">
-                  {output.coreInsight}
-                </p>
+                {(output.whyForYou || output.whatIsInteresting) && (
+                  <div className="rounded-xl bg-border-light px-4 py-3">
+                    <p className="mb-1 text-xs font-medium text-text-muted">なぜ見る価値があるか</p>
+                    <p className="text-sm leading-relaxed text-text">{output.whyForYou || output.whatIsInteresting}</p>
+                  </div>
+                )}
               </div>
             </div>
           </Card>
+
+          {/* ① 投稿の中身そのもの（忠実転写） */}
+          {output.capture && ((output.capture.items && output.capture.items.length > 0) || output.capture.verbatim) && (
+            <Card>
+              <SectionHeader icon={ClipboardList} title="投稿の中身" />
+              {output.capture.headline && (
+                <p className="mb-4 text-base font-semibold text-text">{output.capture.headline}</p>
+              )}
+              {output.capture.verbatim ? (
+                <div className="space-y-3">
+                  <div className="rounded-xl border border-border bg-border-light px-4 py-3">
+                    <p className="whitespace-pre-wrap break-words font-mono text-sm leading-relaxed text-text">
+                      {output.capture.verbatim}
+                    </p>
+                  </div>
+                  <Button
+                    variant="secondary"
+                    onClick={async () => {
+                      try {
+                        await navigator.clipboard.writeText(output.capture!.verbatim || "");
+                        setMessage("中身をコピーしました");
+                      } catch {
+                        // ignore
+                      }
+                    }}
+                  >
+                    <Copy className="mr-1.5 h-4 w-4" />
+                    コピー
+                  </Button>
+                  {output.capture.usage && (
+                    <div className="rounded-xl border border-border px-4 py-3">
+                      <p className="mb-1 text-xs font-medium text-text-muted">使い方</p>
+                      <p className="whitespace-pre-wrap text-sm leading-relaxed text-text">{output.capture.usage}</p>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-2.5">
+                  {output.capture.items.map((item, index) => (
+                    <div key={`${item.label}-${index}`} className="rounded-xl border border-border px-4 py-3">
+                      <div className="flex gap-2.5">
+                        <span className="flex-shrink-0 text-sm font-bold text-accent">{index + 1}.</span>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-semibold text-text">{item.label}</p>
+                          <p className="mt-0.5 text-sm leading-relaxed text-text-secondary">{item.body}</p>
+                          {item.detail && (
+                            <p className="mt-1 text-xs leading-relaxed text-text-muted">{item.detail}</p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </Card>
+          )}
 
           {/* 周辺情報（background context） */}
           {output.backgroundContext && (() => {
@@ -814,8 +851,7 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
               bg.historicalContext ||
               (bg.relatedFrameworks && bg.relatedFrameworks.length > 0) ||
               (bg.referencedWorks && bg.referencedWorks.length > 0) ||
-              (bg.furtherReading && bg.furtherReading.length > 0) ||
-              (bg.terminology && bg.terminology.length > 0);
+              (bg.furtherReading && bg.furtherReading.length > 0);
             if (!hasContent) return null;
             return (
               <Card>
@@ -865,19 +901,6 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
                       </div>
                     </div>
                   )}
-                  {bg.terminology && bg.terminology.length > 0 && (
-                    <div>
-                      <p className="mb-2 text-sm font-semibold text-text">用語解説</p>
-                      <div className="space-y-2">
-                        {bg.terminology.map((t, i) => (
-                          <div key={`${t.term}-${i}`} className="rounded-xl border border-border px-4 py-3">
-                            <p className="mb-1 text-sm font-semibold text-text">{t.term}</p>
-                            <p className="text-sm leading-relaxed text-text-secondary">{t.explanation}</p>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
                   {bg.furtherReading && bg.furtherReading.length > 0 && (
                     <div>
                       <p className="mb-2 text-sm font-semibold text-text">もっと知りたい人へ</p>
@@ -896,7 +919,50 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
             );
           })()}
 
+          {/* ③ 初心者ゾーン */}
+          {(() => {
+            const zone = output.beginnerZone;
+            const stumbling = zone?.stumblingPoints ?? [];
+            // 旧カード互換：用語解説は背景情報から拾う
+            const glossary = zone?.glossary ?? output.backgroundContext?.terminology ?? [];
+            if (stumbling.length === 0 && glossary.length === 0) return null;
+            return (
+              <Card>
+                <SectionHeader icon={GraduationCap} title="初心者ガイド" />
+                <div className="space-y-4">
+                  {stumbling.length > 0 && (
+                    <div>
+                      <p className="mb-2 text-sm font-semibold text-text">つまずきポイント</p>
+                      <div className="space-y-2">
+                        {stumbling.map((s, i) => (
+                          <div key={`${s.point}-${i}`} className="rounded-xl border border-border px-4 py-3">
+                            <p className="mb-1 text-sm font-semibold text-text">{s.point}</p>
+                            <p className="text-sm leading-relaxed text-text-secondary">{s.explanation}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {glossary.length > 0 && (
+                    <div>
+                      <p className="mb-2 text-sm font-semibold text-text">用語解説</p>
+                      <div className="space-y-2">
+                        {glossary.map((t, i) => (
+                          <div key={`${t.term}-${i}`} className="rounded-xl bg-border-light px-4 py-3">
+                            <p className="mb-1 text-sm font-semibold text-text">{t.term}</p>
+                            <p className="text-sm leading-relaxed text-text-secondary">{t.explanation}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </Card>
+            );
+          })()}
+
           {/* 手順 */}
+          {output.steps && output.steps.length > 0 && (
           <Card>
             <SectionHeader icon={ListChecks} title="実践手順" />
             <div className="space-y-4">
@@ -919,6 +985,7 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
               ))}
             </div>
           </Card>
+          )}
 
           {/* 応用アイデア */}
           <Card>
@@ -951,46 +1018,11 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
             </div>
           </Card>
 
-          {/* 構造 — collapsible */}
-          <Card>
-            <CollapsibleHeader
-              icon={Layers}
-              title="抽出できる構造"
-              open={structureOpen}
-              onToggle={() => setStructureOpen((v) => !v)}
-            />
-            {structureOpen && (
-              <div className="mt-4 space-y-3">
-                {output.structure.map((item, index) => (
-                  <div key={`${item.label}-${index}`} className="rounded-xl border border-border px-4 py-3">
-                    <p className="mb-1 text-sm font-semibold text-text">{item.label}</p>
-                    <p className="text-sm leading-relaxed text-text-secondary">{item.description}</p>
-                  </div>
-                ))}
-              </div>
-            )}
-          </Card>
-
-          {/* マニュアル — collapsible */}
-          <Card>
-            <CollapsibleHeader
-              icon={FileText}
-              title="実践マニュアル"
-              open={manualOpen}
-              onToggle={() => setManualOpen((v) => !v)}
-            />
-            {manualOpen && (
-              <div className="mt-4">
-                <p className="whitespace-pre-wrap text-sm leading-7 text-text">{output.manual}</p>
-              </div>
-            )}
-          </Card>
-
-          {/* 厳密学習 — collapsible */}
+          {/* 本質を絞る（オンデマンド深掘り） — collapsible */}
           <Card>
             <CollapsibleHeader
               icon={BookOpen}
-              title="厳密学習"
+              title="本質を絞る"
               open={strictOpen}
               onToggle={() => setStrictOpen((v) => !v)}
             />
@@ -1031,7 +1063,7 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
                       </div>
                     </div>
                     <div>
-                      <p className="mb-2 text-sm font-semibold text-text">厳密学習ビュー</p>
+                      <p className="mb-2 text-sm font-semibold text-text">正例・反例で見る</p>
                       <div className="space-y-3">
                         <div className="rounded-xl border border-border px-4 py-3">
                           <p className="mb-2 text-xs font-medium text-success">正例</p>
@@ -1133,7 +1165,7 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
                   <div className="flex flex-col items-center gap-3 py-8">
                     <Loader2 className="h-5 w-5 animate-spin text-accent" />
                     <p className="text-center text-sm text-text-secondary">
-                      厳密学習を生成しています…<br />
+                      「本質を絞る」を生成しています…<br />
                       内容量により30秒ほどかかることがあります。
                     </p>
                   </div>
@@ -1144,17 +1176,17 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
                     </p>
                     <Button onClick={() => void generateStrict()} loading={strictGenerating} loadingLabel="生成中...">
                       <Sparkles className="mr-1.5 h-4 w-4" />
-                      厳密学習を再生成
+                      再生成
                     </Button>
                   </div>
                 ) : (
                   <div className="flex flex-col items-center gap-4 py-8">
-                    <p className="text-center text-sm text-text-secondary">
-                      厳密学習はまだ生成されていません。
+                    <p className="max-w-md text-center text-sm text-text-secondary">
+                      この投稿をさらに深く理解したいときに。正例・反例で本質を絞り、抽象化・別分野への転用・15分ワークまで掘り下げます。
                     </p>
                     <Button onClick={() => void generateStrict()} loading={strictGenerating} loadingLabel="生成中...">
                       <Sparkles className="mr-1.5 h-4 w-4" />
-                      厳密学習を生成
+                      本質を絞る
                     </Button>
                   </div>
                 )}
@@ -1173,7 +1205,7 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
             {diagramOpen && (
               <div className="mt-4">
                 <div className="mb-6 space-y-3">
-                  {output.diagramStructure.sections.map((section, index) => (
+                  {(output.diagramStructure?.sections ?? []).map((section, index) => (
                     <div key={`${section.heading}-${index}`} className="rounded-xl border border-border px-4 py-3">
                       <p className="mb-1 text-sm font-semibold text-text">{section.heading}</p>
                       <p className="mb-2 text-sm leading-relaxed text-text-secondary">{section.body}</p>
@@ -1311,7 +1343,7 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
                     </div>
                   ) : (
                     outputHistory.map((item) => {
-                      const typeLabels: Record<string, string> = { x: "X投稿", instagram: "Instagram", note: "note", markdown_log: "Markdown", seminar: "セミナー", strict_learning: "厳密学習" };
+                      const typeLabels: Record<string, string> = { x: "X投稿", instagram: "Instagram", short_video: "ショート動画", note: "note", markdown_log: "Markdown", seminar: "セミナー", strict_learning: "本質を絞る" };
                       const parsedJson = item.contentJson ? (() => { try { return JSON.parse(item.contentJson); } catch { return null; } })() : null;
                       return (
                         <OutputPreview
