@@ -151,6 +151,10 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
   const [error, setError] = useState<string | null>(null);
   const autoGenerateTriedRef = useRef(false);
 
+  // 生成モデルの上書き（投稿詳細ページで選び、クエリパラメータで渡される。空 = 設定のデフォルト）
+  const [genProvider, setGenProvider] = useState("");
+  const [genModel, setGenModel] = useState("");
+
   const [learningMode, setLearningMode] = useState<"content" | "format">("content");
   const [strictLearning, setStrictLearning] = useState<StrictLearningOutput | null>(null);
   const [strictGenerating, setStrictGenerating] = useState(false);
@@ -239,6 +243,15 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
     };
   }, [postId]);
 
+  // 投稿詳細ページで選んだモデルをクエリパラメータから受け取る
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const provider = params.get("provider");
+    const model = params.get("model");
+    if (provider) setGenProvider(provider);
+    if (model) setGenModel(model);
+  }, []);
+
   const handleGenerate = async (mode?: "content" | "format") => {
     const activeMode = mode ?? learningMode;
     if (mode !== undefined) setLearningMode(mode);
@@ -251,7 +264,10 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
       const res = await fetch(`/api/posts/${postId}/learning`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ learningMode: activeMode }),
+        body: JSON.stringify({
+          learningMode: activeMode,
+          ...(genProvider ? { provider: genProvider, model: genModel || undefined } : {}),
+        }),
       });
       // タイムアウト等で Vercel が非JSON（プレーンテキスト/HTML）のエラーを返すことがある。
       // res.json() を直接呼ぶと「Unexpected token」で落ちるため、まずテキストで受けてから解析する。

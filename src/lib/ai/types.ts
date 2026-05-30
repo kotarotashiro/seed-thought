@@ -256,10 +256,20 @@ export interface PostContext {
   authorUsername?: string | null;
 }
 
+// 工程ごとの設定（settings）を上書きして、その場限りで使うモデルを指定する。
+// provider 未指定なら設定どおりのモデルが使われる。
+export interface AiModelOverride {
+  provider?: string | null;
+  model?: string | null;
+}
+
 export interface AiProvider {
   classifyPost(input: ClassifyPostInput): Promise<PostClassificationResult>;
   translateText(input: TranslateTextInput): Promise<string>;
-  generateLearningCard(input: SourcePostForLearning): Promise<LearningOutput>;
+  generateLearningCard(
+    input: SourcePostForLearning,
+    override?: AiModelOverride | null
+  ): Promise<LearningOutput>;
   generateOutput(input: GenerateOutputInput): Promise<GeneratedOutputResult>;
   generateStrictLearning(input: {
     postText: string;

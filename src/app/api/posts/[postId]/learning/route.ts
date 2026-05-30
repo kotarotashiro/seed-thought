@@ -45,6 +45,13 @@ export async function POST(
     const learningMode: "content" | "format" =
       (body as { learningMode?: string }).learningMode === "format" ? "format" : "content";
 
+    // 投稿ごとに生成モデルを使い分けるための一時的な上書き（未指定なら設定どおり）
+    const { provider, model } = body as { provider?: string; model?: string };
+    const override =
+      typeof provider === "string" && provider
+        ? { provider, model: typeof model === "string" ? model : undefined }
+        : undefined;
+
     const post = await getPostForLearning(postId);
     if (!post) {
       return NextResponse.json({ error: "投稿が見つかりません" }, { status: 404 });
@@ -53,7 +60,7 @@ export async function POST(
     const source = await buildSourcePost(post);
     const sourceWithMode: SourcePostForLearning = { ...source, learningMode };
 
-    const learningOutput = await getAiProvider().generateLearningCard(sourceWithMode);
+    const learningOutput = await getAiProvider().generateLearningCard(sourceWithMode, override);
     const draftOutput = { ...learningOutput, sourcePostId: post.id, status: "draft" as const };
 
     // 学習カードを再生成したら厳密学習は古くなるため null に戻し、クライアント側で別途再生成させる。
