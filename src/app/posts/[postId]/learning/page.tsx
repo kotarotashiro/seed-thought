@@ -154,6 +154,8 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
   // 生成モデルの上書き（投稿詳細ページで選び、クエリパラメータで渡される。空 = 設定のデフォルト）
   const [genProvider, setGenProvider] = useState("");
   const [genModel, setGenModel] = useState("");
+  // 投稿詳細でモデルを明示選択して来た場合は、既存カードがあっても作り直す
+  const forceRegenRef = useRef(false);
 
   const [learningMode, setLearningMode] = useState<"content" | "format">("content");
   const [strictLearning, setStrictLearning] = useState<StrictLearningOutput | null>(null);
@@ -248,8 +250,16 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
     const params = new URLSearchParams(window.location.search);
     const provider = params.get("provider");
     const model = params.get("model");
-    if (provider) setGenProvider(provider);
+    if (provider) {
+      setGenProvider(provider);
+      // 明示選択して来た = 既存カードがあっても選択モデルで作り直す意図
+      forceRegenRef.current = true;
+    }
     if (model) setGenModel(model);
+    // クエリは消しておく（リロード時に意図せず再生成しないように）
+    if (provider || model) {
+      window.history.replaceState({}, "", window.location.pathname);
+    }
   }, []);
 
   const handleGenerate = async (mode?: "content" | "format") => {
@@ -353,9 +363,11 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
   useEffect(() => {
     if (loading) return;
     if (!post) return;
-    if (card) return;
     if (generating) return;
     if (autoGenerateTriedRef.current) return;
+    // カードがある場合は通常は再生成しない。
+    // ただし投稿詳細でモデルを明示選択して来たときは、その選択モデルで作り直す。
+    if (card && !forceRegenRef.current) return;
     autoGenerateTriedRef.current = true;
     void handleGenerate();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -774,7 +786,15 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
         </Card>
       ) : (
         <>
-          {(message || error) && (
+          {generating && (
+            <div className="flex items-center gap-3 rounded-xl border border-accent/30 bg-accent-light/40 px-4 py-3">
+              <Loader2 className="h-4 w-4 flex-shrink-0 animate-spin text-accent" />
+              <p className="text-sm text-text">
+                選択したモデルで学習カードを作り直しています…（内容量により数分かかることがあります）
+              </p>
+            </div>
+          )}
+          {!generating && (message || error) && (
             <p className={`text-xs ${error ? "text-danger" : "text-text-muted"}`}>
               {error || message}
             </p>
