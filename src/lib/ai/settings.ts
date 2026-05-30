@@ -198,6 +198,28 @@ export async function getProviderApiKey(provider: AiProviderName): Promise<strin
   return getUiApiKey(stored, provider) || getEnvApiKey(provider);
 }
 
+// 工程別設定を無視して、その場で指定された provider/model を解決する。
+// （学習カード生成などで、投稿ごとにモデルを使い分けるための一時的な上書き用）
+export async function resolveProviderModel(
+  provider: AiProviderName,
+  model?: string | null
+): Promise<AiTaskResolved> {
+  const normalized = normalizeProvider(provider);
+  if (normalized === "mock") {
+    return { provider: "mock", model: "mock", apiKey: null };
+  }
+  let apiKey = await getProviderApiKey(normalized); // ui または env キー
+  // Grok は OAuth でも動くため、キーが無くても OAuth センチネルを返す
+  if (!apiKey && normalized === "grok" && (await hasXaiAuthConfigured())) {
+    apiKey = "oauth";
+  }
+  return {
+    provider: normalized,
+    model: model?.trim() || getDefaultModel(normalized),
+    apiKey,
+  };
+}
+
 export async function getAiRuntimeSettings(): Promise<AiRuntimeSettings> {
   const setting = await prisma.appSetting.findUnique({ where: { key: AI_SETTING_KEY } });
   const raw = readStoredSettings(setting?.valueJson);

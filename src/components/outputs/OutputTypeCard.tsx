@@ -1,5 +1,5 @@
 import { Card } from "@/components/ui/Card";
-import { BookOpenText, Brain, FileCode, GraduationCap, Images, Zap } from "lucide-react";
+import { BookOpenText, GraduationCap, Images, Video, Zap } from "lucide-react";
 import { clsx } from "clsx";
 
 interface OutputTypeCardProps {
@@ -11,10 +11,9 @@ interface OutputTypeCardProps {
 const outputTypes: Record<string, { label: string; description: string; icon: React.ComponentType<{ className?: string }> }> = {
   x: { label: "短く伝える", description: "X投稿・280文字", icon: Zap },
   instagram: { label: "図で伝える", description: "カルーセル形式", icon: Images },
+  short_video: { label: "動画で伝える", description: "ショート動画台本・30〜45秒", icon: Video },
   note: { label: "じっくり読ませる", description: "note記事・1000〜2000文字", icon: BookOpenText },
-  markdown_log: { label: "学習ログ", description: "構造化された記録", icon: FileCode },
   seminar: { label: "セミナーを作る", description: "スライド構成と台本", icon: GraduationCap },
-  strict_learning: { label: "厳密学習", description: "正例/反例/本質/15分ワーク", icon: Brain },
 };
 
 export function OutputTypeCard({ type, selected, onClick }: OutputTypeCardProps) {

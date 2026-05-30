@@ -1,4 +1,5 @@
 import type {
+  AiModelOverride,
   AiProvider,
   ChatMessage,
   ClassifyPostInput,
@@ -36,7 +37,12 @@ import {
   isTranslatedTextResult,
 } from "./validation";
 import { mergeClassificationFallback } from "./fallback";
-import { getAiRuntimeSettings, type AiProviderName, type AiTaskName } from "./settings";
+import {
+  getAiRuntimeSettings,
+  resolveProviderModel,
+  type AiProviderName,
+  type AiTaskName,
+} from "./settings";
 import { mockProvider } from "./mockProvider";
 import { getGrokClient } from "./providers/grokProvider";
 import { getClaudeClient } from "./providers/claudeProvider";
@@ -60,12 +66,42 @@ function buildLLMClient(
   }
 }
 
-async function getClient(task: AiTaskName): Promise<{
+async function getClient(
+  task: AiTaskName,
+  override?: AiModelOverride | null
+): Promise<{
   client: LLMClient;
   isMock: boolean;
   provider: string;
   model: string;
 }> {
+  // 工程別設定を無視して、その場で指定されたモデルを使う（投稿ごとの使い分け）
+  if (override?.provider) {
+    const resolved = await resolveProviderModel(
+      override.provider as AiProviderName,
+      override.model
+    );
+    if (resolved.provider === "mock") {
+      return {
+        client: null as unknown as LLMClient,
+        isMock: true,
+        provider: "mock",
+        model: "mock",
+      };
+    }
+    if (!resolved.apiKey) {
+      throw new Error(
+        `[ai/${task}] provider=${resolved.provider} の APIキーが見つかりません。設定画面でAPIキーを登録してください。`
+      );
+    }
+    return {
+      client: buildLLMClient(resolved.provider, resolved.model, resolved.apiKey),
+      isMock: false,
+      provider: resolved.provider,
+      model: resolved.model,
+    };
+  }
+
   const settings = await getAiRuntimeSettings();
   if (settings.tasks[task].provider === "mock") {
     return {
@@ -124,8 +160,11 @@ export function getAiProvider(): AiProvider {
       }
     },
 
-    async generateLearningCard(input: SourcePostForLearning): Promise<LearningOutput> {
-      const ctx = await getClient("generateLearningCard");
+    async generateLearningCard(
+      input: SourcePostForLearning,
+      override?: AiModelOverride | null
+    ): Promise<LearningOutput> {
+      const ctx = await getClient("generateLearningCard", override);
       if (ctx.isMock) return mockProvider.generateLearningCard(input);
       try {
         const prompt = buildLearningPrompt(input);

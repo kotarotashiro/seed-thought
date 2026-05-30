@@ -14,14 +14,26 @@ import {
   AlertCircle,
   ArrowLeft,
   BookOpen,
+  Cpu,
   ExternalLink,
   GitBranch,
   Languages,
+  Loader2,
   Newspaper,
   User,
 } from "lucide-react";
 
 const X_ARTICLE_RE = /(?:x|twitter)\.com\/i\/article\//i;
+
+interface ProviderOption {
+  value: string;
+  label: string;
+  hasKey: boolean;
+}
+interface ModelOption {
+  id: string;
+  name: string;
+}
 
 export default function ConfirmPage({ params }: { params: Promise<{ postId: string }> }) {
   const { postId } = use(params);
@@ -60,6 +72,15 @@ export default function ConfirmPage({ params }: { params: Promise<{ postId: stri
     imageUrl: string | null;
   };
   const [relatedLinks, setRelatedLinks] = useState<RelatedLink[]>([]);
+
+  // 生成モデルの選択（投稿の内容に合わせて使い分け。"" = 設定のデフォルト）
+  const [providers, setProviders] = useState<ProviderOption[]>([]);
+  const [defaultProviderLabel, setDefaultProviderLabel] = useState("");
+  const [defaultModel, setDefaultModel] = useState("");
+  const [genProvider, setGenProvider] = useState("");
+  const [genModel, setGenModel] = useState("");
+  const [modelLists, setModelLists] = useState<Record<string, ModelOption[]>>({});
+  const [modelLoading, setModelLoading] = useState(false);
 
   const loadPost = async () => {
     try {
@@ -111,6 +132,57 @@ export default function ConfirmPage({ params }: { params: Promise<{ postId: stri
       cancelled = true;
     };
   }, [postId]);
+
+  // 生成モデル選択用に、利用可能な provider とデフォルトを取得
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/settings/ai")
+      .then((r) => r.json())
+      .then((data) => {
+        if (cancelled) return;
+        const list: ProviderOption[] = (data.providers || []).filter(
+          (p: ProviderOption) => p.value !== "mock"
+        );
+        setProviders(list);
+        const dp = list.find((p) => p.value === data.defaultProvider);
+        setDefaultProviderLabel(dp?.label || data.defaultProvider || "設定");
+        setDefaultModel(data.defaultModel || "");
+      })
+      .catch(() => {
+        // モデル選択は任意機能なので失敗しても無視（デフォルトのまま生成可能）
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const handleProviderChange = (provider: string) => {
+    setGenProvider(provider);
+    setGenModel("");
+    if (!provider) return;
+    const cached = modelLists[provider];
+    if (cached) {
+      setGenModel(cached[0]?.id || "");
+      return;
+    }
+    setModelLoading(true);
+    fetch(`/api/settings/ai/models?provider=${provider}`)
+      .then((r) => r.json())
+      .then((data) => {
+        const models: ModelOption[] = data.models || [];
+        setModelLists((prev) => ({ ...prev, [provider]: models }));
+        setGenModel(models[0]?.id || "");
+      })
+      .catch(() => {
+        // モデル一覧が取れなければ手入力にフォールバック
+      })
+      .finally(() => setModelLoading(false));
+  };
+
+  // 選んだモデルを学習ページへクエリパラメータで渡す
+  const learningHref = genProvider
+    ? `/posts/${postId}/learning?provider=${encodeURIComponent(genProvider)}${genModel ? `&model=${encodeURIComponent(genModel)}` : ""}`
+    : `/posts/${postId}/learning`;
 
   const handleFetchThread = async () => {
     setFetchingThread(true);
@@ -758,14 +830,64 @@ export default function ConfirmPage({ params }: { params: Promise<{ postId: stri
       </Card>
 
       {/* Actions */}
-      <div className="flex flex-col gap-3 sm:flex-row">
-        <Link href={`/posts/${postId}/learning`} className="flex-1">
+      <Card>
+        {/* 生成モデルの選択（投稿の内容に合わせて使い分け） */}
+        <div className="mb-4">
+          <div className="mb-2 flex items-center gap-2">
+            <Cpu className="h-4 w-4 text-accent" />
+            <p className="text-sm font-bold text-text">生成モデル</p>
+          </div>
+          <p className="mb-3 text-xs text-text-muted">
+            投稿の内容に合わせてモデルを選べます。この投稿の生成にのみ適用されます。
+          </p>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <select
+              value={genProvider}
+              onChange={(e) => handleProviderChange(e.target.value)}
+              className="flex-1 rounded-lg border border-border bg-white px-3 py-2 text-sm text-text outline-none focus:border-accent"
+            >
+              <option value="">
+                デフォルト{defaultProviderLabel ? `（${defaultProviderLabel}${defaultModel ? " / " + defaultModel : ""}）` : ""}
+              </option>
+              {providers.map((p) => (
+                <option key={p.value} value={p.value} disabled={!p.hasKey}>
+                  {p.label}{!p.hasKey ? "（未設定）" : ""}
+                </option>
+              ))}
+            </select>
+            {genProvider && (
+              <div className="flex flex-1 items-center gap-2">
+                {(modelLists[genProvider]?.length ?? 0) > 0 ? (
+                  <select
+                    value={genModel}
+                    onChange={(e) => setGenModel(e.target.value)}
+                    className="flex-1 rounded-lg border border-border bg-white px-3 py-2 text-sm text-text outline-none focus:border-accent"
+                  >
+                    {modelLists[genProvider].map((m) => (
+                      <option key={m.id} value={m.id}>{m.name}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    type="text"
+                    value={genModel}
+                    onChange={(e) => setGenModel(e.target.value)}
+                    placeholder="モデル名..."
+                    className="flex-1 rounded-lg border border-border bg-white px-3 py-2 text-sm text-text outline-none focus:border-accent"
+                  />
+                )}
+                {modelLoading && <Loader2 className="h-4 w-4 flex-shrink-0 animate-spin text-text-muted" />}
+              </div>
+            )}
+          </div>
+        </div>
+        <Link href={learningHref} className="block">
           <Button className="w-full">
             <BookOpen className="w-4 h-4 mr-2" />
             学習カードを生成
           </Button>
         </Link>
-      </div>
+      </Card>
 
       {/* Bottom back button */}
       <button

@@ -74,9 +74,7 @@ export function isLearningOutput(value: unknown): value is LearningOutput {
     typeof value.title === "string" &&
     typeof value.summary === "string" &&
     typeof value.originalIntent === "string" &&
-    typeof value.whatIsInteresting === "string" &&
-    typeof value.coreInsight === "string" &&
-    isLabelDescriptionArray(value.structure) &&
+    isValidCapture(value.capture) &&
     Array.isArray(value.steps) &&
     value.steps.every((step) => {
       if (!isRecord(step)) return false;
@@ -86,10 +84,10 @@ export function isLearningOutput(value: unknown): value is LearningOutput {
         isStringArray(step.actions)
       );
     }) &&
-    typeof value.manual === "string" &&
     isLabelDescriptionArray(value.applicationIdeas, "title") &&
     isStringArray(value.tips) &&
     isStringArray(value.useCases) &&
+    isValidBeginnerZone(value.beginnerZone) &&
     typeof value.diagramStructure.title === "string" &&
     Array.isArray(value.diagramStructure.sections) &&
     value.diagramStructure.sections.every((section) => {
@@ -104,6 +102,38 @@ export function isLearningOutput(value: unknown): value is LearningOutput {
     typeof value.userLearningMemo === "string" &&
     (value.status === "draft" || value.status === "saved")
   );
+}
+
+/** ① capture（投稿の中身）：items が1件以上 か verbatim が非空文字列 のどちらかを満たす */
+function isValidCapture(value: unknown): boolean {
+  if (!isRecord(value)) return false;
+  const hasItems =
+    Array.isArray(value.items) &&
+    value.items.length > 0 &&
+    value.items.every(
+      (it) => isRecord(it) && typeof it.label === "string" && typeof it.body === "string"
+    );
+  const hasVerbatim = typeof value.verbatim === "string" && value.verbatim.trim().length > 0;
+  return hasItems || hasVerbatim;
+}
+
+/** ③ 初心者ゾーン：任意。存在する場合のみ形を緩くチェックする */
+function isValidBeginnerZone(value: unknown): boolean {
+  if (value === undefined || value === null) return true;
+  if (!isRecord(value)) return false;
+  const stumblingOk =
+    value.stumblingPoints === undefined ||
+    (Array.isArray(value.stumblingPoints) &&
+      value.stumblingPoints.every(
+        (s) => isRecord(s) && typeof s.point === "string" && typeof s.explanation === "string"
+      ));
+  const glossaryOk =
+    value.glossary === undefined ||
+    (Array.isArray(value.glossary) &&
+      value.glossary.every(
+        (g) => isRecord(g) && typeof g.term === "string" && typeof g.explanation === "string"
+      ));
+  return stumblingOk && glossaryOk;
 }
 
 export function isStrictLearningOutput(value: unknown): value is StrictLearningOutput {

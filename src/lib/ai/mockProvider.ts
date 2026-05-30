@@ -65,15 +65,20 @@ export const mockProvider: AiProvider = {
     return {
       sourcePostId: input.id,
       title,
-      summary: `この投稿は、${topic}に関する気づきを扱っています。\nポイントは、内容をそのまま読むのではなく、再利用できる型として捉えることです。\n実務では手順化して小さく試すことで価値に変えられます。`,
+      summary: `${topic}を、再利用できる型として捉えるための学習カードです。`,
       originalIntent: "投稿者は、自分の経験から得た実践知を短い形で共有し、読者が次の行動に移せるようにしています。",
-      whatIsInteresting: "短い投稿の中に、背景となる判断基準、実践手順、応用できる型が含まれている点が面白いところです。",
-      coreInsight: `${baseText.substring(0, 80)}${baseText.length > 80 ? "..." : ""} という内容を、自分の仕事に移植できる構造として捉えることが中心です。`,
-      structure: [
-        { label: "課題の発見", description: "投稿内で扱われている困りごとや改善余地を見つける。" },
-        { label: "型への変換", description: "個別の経験を、他の場面でも使える手順や判断基準に変える。" },
-        { label: "実務への適用", description: "自分のテーマや顧客対応、発信、教材づくりに置き換える。" },
-      ],
+      whyForYou: "短い投稿の中に、背景となる判断基準・実践手順・応用できる型が含まれており、自分の実務に移植できます。",
+      capture: {
+        format: "list",
+        headline: `${topic}の要点`,
+        items: [
+          { label: "中心メッセージ", body: `${baseText.substring(0, 80)}${baseText.length > 80 ? "..." : ""}` },
+          { label: "前提となる判断基準", body: "どんな状況でこのノウハウが効くのか、投稿が示している条件。" },
+          { label: "具体的なやり方", body: "投稿が挙げている手順・コツをそのまま書き出したもの。" },
+        ],
+        verbatim: null,
+        usage: null,
+      },
       steps: [
         {
           title: "投稿の狙いを一文にする",
@@ -99,6 +104,14 @@ export const mockProvider: AiProvider = {
       ],
       tips: ["投稿の文面を転載せず、自分の言葉に置き換える", "最初は1つの業務場面だけで試す", "うまくいった条件も一緒に保存する"],
       useCases: ["学習メモ", "SNS投稿", "セミナー資料", "業務手順書", "ノウハウ記事"],
+      beginnerZone: {
+        stumblingPoints: [
+          { point: "「型」と「内容」の違いがわかりにくい", explanation: "内容＝この投稿が言っている具体的な中身。型＝他の場面でも使える形に一般化したもの。まずは内容をそのまま掴めばOK。" },
+        ],
+        glossary: [
+          { term: "再利用できる型", explanation: "一度学んだやり方を、別の仕事でも当てはめられるように整理した手順や判断基準のこと。" },
+        ],
+      },
       diagramStructure: {
         title: `${topic}を使える知識に変える流れ`,
         sections: [
@@ -140,6 +153,20 @@ export const mockProvider: AiProvider = {
               { slideNumber: 2, heading: "なぜ大事なのか", body: "この考え方が実践で使える理由", note: "背景を説明" },
               { slideNumber: 3, heading: "具体的なアクション", body: "明日から試せること", note: "行動を促す" },
               { slideNumber: 4, heading: "まとめ", body: "一番大事なポイント", note: "保存を促す" },
+            ],
+          },
+        };
+
+      case "short_video":
+        return {
+          title: "ショート動画台本",
+          content: `【0〜3秒｜フック】\nナレーション: ${context.substring(0, 40)}\nテロップ: これ見て\n\n【8〜18秒｜本質】\nナレーション: 大事なのは情報の量じゃなく、自分の言葉に変えられるか。\n\n【18〜40秒｜解決策】\nナレーション: 保存した投稿を、自分の仕事に置き換える形に言い換える。\n\n【最後｜CTA】\nナレーション: あとで使えるので保存しておいてください。`,
+          contentJson: {
+            segments: [
+              { time: "0〜3秒", role: "フック", narration: context.substring(0, 40), telop: "これ見て" },
+              { time: "8〜18秒", role: "本質", narration: "情報の量じゃなく、自分の言葉に変えられるか", telop: "量じゃない" },
+              { time: "18〜40秒", role: "解決策", narration: "自分の仕事に置き換える形に言い換える", telop: "置き換える" },
+              { time: "最後", role: "CTA", narration: "保存しておいてください", telop: "保存推奨" },
             ],
           },
         };

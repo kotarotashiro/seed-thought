@@ -23,11 +23,23 @@ interface CardExportInput {
 }
 
 interface LearningOutputJson {
-  structure?: Array<{ label: string; description: string }>;
+  capture?: {
+    format?: string;
+    headline?: string;
+    items?: Array<{ label: string; body: string; detail?: string }>;
+    verbatim?: string | null;
+    usage?: string | null;
+  };
   steps?: Array<{ title: string; description: string; actions?: string[] }>;
   applicationIdeas?: Array<{ title: string; description: string }>;
   tips?: string[];
   useCases?: string[];
+  beginnerZone?: {
+    stumblingPoints?: Array<{ point: string; explanation: string }>;
+    glossary?: Array<{ term: string; explanation: string }>;
+  };
+  // legacy
+  structure?: Array<{ label: string; description: string }>;
 }
 
 function slugify(input: string, fallback: string): string {
@@ -91,14 +103,24 @@ export function renderCardMarkdown(card: CardExportInput): { filename: string; b
   const sections: string[] = [];
   sections.push(`# ${card.title}`);
 
-  sections.push(`## 要約\n\n${card.summary}`);
-  sections.push(`## 核心\n\n${card.coreInsight}`);
+  sections.push(`## 一言でいうと\n\n${card.summary}`);
+  if (card.coreInsight) {
+    sections.push(`## 核心\n\n${card.coreInsight}`);
+  }
 
-  if (output.structure && output.structure.length > 0) {
-    const items = output.structure
-      .map((s) => `- **${s.label}**: ${s.description}`)
-      .join("\n");
-    sections.push(`## 構造\n\n${items}`);
+  // ① 投稿の中身そのもの
+  if (output.capture) {
+    const cap = output.capture;
+    const head = cap.headline ? `**${cap.headline}**\n\n` : "";
+    if (cap.verbatim) {
+      const usage = cap.usage ? `\n\n**使い方**\n\n${cap.usage}` : "";
+      sections.push(`## 投稿の中身\n\n${head}\`\`\`\n${cap.verbatim}\n\`\`\`${usage}`);
+    } else if (cap.items && cap.items.length > 0) {
+      const items = cap.items
+        .map((it, i) => `${i + 1}. **${it.label}** — ${it.body}${it.detail ? `\n   - ${it.detail}` : ""}`)
+        .join("\n");
+      sections.push(`## 投稿の中身\n\n${head}${items}`);
+    }
   }
 
   if (output.steps && output.steps.length > 0) {
@@ -111,7 +133,24 @@ export function renderCardMarkdown(card: CardExportInput): { filename: string; b
     sections.push(`## 実践手順\n\n${items}`);
   }
 
-  sections.push(`## マニュアル\n\n${card.manual}`);
+  // ③ 初心者ガイド
+  if (output.beginnerZone) {
+    const zone = output.beginnerZone;
+    const parts: string[] = [];
+    if (zone.stumblingPoints && zone.stumblingPoints.length > 0) {
+      parts.push(
+        `**つまずきポイント**\n\n${zone.stumblingPoints.map((s) => `- **${s.point}**: ${s.explanation}`).join("\n")}`
+      );
+    }
+    if (zone.glossary && zone.glossary.length > 0) {
+      parts.push(
+        `**用語解説**\n\n${zone.glossary.map((g) => `- **${g.term}**: ${g.explanation}`).join("\n")}`
+      );
+    }
+    if (parts.length > 0) {
+      sections.push(`## 初心者ガイド\n\n${parts.join("\n\n")}`);
+    }
+  }
 
   if (output.applicationIdeas && output.applicationIdeas.length > 0) {
     const items = output.applicationIdeas
