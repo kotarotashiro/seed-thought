@@ -104,6 +104,74 @@ export function isLearningOutput(value: unknown): value is LearningOutput {
   );
 }
 
+/** 学習カード本体（A: 並列2分割の本体側）。中身そのもの＋実践材料のみを検証する。 */
+export type LearningCoreOutput = Pick<
+  LearningOutput,
+  | "sourcePostId"
+  | "title"
+  | "summary"
+  | "originalIntent"
+  | "whyForYou"
+  | "capture"
+  | "steps"
+  | "applicationIdeas"
+  | "tips"
+  | "useCases"
+>;
+
+/** 学習カード補足（A: 並列2分割の補足側）。初心者ゾーン・図解・周辺情報。 */
+export type LearningSupplementOutput = Pick<
+  LearningOutput,
+  | "beginnerZone"
+  | "diagramStructure"
+  | "imageExplanationPrompt"
+  | "userLearningMemo"
+  | "backgroundContext"
+>;
+
+export function isLearningCoreOutput(value: unknown): value is LearningCoreOutput {
+  if (!isRecord(value)) return false;
+  return (
+    typeof value.sourcePostId === "string" &&
+    typeof value.title === "string" &&
+    typeof value.summary === "string" &&
+    typeof value.originalIntent === "string" &&
+    isValidCapture(value.capture) &&
+    Array.isArray(value.steps) &&
+    value.steps.every((step) => {
+      if (!isRecord(step)) return false;
+      return (
+        typeof step.title === "string" &&
+        typeof step.description === "string" &&
+        isStringArray(step.actions)
+      );
+    }) &&
+    isLabelDescriptionArray(value.applicationIdeas, "title") &&
+    isStringArray(value.tips) &&
+    isStringArray(value.useCases)
+  );
+}
+
+/** 補足側の検証。diagramStructure は必須形だが、beginnerZone/backgroundContext は任意。 */
+export function isLearningSupplementOutput(value: unknown): value is LearningSupplementOutput {
+  if (!isRecord(value) || !isRecord(value.diagramStructure)) return false;
+  return (
+    typeof value.diagramStructure.title === "string" &&
+    Array.isArray(value.diagramStructure.sections) &&
+    value.diagramStructure.sections.every((section) => {
+      if (!isRecord(section)) return false;
+      return (
+        typeof section.heading === "string" &&
+        typeof section.body === "string" &&
+        (section.visualIdea === undefined || typeof section.visualIdea === "string")
+      );
+    }) &&
+    typeof value.imageExplanationPrompt === "string" &&
+    typeof value.userLearningMemo === "string" &&
+    isValidBeginnerZone(value.beginnerZone)
+  );
+}
+
 /** ① capture（投稿の中身）：items が1件以上 か verbatim が非空文字列 のどちらかを満たす */
 function isValidCapture(value: unknown): boolean {
   if (!isRecord(value)) return false;

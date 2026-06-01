@@ -61,7 +61,9 @@ export function getClaudeClient(config: ProviderConfig): LLMClient {
   async function call(prompt: string, temperature: number): Promise<string> {
     const message = await client.messages.create({
       model: config.model,
-      max_tokens: 8192,
+      // note の長文記事（最大6000字）＋ 改稿パスの critique フィールドが
+      // 8192 では切れるため引き上げる。ceiling なので短い出力には影響しない。
+      max_tokens: 16384,
       temperature,
       messages: [{ role: "user", content: prompt }],
     });

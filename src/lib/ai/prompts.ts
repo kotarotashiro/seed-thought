@@ -3,6 +3,7 @@ import type {
   ChatMessage,
   ClassifyPostInput,
   GenerateOutputInput,
+  GeneratedOutputResult,
   PostContext,
   PostSummaryForSearch,
   PostSummaryForTrend,
@@ -78,12 +79,24 @@ ${input.text}
 }`;
 }
 
-export function buildLearningPrompt(input: SourcePostForLearning): string {
-  const mode = input.learningMode ?? "content";
+// 入力（投稿本文・記事本文・動画文字起こし）が長すぎると、LLMの所要時間が
+// 出力前から押し上げられ、Kimi k2.6 では300秒の壁を超える原因になる。
+// 生成前に各入力へ上限を設けて切り詰める（B: 入力上限）。
+const MAX_POST_TEXT_CHARS = 4000;
+const MAX_ARTICLE_CHARS = 6000;
+const MAX_TRANSCRIPT_CHARS = 8000;
 
-  const modeInstruction =
-    mode === "content"
-      ? `あなたは「勉強のできる解説者」です。
+function truncateForPrompt(text: string | undefined | null, max: number): string | undefined {
+  if (text == null) return undefined;
+  if (text.length <= max) return text;
+  return `${text.slice(0, max)}\n…（長いため省略：全${text.length}文字中${max}文字まで）`;
+}
+
+// content/format モードで共通の役割設定
+function learningModeInstruction(input: SourcePostForLearning): string {
+  const mode = input.learningMode ?? "content";
+  return mode === "content"
+    ? `あなたは「勉強のできる解説者」です。
 ユーザーが保存したX投稿について、ユーザーが一段深く理解できるように整理します。
 
 役割は投稿の要約整理ではありません。役割は以下の3つです：
@@ -94,25 +107,49 @@ export function buildLearningPrompt(input: SourcePostForLearning): string {
 - 投稿のテーマ領域に踏み込んで、内容として学ぶ
 - 投稿者の主張・根拠・推奨アクションを尊重する
 - ツリー投稿が含まれている場合は、ツリー全体を1つの教材として扱う`
-      : `あなたは、X投稿を発信者視点で分析し、再利用可能な「型」を抽出するAIです。
+    : `あなたは、X投稿を発信者視点で分析し、再利用可能な「型」を抽出するAIです。
 
 重要なのは、投稿を保存することではなく、投稿の中にある
 「構造」「手順」「発想」「応用可能な型」を抽出することです。`;
+}
 
-  return `${modeInstruction}
+// 投稿データ・記事・動画文字起こしの共通入力ブロック（上限つき）。
+// 本体プロンプト/補足プロンプトの両方が同じ素材を見られるようにする。
+function buildLearningInputBlock(input: SourcePostForLearning): string {
+  const articleDescription = truncateForPrompt(input.articleDescription, MAX_ARTICLE_CHARS);
+  const videoTranscript = truncateForPrompt(input.videoTranscript, MAX_TRANSCRIPT_CHARS);
+  // 巨大ツリー対策：JSON に載せる本文系フィールドも切り詰めてから整形する
+  const trimmedInput: SourcePostForLearning = {
+    ...input,
+    text: truncateForPrompt(input.text, MAX_POST_TEXT_CHARS) ?? input.text,
+    translatedText: truncateForPrompt(input.translatedText, MAX_POST_TEXT_CHARS),
+    articleDescription,
+    videoTranscript,
+  };
 
-${input.articleTitle || input.articleDescription ? `## 記事情報（投稿リンク先の内容）
+  return `${input.articleTitle || articleDescription ? `## 記事情報（投稿リンク先の内容）
 ${input.articleTitle ? `タイトル: ${input.articleTitle}` : ""}
-${input.articleDescription ? `内容: ${input.articleDescription}` : ""}
-` : ""}${input.videoTranscript ? `## 動画文字起こし（ユーザーが貼り付けた動画の文字起こしテキスト）
-${input.videoTranscript}
+${articleDescription ? `内容: ${articleDescription}` : ""}
+` : ""}${videoTranscript ? `## 動画文字起こし（ユーザーが貼り付けた動画の文字起こしテキスト）
+${videoTranscript}
 ` : ""}## 投稿データ
-${JSON.stringify(input, null, 2)}
+${JSON.stringify(trimmedInput, null, 2)}`;
+}
 
-## あなたの出力（必須・JSONの全フィールドを必ず埋める）
+// 学習カードは1ショットだと出力JSONが巨大で、Kimi k2.6 では300秒を超えて打ち切られる。
+// 出力を「本体」と「補足」に分け、provider 側で Promise.all 並列実行して体感時間を
+// max(本体, 補足) ≒ 半分に抑える（A: 並列2分割）。本体が主役、補足は best-effort。
 
-以下のJSON構造で返してください。**status を含むすべての必須フィールドを省略しないこと**。
-該当しないサブフィールドは null/空配列でOK。
+// ① 本体：投稿の中身そのもの＋実践材料（title/summary/capture/steps/応用/tips/useCases）
+export function buildLearningCorePrompt(input: SourcePostForLearning): string {
+  return `${learningModeInstruction(input)}
+
+${buildLearningInputBlock(input)}
+
+## あなたの出力（必須・全フィールドを必ず埋める）
+
+以下のJSON構造で返してください。必須フィールドを省略しないこと。該当しないサブフィールドは null/空配列でOK。
+これは学習カードの「本体（中身そのもの）」を作る工程です。初心者補足・図解・周辺情報は別工程で作るため、ここでは出力しないこと。
 
 {
   "sourcePostId": "${input.id}",
@@ -136,7 +173,37 @@ ${JSON.stringify(input, null, 2)}
     { "title": "応用アイデア", "description": "説明" }
   ],
   "tips": ["うまく使うコツ1", "コツ2"],
-  "useCases": ["向いている用途1", "用途2"],
+  "useCases": ["向いている用途1", "用途2"]
+}
+
+## ① capture（投稿の中身）の作法 ＝ このカードの主役
+投稿の中身そのものを取り出すセクション。何も知らない人がこの通りやれば同じ結果になる粒度で、中身を忠実に転写する。
+- 投稿の型を見て format を選ぶ：リスト型（例: 10の要素）→ list で要素を“全部”列挙／手順型 → steps／主張の列挙 → claims／プロンプト・テンプレ → template（原文を verbatim にそのまま）／地の文中心 → narrative
+- 「10個ある」と数だけ言って中身を省略するのは禁止。10個あるなら items に10個全部入れる
+- 抽象化・批評・自分の言葉への変換はしない（それは別セクションの仕事）
+- 投稿のノイズ（煽り・自分語り・宣伝・URL・CTA）は削り、価値のある中身だけ残す
+
+${KOTARO_LENS_PROFILE}
+
+## 最終確認
+- すべての必須フィールドを省略しない
+- 投稿の内容に忠実に、Kotaroの持論をねじ込まない
+- 投稿が興味の核に自然に接続するときだけ、自然に指摘する（無理に接続しない）
+- JSONのみ返してください。説明文・前置きは不要です`;
+}
+
+// ② 補足：初心者ゾーン・図解・解説画像プロンプト・学習メモ・周辺情報
+export function buildLearningSupplementPrompt(input: SourcePostForLearning): string {
+  return `${learningModeInstruction(input)}
+
+${buildLearningInputBlock(input)}
+
+## あなたの出力（必須・全フィールドを必ず埋める）
+
+これは学習カードの「補足（理解を助ける周辺情報）」を作る工程です。投稿の中身そのもの（手順・要素の列挙）は別工程で作るため、ここでは扱わない。
+以下のJSON構造で返してください。該当しないサブフィールドは null/空配列でOK。
+
+{
   "beginnerZone": {
     "stumblingPoints": [
       { "point": "初心者がつまずく所", "explanation": "やさしくかみくだいた補足" }
@@ -166,16 +233,8 @@ ${JSON.stringify(input, null, 2)}
     "furtherReading": [
       { "topic": "もっと知りたい人へのトピック", "reason": "なぜそれを読むと良いか" }
     ]
-  },
-  "status": "draft"
+  }
 }
-
-## ① capture（投稿の中身）の作法 ＝ このカードの主役
-投稿の中身そのものを取り出すセクション。何も知らない人がこの通りやれば同じ結果になる粒度で、中身を忠実に転写する。
-- 投稿の型を見て format を選ぶ：リスト型（例: 10の要素）→ list で要素を“全部”列挙／手順型 → steps／主張の列挙 → claims／プロンプト・テンプレ → template（原文を verbatim にそのまま）／地の文中心 → narrative
-- 「10個ある」と数だけ言って中身を省略するのは禁止。10個あるなら items に10個全部入れる
-- 抽象化・批評・自分の言葉への変換はしない（それは別セクションの仕事）
-- 投稿のノイズ（煽り・自分語り・宣伝・URL・CTA）は削り、価値のある中身だけ残す
 
 ## ③ beginnerZone（初心者ゾーン）の作法
 ${beginnerTeachingRules}
@@ -195,12 +254,9 @@ ${beginnerTeachingRules}
 該当しないサブフィールドは null または空配列 []。不確かな情報は「諸説あり」と明示。
 推測ではなく事実ベース。AIが知らない領域は素直に簡潔に。網羅より厳選（各3〜5個まで）。
 
-${KOTARO_LENS_PROFILE}
-
 ## 最終確認
-- すべての必須フィールド（特に diagramStructure, status）を省略しない
+- diagramStructure を必ず埋める
 - 投稿の内容に忠実に、Kotaroの持論をねじ込まない
-- 投稿が興味の核に自然に接続するときだけ、自然に指摘する（無理に接続しない）
 - JSONのみ返してください。説明文・前置きは不要です`;
 }
 
@@ -304,7 +360,7 @@ export async function buildOutputPrompt(input: GenerateOutputInput): Promise<str
     x: "短く伝える（X投稿・280文字以内）",
     instagram: "図で伝える（Instagramカルーセル）",
     short_video: "動画で伝える（ショート動画台本・30〜45秒）",
-    note: "じっくり読ませる（note記事・1000-2000文字）",
+    note: "じっくり読ませる（note記事・3000-6000文字）",
     markdown_log: "学習ログ（Markdown形式）",
     seminar: "セミナーを作る（スライド構成＋台本）",
   };
@@ -453,8 +509,13 @@ ${input.outputType === "x" ? `X投稿（短く伝える）の構成:
 ${input.outputType === "note" ? `note記事（じっくり読ませる）の構成:
   ${authorRef}の投稿との出会い (3〜4行)
   → 投稿が言っていることの要約 (出典明示)
-  → 自分が特に響いた・引っかかった点
+  → なぜそれが効くのか／効かないのかの背景・原理を掘り下げる
+  → 自分が特に響いた・引っかかった点を、具体例や場面に落として書く
+  → 反対側・例外・うまくいかないケースにも触れて立体的にする
   → 読者への含意 (押し付けない問い「あなたなら何を試す？」レベル)
+3000〜6000字。長さは「水増し」でなく「掘り下げと具体例」で満たす。
+各セクションを抽象論で終わらせず、具体的な場面・手触り・原理まで踏み込む。
+読み飛ばされないよう小見出しで区切ってよい。
 文末に「いかがでしたか」「ぜひ」「ありがとうございました」は禁止。` : ""}
 
 ${input.outputType === "short_video" ? `ショート動画（動画で伝える）の台本:
@@ -497,6 +558,89 @@ ${input.outputType === "seminar" ? `
 - セミナー告知文も作る
 - 抽象論だけでなく、実際に使える手順まで落とし込む` : ""}
 
+JSONのみ返してください。`;
+}
+
+/** 改稿パスを使う媒体と、そのラベル（散文・説得が効く媒体に限定。seminar/markdown_log は対象外）。 */
+export const REFINABLE_OUTPUT_TYPES: Record<string, string> = {
+  x: "X投稿（280字以内）",
+  instagram: "Instagramカルーセル",
+  short_video: "ショート動画台本（30〜45秒）",
+  note: "note記事（3000〜6000字）",
+};
+
+/**
+ * 2段生成の「改稿パス」。1回目で書いた下書きを外部入力として渡し、
+ * 編集者の視点で厳しく添削させてから書き直させる。
+ * 自己添削を同じ生成内でやらせても効かないため、別呼び出しに分けるのが要点。
+ * 散文・説得が効く媒体（X / Instagram / 動画 / note）でのみ使用する。
+ */
+export function buildOutputRefinePrompt(
+  input: GenerateOutputInput,
+  draft: GeneratedOutputResult
+): string {
+  const authorRef = input.postAuthorUsername
+    ? `@${input.postAuthorUsername}${input.postAuthorName ? `（${input.postAuthorName}）` : ""}`
+    : input.postAuthorName ?? "元投稿者";
+
+  const mediumLabel = REFINABLE_OUTPUT_TYPES[input.outputType] ?? input.outputType;
+  const mediumKnowledge = [outputMediumKnowledge[input.outputType] ?? "", outputSelfReview]
+    .filter(Boolean)
+    .join("\n\n");
+  const draftJson =
+    draft.contentJson && Object.keys(draft.contentJson).length > 0
+      ? JSON.stringify(draft.contentJson, null, 2)
+      : null;
+
+  return `あなたは発信コンテンツを仕上げる編集者です。
+以下は同じ素材から書かれた「下書き」です。${mediumLabel}として、編集者の視点で厳しく添削し、別物の完成度まで書き直してください。
+「だいたい良い」で止めず、有料でも読まれる水準を狙ってください。
+
+${KOTARO_LENS_PROFILE}
+
+## この媒体の狙いと構成
+${mediumKnowledge}
+
+## 元素材（事実の源。ここから外れた捏造は禁止）
+### 元投稿（${authorRef}、転載禁止）
+${input.postText}
+
+### 最終サマリー
+${input.finalSummary || "なし"}
+
+### ユーザーの最終メモ
+${input.userFinalNote || "なし"}
+
+## 下書き（これを書き直す）
+タイトル: ${draft.title}
+
+本文:
+${draft.content}${draftJson ? `\n\n構造データ(contentJson):\n${draftJson}` : ""}
+
+## 添削と改稿の手順（必ずこの順で行う）
+1. まず下書きの弱点を遠慮なく挙げる。特に次を疑う:
+   - 表面のなぞりで終わっていないか（本質・背景まで踏み込めているか）
+   - 安全側に逃げた一般論・体温のない正論になっていないか
+   - 冒頭で「誰向けか」が一瞬で分かるか
+   - 具体・手触り・固有の視点が足りているか
+   - 借り物の言葉・AIっぽい言い回し・浅い表現が混ざっていないか
+   - この媒体の読まれ方・文字数・構成に合っているか
+2. 挙げた弱点を全て潰すように書き直す。なぞりを具体に、抽象を手触りに置き換え、冗長は削る。
+3. この媒体の構成・文字数の制約を必ず守る。
+
+## 厳守
+- 元素材にない事実・数字・固有名・体験を捏造しない（盛らない）
+- 出典（${authorRef}）は自然な形で残す
+- 「いかがでしたか」「ぜひ」「素晴らしい」「印象的でした」等の浅い表現・締めの定型句は使わない
+- 下書きが構造データ(contentJson)を持つ媒体（カルーセル・動画台本など）は、同じ構造で改稿版の contentJson を必ず返す
+
+以下のJSON形式で返してください。critique は社内用（本文・UIには出さない）：
+{
+  "critique": "下書きの弱点（箇条書き）",
+  "title": "改稿後のタイトル",
+  "content": "改稿後の本文",
+  "contentJson": { /* 媒体の構造データ。下書きと同じ形を維持。無ければ {} */ }
+}
 JSONのみ返してください。`;
 }
 
