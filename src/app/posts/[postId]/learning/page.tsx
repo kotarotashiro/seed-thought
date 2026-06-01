@@ -137,6 +137,16 @@ function CollapsibleHeader({
   );
 }
 
+function LayerDivider({ label }: { label: string }) {
+  return (
+    <div className="flex items-center gap-3 py-1">
+      <div className="h-px flex-1 bg-border" />
+      <span className="text-xs font-medium text-text-muted">{label}</span>
+      <div className="h-px flex-1 bg-border" />
+    </div>
+  );
+}
+
 export default function PostLearningPage({ params }: { params: Promise<{ postId: string }> }) {
   const { postId } = use(params);
   const safeBack = useSafeBack();
@@ -186,6 +196,8 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
   // Collapsible section states (secondary content starts closed)
   const [strictOpen, setStrictOpen] = useState(false);
   const [diagramOpen, setDiagramOpen] = useState(false);
+  const [applicationOpen, setApplicationOpen] = useState(false);
+  const [memoOpen, setMemoOpen] = useState(false);
 
   const article = useMemo(() => (post ? parseArticleContent(post.urlCardJson) : null), [post]);
 
@@ -800,6 +812,9 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
             </p>
           )}
 
+          {/* ── Layer 1: まず掴む ── */}
+          <LayerDivider label="① まず掴む" />
+
           {/* 要約（オリエンテーション） */}
           <Card>
             <SectionHeader icon={Sparkles} title="一言でいうと" />
@@ -822,6 +837,9 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
               </div>
             </div>
           </Card>
+
+          {/* ── Layer 2: じっくり理解する ── */}
+          <LayerDivider label="② じっくり理解する" />
 
           {/* ① 投稿の中身そのもの（忠実転写） */}
           {output.capture && ((output.capture.items && output.capture.items.length > 0) || output.capture.verbatim) && (
@@ -878,6 +896,48 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
               )}
             </Card>
           )}
+
+          {/* ③ 初心者ゾーン */}
+          {(() => {
+            const zone = output.beginnerZone;
+            const stumbling = zone?.stumblingPoints ?? [];
+            // 旧カード互換：用語解説は背景情報から拾う
+            const glossary = zone?.glossary ?? output.backgroundContext?.terminology ?? [];
+            if (stumbling.length === 0 && glossary.length === 0) return null;
+            return (
+              <Card>
+                <SectionHeader icon={GraduationCap} title="初心者ガイド" />
+                <div className="space-y-4">
+                  {stumbling.length > 0 && (
+                    <div>
+                      <p className="mb-2 text-sm font-semibold text-text">つまずきポイント</p>
+                      <div className="space-y-2">
+                        {stumbling.map((s, i) => (
+                          <div key={`${s.point}-${i}`} className="rounded-xl border border-border px-4 py-3">
+                            <p className="mb-1 text-sm font-semibold text-text">{s.point}</p>
+                            <p className="text-sm leading-relaxed text-text-secondary">{s.explanation}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {glossary.length > 0 && (
+                    <div>
+                      <p className="mb-2 text-sm font-semibold text-text">用語解説</p>
+                      <div className="space-y-2">
+                        {glossary.map((t, i) => (
+                          <div key={`${t.term}-${i}`} className="rounded-xl bg-border-light px-4 py-3">
+                            <p className="mb-1 text-sm font-semibold text-text">{t.term}</p>
+                            <p className="text-sm leading-relaxed text-text-secondary">{t.explanation}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </Card>
+            );
+          })()}
 
           {/* 周辺情報（background context） */}
           {output.backgroundContext && (() => {
@@ -955,48 +1015,6 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
             );
           })()}
 
-          {/* ③ 初心者ゾーン */}
-          {(() => {
-            const zone = output.beginnerZone;
-            const stumbling = zone?.stumblingPoints ?? [];
-            // 旧カード互換：用語解説は背景情報から拾う
-            const glossary = zone?.glossary ?? output.backgroundContext?.terminology ?? [];
-            if (stumbling.length === 0 && glossary.length === 0) return null;
-            return (
-              <Card>
-                <SectionHeader icon={GraduationCap} title="初心者ガイド" />
-                <div className="space-y-4">
-                  {stumbling.length > 0 && (
-                    <div>
-                      <p className="mb-2 text-sm font-semibold text-text">つまずきポイント</p>
-                      <div className="space-y-2">
-                        {stumbling.map((s, i) => (
-                          <div key={`${s.point}-${i}`} className="rounded-xl border border-border px-4 py-3">
-                            <p className="mb-1 text-sm font-semibold text-text">{s.point}</p>
-                            <p className="text-sm leading-relaxed text-text-secondary">{s.explanation}</p>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  {glossary.length > 0 && (
-                    <div>
-                      <p className="mb-2 text-sm font-semibold text-text">用語解説</p>
-                      <div className="space-y-2">
-                        {glossary.map((t, i) => (
-                          <div key={`${t.term}-${i}`} className="rounded-xl bg-border-light px-4 py-3">
-                            <p className="mb-1 text-sm font-semibold text-text">{t.term}</p>
-                            <p className="text-sm leading-relaxed text-text-secondary">{t.explanation}</p>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </Card>
-            );
-          })()}
-
           {/* 手順 */}
           {output.steps && output.steps.length > 0 && (
           <Card>
@@ -1023,36 +1041,8 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
           </Card>
           )}
 
-          {/* 応用アイデア */}
-          <Card>
-            <SectionHeader icon={Lightbulb} title="応用アイデア" />
-            <div className="mb-5 grid gap-3 sm:grid-cols-2">
-              {output.applicationIdeas.map((idea, index) => (
-                <div key={`${idea.title}-${index}`} className="rounded-xl bg-border-light px-4 py-3">
-                  <p className="mb-1 text-sm font-semibold text-text">{idea.title}</p>
-                  <p className="text-sm leading-relaxed text-text-secondary">{idea.description}</p>
-                </div>
-              ))}
-            </div>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div>
-                <p className="mb-2 text-sm font-semibold text-text">うまく使うコツ</p>
-                <ul className="space-y-1.5">
-                  {output.tips.map((tip, index) => (
-                    <li key={`${tip}-${index}`} className="text-sm text-text-secondary">・{tip}</li>
-                  ))}
-                </ul>
-              </div>
-              <div>
-                <p className="mb-2 text-sm font-semibold text-text">向いている用途</p>
-                <div className="flex flex-wrap gap-2">
-                  {output.useCases.map((useCase) => (
-                    <Badge key={useCase}>{useCase}</Badge>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </Card>
+          {/* ── Layer 3: 深める・手を動かす ── */}
+          <LayerDivider label="③ 深める・手を動かす" />
 
           {/* 本質を絞る（オンデマンド深掘り） — collapsible */}
           <Card>
@@ -1230,6 +1220,46 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
             )}
           </Card>
 
+          {/* 応用アイデア — collapsible */}
+          <Card>
+            <CollapsibleHeader
+              icon={Lightbulb}
+              title="応用アイデア"
+              open={applicationOpen}
+              onToggle={() => setApplicationOpen((v) => !v)}
+            />
+            {applicationOpen && (
+              <div className="mt-4">
+                <div className="mb-5 grid gap-3 sm:grid-cols-2">
+                  {output.applicationIdeas.map((idea, index) => (
+                    <div key={`${idea.title}-${index}`} className="rounded-xl bg-border-light px-4 py-3">
+                      <p className="mb-1 text-sm font-semibold text-text">{idea.title}</p>
+                      <p className="text-sm leading-relaxed text-text-secondary">{idea.description}</p>
+                    </div>
+                  ))}
+                </div>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div>
+                    <p className="mb-2 text-sm font-semibold text-text">うまく使うコツ</p>
+                    <ul className="space-y-1.5">
+                      {output.tips.map((tip, index) => (
+                        <li key={`${tip}-${index}`} className="text-sm text-text-secondary">・{tip}</li>
+                      ))}
+                    </ul>
+                  </div>
+                  <div>
+                    <p className="mb-2 text-sm font-semibold text-text">向いている用途</p>
+                    <div className="flex flex-wrap gap-2">
+                      {output.useCases.map((useCase) => (
+                        <Badge key={useCase}>{useCase}</Badge>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </Card>
+
           {/* 図解 — collapsible */}
           <Card>
             <CollapsibleHeader
@@ -1284,26 +1314,42 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
             )}
           </Card>
 
-          {/* 自分用メモ */}
+          {/* 自分用メモ — collapsible */}
           <Card>
-            <SectionHeader icon={Pencil} title="自分用メモ" />
-            <textarea
-              value={memo}
-              onChange={(event) => setMemo(event.target.value)}
-              className="min-h-[180px] w-full resize-y rounded-xl border border-border px-4 py-3 text-sm leading-relaxed text-text focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20"
-              placeholder="あとで見返すためのメモを書いてください"
+            <CollapsibleHeader
+              icon={Pencil}
+              title="自分用メモ"
+              open={memoOpen}
+              onToggle={() => setMemoOpen((v) => !v)}
             />
-            <div className="mt-3 flex gap-2">
-              <Button onClick={handleSave} loading={saving} loadingLabel="保存中...">
-                <CheckCircle2 className="mr-1.5 h-4 w-4" />
-                メモを保存
-              </Button>
-              <Button variant="secondary" onClick={handleCopyMemo} disabled={!memo}>
-                <Copy className="mr-1.5 h-4 w-4" />
-                コピー
-              </Button>
-            </div>
+            {memoOpen && (
+              <div className="mt-4">
+                <textarea
+                  value={memo}
+                  onChange={(event) => setMemo(event.target.value)}
+                  className="min-h-[180px] w-full resize-y rounded-xl border border-border px-4 py-3 text-sm leading-relaxed text-text focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20"
+                  placeholder="あとで見返すためのメモを書いてください"
+                />
+                <div className="mt-3 flex gap-2">
+                  <Button onClick={handleSave} loading={saving} loadingLabel="保存中...">
+                    <CheckCircle2 className="mr-1.5 h-4 w-4" />
+                    メモを保存
+                  </Button>
+                  <Button variant="secondary" onClick={handleCopyMemo} disabled={!memo}>
+                    <Copy className="mr-1.5 h-4 w-4" />
+                    コピー
+                  </Button>
+                </div>
+              </div>
+            )}
           </Card>
+
+          {/* ── 出すゾーン ── */}
+          <div className="flex items-center gap-3 py-2">
+            <div className="h-0.5 flex-1 bg-border" />
+            <span className="rounded-full bg-border-light px-3 py-1 text-xs font-semibold text-text-secondary">学びを他の人に伝える</span>
+            <div className="h-0.5 flex-1 bg-border" />
+          </div>
 
           {/* 発信コンテンツを作る */}
           <Card>

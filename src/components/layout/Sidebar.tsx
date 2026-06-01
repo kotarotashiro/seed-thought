@@ -21,20 +21,58 @@ import {
 } from "lucide-react";
 import { clsx } from "clsx";
 
-const menuItems = [
-  { href: "/", label: "ホーム", icon: Home },
-  { href: "/posts", label: "保存した投稿", icon: Archive },
-  { href: "/knowhow", label: "学びメモ", icon: BookOpen },
-  { href: "/collections", label: "コレクション", icon: Layers },
-  { href: "/search", label: "メモを検索", icon: Search },
-  { href: "/chat", label: "投稿に質問", icon: MessageSquare },
-  { href: "/insights", label: "保存傾向", icon: TrendingUp },
-  { href: "/drafts", label: "X下書き", icon: FileText },
-  { href: "/posts/new", label: "投稿を追加", icon: PenSquare },
-  { href: "/settings/x", label: "X連携", icon: Link2 },
-  { href: "/settings/bookmarklet", label: "ブックマークレット", icon: Bookmark },
-  { href: "/settings", label: "設定", icon: Settings },
+// 「入れる → 理解する → 残す → 出す」の行為フローでグルーピングする。
+// title なしのグループは見出しを出さない（ホーム / 設定）。
+const navGroups: {
+  title?: string;
+  items: { href: string; label: string; icon: typeof Home }[];
+}[] = [
+  { items: [{ href: "/", label: "ホーム", icon: Home }] },
+  {
+    title: "入れる",
+    items: [{ href: "/posts/new", label: "投稿を追加", icon: PenSquare }],
+  },
+  {
+    title: "理解する",
+    items: [
+      { href: "/posts", label: "保存した投稿", icon: Archive },
+      { href: "/chat", label: "投稿に質問", icon: MessageSquare },
+    ],
+  },
+  {
+    title: "残す・見返す",
+    items: [
+      { href: "/knowhow", label: "学びメモ", icon: BookOpen },
+      { href: "/collections", label: "コレクション", icon: Layers },
+      { href: "/search", label: "メモを検索", icon: Search },
+      { href: "/insights", label: "保存傾向", icon: TrendingUp },
+    ],
+  },
+  {
+    title: "出す",
+    items: [{ href: "/drafts", label: "X下書き", icon: FileText }],
+  },
+  {
+    title: "設定",
+    items: [
+      { href: "/settings/x", label: "X連携", icon: Link2 },
+      { href: "/settings/bookmarklet", label: "ブックマークレット", icon: Bookmark },
+      { href: "/settings", label: "設定", icon: Settings },
+    ],
+  },
 ];
+
+function isActivePath(pathname: string, href: string) {
+  if (href === "/") return pathname === "/";
+  // /posts/new（入れる）は /posts（理解する）の子として扱わない＝二重ハイライト防止。
+  if (href === "/posts") {
+    return (
+      (pathname === "/posts" || pathname.startsWith("/posts/")) &&
+      pathname !== "/posts/new"
+    );
+  }
+  return pathname === href || (href !== "/settings" && pathname.startsWith(`${href}/`));
+}
 
 export function Sidebar({
   collapsed,
@@ -110,31 +148,44 @@ export function Sidebar({
       </Link>
 
       {/* Navigation */}
-      <nav className="flex-1 py-4 px-3 space-y-1 overflow-y-auto">
-        {menuItems.map((item) => {
-          const isActive =
-            item.href === "/"
-              ? pathname === "/"
-              : pathname === item.href ||
-                (item.href !== "/settings" && pathname.startsWith(`${item.href}/`));
-          const Icon = item.icon;
-
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={clsx(
-                "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200",
-                isActive
-                  ? "bg-accent-light text-accent"
-                  : "text-text-secondary hover:bg-border-light hover:text-text"
-              )}
-            >
-              <Icon className="w-[18px] h-[18px] flex-shrink-0" />
-              {!collapsed && <span>{item.label}</span>}
-            </Link>
-          );
-        })}
+      <nav className="flex-1 py-4 px-3 overflow-y-auto">
+        {navGroups.map((group, groupIndex) => (
+          <div
+            key={group.title ?? `group-${groupIndex}`}
+            className={groupIndex > 0 ? "mt-4" : ""}
+          >
+            {group.title && !collapsed && (
+              <p className="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wide text-text-muted">
+                {group.title}
+              </p>
+            )}
+            {group.title && collapsed && groupIndex > 0 && (
+              <div className="mx-3 mb-2 border-t border-border-light" />
+            )}
+            <div className="space-y-1">
+              {group.items.map((item) => {
+                const isActive = isActivePath(pathname, item.href);
+                const Icon = item.icon;
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    title={collapsed ? item.label : undefined}
+                    className={clsx(
+                      "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200",
+                      isActive
+                        ? "bg-accent-light text-accent"
+                        : "text-text-secondary hover:bg-border-light hover:text-text"
+                    )}
+                  >
+                    <Icon className="w-[18px] h-[18px] flex-shrink-0" />
+                    {!collapsed && <span>{item.label}</span>}
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        ))}
       </nav>
 
       {/* User Section */}

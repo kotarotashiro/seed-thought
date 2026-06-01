@@ -11,7 +11,6 @@ import {
   Cpu,
   Database,
   Loader2,
-  RefreshCw,
   Save,
   Settings,
   User,
@@ -80,20 +79,6 @@ const toneOptions = [
   "落ち着いていて、信頼感のある文章",
 ];
 
-const ALL_TASKS: AiTaskName[] = [
-  "classifyPost", "translateText", "generateLearningCard", "generateStrictLearning",
-  "generateOutput", "searchSemantically", "analyzeLikeTrends", "chat",
-];
-
-const PROVIDER_NAMES: Record<AiProviderName, string> = {
-  grok: "Grok (xAI)",
-  claude: "Claude (Anthropic)",
-  openai: "OpenAI",
-  gemini: "Gemini (Google)",
-  kimi: "Kimi (Moonshot)",
-  mock: "Mock",
-};
-
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function toggleListValue(values: string[], value: string): string[] {
@@ -135,7 +120,6 @@ function KeySourceBadge({ source }: { source: string }) {
 function AiSettingsSection({ open, onToggle }: { open: boolean; onToggle: () => void }) {
   const [settings, setSettings] = useState<AiSettings | null>(null);
   const [apiKeyInputs, setApiKeyInputs] = useState<Partial<Record<AiProviderName, string>>>({});
-  const [taskAssignments, setTaskAssignments] = useState<Partial<Record<AiTaskName, TaskAssignment>>>({});
   const [defaultProvider, setDefaultProvider] = useState<AiProviderName>("grok");
   const [defaultModel, setDefaultModel] = useState("");
   const [modelLists, setModelLists] = useState<Partial<Record<AiProviderName, ModelInfo[]>>>({});
@@ -172,7 +156,6 @@ function AiSettingsSection({ open, onToggle }: { open: boolean; onToggle: () => 
         setSettings(data);
         setDefaultProvider(data.defaultProvider);
         setDefaultModel(data.defaultModel);
-        setTaskAssignments(data.taskAssignments ?? {});
       })
       .catch(() => setError("AI設定の読み込みに失敗しました"));
   }, []);
@@ -216,7 +199,8 @@ function AiSettingsSection({ open, onToggle }: { open: boolean; onToggle: () => 
         body: JSON.stringify({
           defaultProvider,
           defaultModel,
-          taskAssignments,
+          // 工程別割り当ては廃止。保存のたびに空で送り、過去の割り当てをクリアする。
+          taskAssignments: {},
           apiKeys: Object.keys(apiKeys).length > 0 ? apiKeys : undefined,
         }),
       });
@@ -233,7 +217,6 @@ function AiSettingsSection({ open, onToggle }: { open: boolean; onToggle: () => 
       setSettings(fresh);
       setDefaultProvider(fresh.defaultProvider);
       setDefaultModel(fresh.defaultModel);
-      setTaskAssignments(fresh.taskAssignments ?? {});
     } catch {
       setError("保存に失敗しました");
     } finally {
@@ -258,24 +241,6 @@ function AiSettingsSection({ open, onToggle }: { open: boolean; onToggle: () => 
     } finally {
       setTesting(false);
     }
-  };
-
-  const getTaskProvider = (task: AiTaskName): AiProviderName =>
-    taskAssignments[task]?.provider ?? defaultProvider;
-
-  const getTaskModel = (task: AiTaskName): string =>
-    taskAssignments[task]?.model ?? defaultModel;
-
-  const setTaskProvider = (task: AiTaskName, provider: AiProviderName) => {
-    const models = getModelsForProvider(provider);
-    const model = models[0]?.id ?? defaultModel;
-    setTaskAssignments((prev) => ({ ...prev, [task]: { provider, model } }));
-    if (!modelLists[provider]) fetchModels(provider);
-  };
-
-  const setTaskModel = (task: AiTaskName, model: string) => {
-    const provider = getTaskProvider(task);
-    setTaskAssignments((prev) => ({ ...prev, [task]: { provider, model } }));
   };
 
   const handleDefaultProviderChange = (provider: AiProviderName) => {
@@ -365,7 +330,7 @@ function AiSettingsSection({ open, onToggle }: { open: boolean; onToggle: () => 
       {/* セクション2: デフォルトモデル */}
       <div>
         <p className="text-xs font-semibold text-text-secondary mb-3">デフォルトモデル</p>
-        <p className="text-xs text-text-muted mb-3">工程別に指定がない場合にこのProvider・モデルが使われます</p>
+        <p className="text-xs text-text-muted mb-3">アプリ全体のAI処理でこのProvider・モデルが使われます</p>
         <div className="rounded-xl border border-border bg-white p-3 space-y-3">
           <div className="grid grid-cols-2 gap-2">
             <div>
@@ -413,111 +378,10 @@ function AiSettingsSection({ open, onToggle }: { open: boolean; onToggle: () => 
         </div>
       </div>
 
-      {/* セクション3: 工程別モデル割り当て */}
-      <div>
-        <p className="text-xs font-semibold text-text-secondary mb-3">工程別モデル割り当て</p>
-        <p className="text-xs text-text-muted mb-3">
-          空白の工程はデフォルトモデル（{PROVIDER_NAMES[defaultProvider]} / {defaultModel}）を使用
-        </p>
-        <div className="space-y-2">
-          {ALL_TASKS.map((task) => {
-            const taskLabel = settings.taskLabels[task] ?? task;
-            const taskProvider = getTaskProvider(task);
-            const taskModel = getTaskModel(task);
-            const models = getModelsForProvider(taskProvider);
-            const isCustom = Boolean(taskAssignments[task]);
-
-            return (
-              <div key={task} className={`rounded-xl border p-3 ${isCustom ? "border-accent/30 bg-accent-light/30" : "border-border bg-white"}`}>
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="text-xs font-medium text-text">{taskLabel}</span>
-                  {isCustom && <Badge variant="learning">カスタム</Badge>}
-                  {!isCustom && <span className="text-xs text-text-muted ml-auto">デフォルト使用</span>}
-                  {isCustom && (
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setTaskAssignments((prev) => {
-                          const next = { ...prev };
-                          delete next[task];
-                          return next;
-                        })
-                      }
-                      className="text-xs text-text-muted hover:text-danger ml-auto"
-                    >
-                      リセット
-                    </button>
-                  )}
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <select
-                    value={taskProvider}
-                    onChange={(e) => setTaskProvider(task, e.target.value as AiProviderName)}
-                    className="rounded-lg border border-border bg-white px-2 py-1.5 text-xs text-text outline-none focus:border-accent"
-                  >
-                    {availableProviders.map((p) => (
-                      <option key={p.value} value={p.value} disabled={!p.hasKey}>
-                        {p.label}{!p.hasKey ? " (未設定)" : ""}
-                      </option>
-                    ))}
-                  </select>
-                  {models.length > 0 ? (
-                    <select
-                      value={taskModel}
-                      onChange={(e) => setTaskModel(task, e.target.value)}
-                      className="rounded-lg border border-border bg-white px-2 py-1.5 text-xs text-text outline-none focus:border-accent"
-                    >
-                      {models.map((m) => (
-                        <option key={m.id} value={m.id}>{m.name}</option>
-                      ))}
-                    </select>
-                  ) : (
-                    <input
-                      type="text"
-                      value={taskModel}
-                      onChange={(e) => setTaskModel(task, e.target.value)}
-                      placeholder="モデル名..."
-                      className="rounded-lg border border-border bg-white px-2 py-1.5 text-xs text-text outline-none focus:border-accent"
-                    />
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* 推奨プリセット */}
-      <div>
-        <p className="text-xs font-semibold text-text-secondary mb-2">プリセット</p>
-        <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={() => setTaskAssignments({})}
-            className="rounded-lg border border-border bg-white px-3 py-1.5 text-xs text-text hover:border-accent"
-          >
-            すべてデフォルト
-          </button>
-          {settings.keyStatus.claude?.hasKey && (
-            <button
-              type="button"
-              onClick={() => {
-                const claudeModels = getModelsForProvider("claude");
-                const opusModel = claudeModels.find((m) => m.id.includes("opus"))?.id
-                  ?? claudeModels[0]?.id
-                  ?? "claude-opus-4-7";
-                setTaskAssignments({
-                  generateLearningCard: { provider: "claude", model: opusModel },
-                  generateStrictLearning: { provider: "claude", model: opusModel },
-                });
-              }}
-              className="rounded-lg border border-border bg-white px-3 py-1.5 text-xs text-text hover:border-accent"
-            >
-              学習系のみ Claude Opus
-            </button>
-          )}
-        </div>
-      </div>
+      <p className="text-xs text-text-muted leading-relaxed">
+        すべてのAI処理でこのデフォルトモデルを使います。学習カードや本質深掘りなど、
+        投稿ごとにモデルを変えたいときは、投稿の詳細ページの「生成モデル」でその場で選べます。
+      </p>
 
       {/* アクション */}
       <div className="flex flex-wrap gap-2">
@@ -556,7 +420,6 @@ export default function SettingsPage() {
   const [notionDatabaseId, setNotionDatabaseId] = useState("");
   const [notionHasApiKey, setNotionHasApiKey] = useState(false);
   const [savingNotion, setSavingNotion] = useState(false);
-  const [syncingNotion, setSyncingNotion] = useState(false);
   const [notionMessage, setNotionMessage] = useState<string | null>(null);
   const [notionError, setNotionError] = useState<string | null>(null);
 
@@ -666,27 +529,6 @@ export default function SettingsPage() {
     }
   };
 
-  const handleSyncNotion = async () => {
-    setSyncingNotion(true);
-    setNotionError(null);
-    setNotionMessage(null);
-    try {
-      const res = await fetch("/api/notion/sync", { method: "POST" });
-      const data = await res.json();
-      if (!res.ok) {
-        setNotionError(data.error || "同期に失敗しました");
-        return;
-      }
-      setNotionMessage(
-        `同期完了: ${data.synced}件を新規追加、${data.skipped}件はスキップ${data.errors?.length ? `（${data.errors.length}件エラー）` : ""}`
-      );
-    } catch {
-      setNotionError("Notion同期に失敗しました");
-    } finally {
-      setSyncingNotion(false);
-    }
-  };
-
   return (
     <div className="mx-auto max-w-2xl space-y-5 sm:space-y-6">
       <div className="flex items-start gap-3 sm:items-center">
@@ -783,15 +625,6 @@ export default function SettingsPage() {
               <Button onClick={handleSaveNotion} disabled={savingNotion} size="sm">
                 {savingNotion ? <Loader2 className="w-4 h-4 animate-spin mr-1.5" /> : <Save className="w-4 h-4 mr-1.5" />}
                 設定を保存
-              </Button>
-              <Button
-                variant="secondary"
-                onClick={handleSyncNotion}
-                disabled={syncingNotion || !notionHasApiKey || !notionDatabaseId}
-                size="sm"
-              >
-                {syncingNotion ? <Loader2 className="w-4 h-4 animate-spin mr-1.5" /> : <RefreshCw className="w-4 h-4 mr-1.5" />}
-                Notionに同期
               </Button>
             </div>
           </div>
