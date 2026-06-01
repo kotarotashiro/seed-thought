@@ -11,7 +11,6 @@ import {
   Cpu,
   Database,
   Loader2,
-  RefreshCw,
   Save,
   Settings,
   User,
@@ -421,7 +420,6 @@ export default function SettingsPage() {
   const [notionDatabaseId, setNotionDatabaseId] = useState("");
   const [notionHasApiKey, setNotionHasApiKey] = useState(false);
   const [savingNotion, setSavingNotion] = useState(false);
-  const [syncingNotion, setSyncingNotion] = useState(false);
   const [notionMessage, setNotionMessage] = useState<string | null>(null);
   const [notionError, setNotionError] = useState<string | null>(null);
 
@@ -531,27 +529,6 @@ export default function SettingsPage() {
     }
   };
 
-  const handleSyncNotion = async () => {
-    setSyncingNotion(true);
-    setNotionError(null);
-    setNotionMessage(null);
-    try {
-      const res = await fetch("/api/notion/sync", { method: "POST" });
-      const data = await res.json();
-      if (!res.ok) {
-        setNotionError(data.error || "同期に失敗しました");
-        return;
-      }
-      setNotionMessage(
-        `同期完了: ${data.synced}件を新規追加、${data.skipped}件はスキップ${data.errors?.length ? `（${data.errors.length}件エラー）` : ""}`
-      );
-    } catch {
-      setNotionError("Notion同期に失敗しました");
-    } finally {
-      setSyncingNotion(false);
-    }
-  };
-
   return (
     <div className="mx-auto max-w-2xl space-y-5 sm:space-y-6">
       <div className="flex items-start gap-3 sm:items-center">
@@ -648,15 +625,6 @@ export default function SettingsPage() {
               <Button onClick={handleSaveNotion} disabled={savingNotion} size="sm">
                 {savingNotion ? <Loader2 className="w-4 h-4 animate-spin mr-1.5" /> : <Save className="w-4 h-4 mr-1.5" />}
                 設定を保存
-              </Button>
-              <Button
-                variant="secondary"
-                onClick={handleSyncNotion}
-                disabled={syncingNotion || !notionHasApiKey || !notionDatabaseId}
-                size="sm"
-              >
-                {syncingNotion ? <Loader2 className="w-4 h-4 animate-spin mr-1.5" /> : <RefreshCw className="w-4 h-4 mr-1.5" />}
-                Notionに同期
               </Button>
             </div>
           </div>
