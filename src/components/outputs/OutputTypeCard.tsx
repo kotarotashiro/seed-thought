@@ -12,7 +12,7 @@ const outputTypes: Record<string, { label: string; description: string; icon: Re
   x: { label: "短く伝える", description: "X投稿・280文字", icon: Zap },
   instagram: { label: "図で伝える", description: "カルーセル形式", icon: Images },
   short_video: { label: "動画で伝える", description: "ショート動画台本・30〜45秒", icon: Video },
-  note: { label: "じっくり読ませる", description: "note記事・1000〜2000文字", icon: BookOpenText },
+  note: { label: "じっくり読ませる", description: "note記事・3000〜6000文字", icon: BookOpenText },
   seminar: { label: "セミナーを作る", description: "スライド構成と台本", icon: GraduationCap },
 };
 
