@@ -78,12 +78,24 @@ ${input.text}
 }`;
 }
 
-export function buildLearningPrompt(input: SourcePostForLearning): string {
-  const mode = input.learningMode ?? "content";
+// 入力（投稿本文・記事本文・動画文字起こし）が長すぎると、LLMの所要時間が
+// 出力前から押し上げられ、Kimi k2.6 では300秒の壁を超える原因になる。
+// 生成前に各入力へ上限を設けて切り詰める（B: 入力上限）。
+const MAX_POST_TEXT_CHARS = 4000;
+const MAX_ARTICLE_CHARS = 6000;
+const MAX_TRANSCRIPT_CHARS = 8000;
 
-  const modeInstruction =
-    mode === "content"
-      ? `あなたは「勉強のできる解説者」です。
+function truncateForPrompt(text: string | undefined | null, max: number): string | undefined {
+  if (text == null) return undefined;
+  if (text.length <= max) return text;
+  return `${text.slice(0, max)}\n…（長いため省略：全${text.length}文字中${max}文字まで）`;
+}
+
+// content/format モードで共通の役割設定
+function learningModeInstruction(input: SourcePostForLearning): string {
+  const mode = input.learningMode ?? "content";
+  return mode === "content"
+    ? `あなたは「勉強のできる解説者」です。
 ユーザーが保存したX投稿について、ユーザーが一段深く理解できるように整理します。
 
 役割は投稿の要約整理ではありません。役割は以下の3つです：
@@ -94,25 +106,49 @@ export function buildLearningPrompt(input: SourcePostForLearning): string {
 - 投稿のテーマ領域に踏み込んで、内容として学ぶ
 - 投稿者の主張・根拠・推奨アクションを尊重する
 - ツリー投稿が含まれている場合は、ツリー全体を1つの教材として扱う`
-      : `あなたは、X投稿を発信者視点で分析し、再利用可能な「型」を抽出するAIです。
+    : `あなたは、X投稿を発信者視点で分析し、再利用可能な「型」を抽出するAIです。
 
 重要なのは、投稿を保存することではなく、投稿の中にある
 「構造」「手順」「発想」「応用可能な型」を抽出することです。`;
+}
 
-  return `${modeInstruction}
+// 投稿データ・記事・動画文字起こしの共通入力ブロック（上限つき）。
+// 本体プロンプト/補足プロンプトの両方が同じ素材を見られるようにする。
+function buildLearningInputBlock(input: SourcePostForLearning): string {
+  const articleDescription = truncateForPrompt(input.articleDescription, MAX_ARTICLE_CHARS);
+  const videoTranscript = truncateForPrompt(input.videoTranscript, MAX_TRANSCRIPT_CHARS);
+  // 巨大ツリー対策：JSON に載せる本文系フィールドも切り詰めてから整形する
+  const trimmedInput: SourcePostForLearning = {
+    ...input,
+    text: truncateForPrompt(input.text, MAX_POST_TEXT_CHARS) ?? input.text,
+    translatedText: truncateForPrompt(input.translatedText, MAX_POST_TEXT_CHARS),
+    articleDescription,
+    videoTranscript,
+  };
 
-${input.articleTitle || input.articleDescription ? `## 記事情報（投稿リンク先の内容）
+  return `${input.articleTitle || articleDescription ? `## 記事情報（投稿リンク先の内容）
 ${input.articleTitle ? `タイトル: ${input.articleTitle}` : ""}
-${input.articleDescription ? `内容: ${input.articleDescription}` : ""}
-` : ""}${input.videoTranscript ? `## 動画文字起こし（ユーザーが貼り付けた動画の文字起こしテキスト）
-${input.videoTranscript}
+${articleDescription ? `内容: ${articleDescription}` : ""}
+` : ""}${videoTranscript ? `## 動画文字起こし（ユーザーが貼り付けた動画の文字起こしテキスト）
+${videoTranscript}
 ` : ""}## 投稿データ
-${JSON.stringify(input, null, 2)}
+${JSON.stringify(trimmedInput, null, 2)}`;
+}
 
-## あなたの出力（必須・JSONの全フィールドを必ず埋める）
+// 学習カードは1ショットだと出力JSONが巨大で、Kimi k2.6 では300秒を超えて打ち切られる。
+// 出力を「本体」と「補足」に分け、provider 側で Promise.all 並列実行して体感時間を
+// max(本体, 補足) ≒ 半分に抑える（A: 並列2分割）。本体が主役、補足は best-effort。
 
-以下のJSON構造で返してください。**status を含むすべての必須フィールドを省略しないこと**。
-該当しないサブフィールドは null/空配列でOK。
+// ① 本体：投稿の中身そのもの＋実践材料（title/summary/capture/steps/応用/tips/useCases）
+export function buildLearningCorePrompt(input: SourcePostForLearning): string {
+  return `${learningModeInstruction(input)}
+
+${buildLearningInputBlock(input)}
+
+## あなたの出力（必須・全フィールドを必ず埋める）
+
+以下のJSON構造で返してください。必須フィールドを省略しないこと。該当しないサブフィールドは null/空配列でOK。
+これは学習カードの「本体（中身そのもの）」を作る工程です。初心者補足・図解・周辺情報は別工程で作るため、ここでは出力しないこと。
 
 {
   "sourcePostId": "${input.id}",
@@ -136,7 +172,37 @@ ${JSON.stringify(input, null, 2)}
     { "title": "応用アイデア", "description": "説明" }
   ],
   "tips": ["うまく使うコツ1", "コツ2"],
-  "useCases": ["向いている用途1", "用途2"],
+  "useCases": ["向いている用途1", "用途2"]
+}
+
+## ① capture（投稿の中身）の作法 ＝ このカードの主役
+投稿の中身そのものを取り出すセクション。何も知らない人がこの通りやれば同じ結果になる粒度で、中身を忠実に転写する。
+- 投稿の型を見て format を選ぶ：リスト型（例: 10の要素）→ list で要素を“全部”列挙／手順型 → steps／主張の列挙 → claims／プロンプト・テンプレ → template（原文を verbatim にそのまま）／地の文中心 → narrative
+- 「10個ある」と数だけ言って中身を省略するのは禁止。10個あるなら items に10個全部入れる
+- 抽象化・批評・自分の言葉への変換はしない（それは別セクションの仕事）
+- 投稿のノイズ（煽り・自分語り・宣伝・URL・CTA）は削り、価値のある中身だけ残す
+
+${KOTARO_LENS_PROFILE}
+
+## 最終確認
+- すべての必須フィールドを省略しない
+- 投稿の内容に忠実に、Kotaroの持論をねじ込まない
+- 投稿が興味の核に自然に接続するときだけ、自然に指摘する（無理に接続しない）
+- JSONのみ返してください。説明文・前置きは不要です`;
+}
+
+// ② 補足：初心者ゾーン・図解・解説画像プロンプト・学習メモ・周辺情報
+export function buildLearningSupplementPrompt(input: SourcePostForLearning): string {
+  return `${learningModeInstruction(input)}
+
+${buildLearningInputBlock(input)}
+
+## あなたの出力（必須・全フィールドを必ず埋める）
+
+これは学習カードの「補足（理解を助ける周辺情報）」を作る工程です。投稿の中身そのもの（手順・要素の列挙）は別工程で作るため、ここでは扱わない。
+以下のJSON構造で返してください。該当しないサブフィールドは null/空配列でOK。
+
+{
   "beginnerZone": {
     "stumblingPoints": [
       { "point": "初心者がつまずく所", "explanation": "やさしくかみくだいた補足" }
@@ -166,16 +232,8 @@ ${JSON.stringify(input, null, 2)}
     "furtherReading": [
       { "topic": "もっと知りたい人へのトピック", "reason": "なぜそれを読むと良いか" }
     ]
-  },
-  "status": "draft"
+  }
 }
-
-## ① capture（投稿の中身）の作法 ＝ このカードの主役
-投稿の中身そのものを取り出すセクション。何も知らない人がこの通りやれば同じ結果になる粒度で、中身を忠実に転写する。
-- 投稿の型を見て format を選ぶ：リスト型（例: 10の要素）→ list で要素を“全部”列挙／手順型 → steps／主張の列挙 → claims／プロンプト・テンプレ → template（原文を verbatim にそのまま）／地の文中心 → narrative
-- 「10個ある」と数だけ言って中身を省略するのは禁止。10個あるなら items に10個全部入れる
-- 抽象化・批評・自分の言葉への変換はしない（それは別セクションの仕事）
-- 投稿のノイズ（煽り・自分語り・宣伝・URL・CTA）は削り、価値のある中身だけ残す
 
 ## ③ beginnerZone（初心者ゾーン）の作法
 ${beginnerTeachingRules}
@@ -195,12 +253,9 @@ ${beginnerTeachingRules}
 該当しないサブフィールドは null または空配列 []。不確かな情報は「諸説あり」と明示。
 推測ではなく事実ベース。AIが知らない領域は素直に簡潔に。網羅より厳選（各3〜5個まで）。
 
-${KOTARO_LENS_PROFILE}
-
 ## 最終確認
-- すべての必須フィールド（特に diagramStructure, status）を省略しない
+- diagramStructure を必ず埋める
 - 投稿の内容に忠実に、Kotaroの持論をねじ込まない
-- 投稿が興味の核に自然に接続するときだけ、自然に指摘する（無理に接続しない）
 - JSONのみ返してください。説明文・前置きは不要です`;
 }
 

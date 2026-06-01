@@ -19,22 +19,26 @@ import type {
 import {
   buildChatPrompt,
   buildClassifyPrompt,
-  buildLearningPrompt,
+  buildLearningCorePrompt,
+  buildLearningSupplementPrompt,
   buildOutputPrompt,
   buildSemanticSearchPrompt,
   buildStrictLearningPrompt,
   buildTranslatePrompt,
   buildTrendAnalysisPrompt,
 } from "./prompts";
-import { parseAiJson } from "./json";
+import { parseAiJson, tryParseAiJson } from "./json";
 import {
   isGeneratedOutputResult,
-  isLearningOutput,
+  isLearningCoreOutput,
+  isLearningSupplementOutput,
   isPostClassificationResult,
   isSemanticSearchResult,
   isStrictLearningOutput,
   isTrendInsight,
   isTranslatedTextResult,
+  type LearningCoreOutput,
+  type LearningSupplementOutput,
 } from "./validation";
 import { mergeClassificationFallback } from "./fallback";
 import {
@@ -125,6 +129,26 @@ async function getClient(
   };
 }
 
+// 並列生成した「本体」と「補足」を1つの LearningOutput にまとめる。
+// 補足が欠けた（タイムアウト/形式不正で null）場合は安全なデフォルトで埋め、
+// 本体だけでもカードが成立するようにする。
+function mergeLearningOutput(
+  input: SourcePostForLearning,
+  core: LearningCoreOutput,
+  supplement: LearningSupplementOutput | null
+): LearningOutput {
+  return {
+    ...core,
+    sourcePostId: input.id,
+    beginnerZone: supplement?.beginnerZone,
+    diagramStructure: supplement?.diagramStructure ?? { title: core.title, sections: [] },
+    imageExplanationPrompt: supplement?.imageExplanationPrompt ?? "",
+    userLearningMemo: supplement?.userLearningMemo ?? core.summary ?? "",
+    backgroundContext: supplement?.backgroundContext ?? null,
+    status: "draft",
+  };
+}
+
 // LLM 呼び出し失敗時に provider/model/task を含めた診断ログを出す
 function logAiError(task: AiTaskName, provider: string, model: string, err: unknown): void {
   const message = err instanceof Error ? err.message : String(err);
@@ -167,9 +191,24 @@ export function getAiProvider(): AiProvider {
       const ctx = await getClient("generateLearningCard", override);
       if (ctx.isMock) return mockProvider.generateLearningCard(input);
       try {
-        const prompt = buildLearningPrompt(input);
-        const result = await ctx.client.chatJson(prompt);
-        return parseAiJson(result, isLearningOutput, "学習カード");
+        // 1ショットだと出力JSONが巨大で Kimi k2.6 は300秒を超えて打ち切られる。
+        // 「本体」と「補足」を並列実行し、体感時間を max(本体, 補足) に抑える。
+        // 本体は必須、補足は best-effort（欠けても本体だけでカードを成立させる）。
+        const [coreRaw, supplementRaw] = await Promise.all([
+          ctx.client.chatJson(buildLearningCorePrompt(input)),
+          ctx.client.chatJson(buildLearningSupplementPrompt(input)).catch((err) => {
+            console.warn(
+              `[ai/generateLearningCard] 補足の生成に失敗（本体のみで続行） provider=${ctx.provider} model=${ctx.model}:`,
+              err instanceof Error ? err.message : err
+            );
+            return "";
+          }),
+        ]);
+        const core = parseAiJson(coreRaw, isLearningCoreOutput, "学習カード(本体)");
+        const supplement = supplementRaw
+          ? tryParseAiJson(supplementRaw, isLearningSupplementOutput, "学習カード(補足)")
+          : null;
+        return mergeLearningOutput(input, core, supplement);
       } catch (err) {
         logAiError("generateLearningCard", ctx.provider, ctx.model, err);
         throw err;
