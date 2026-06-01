@@ -1,0 +1,21 @@
+name: Keep Grok OAuth warm
+
+# Vercel Hobby の cron は 1日1回までしか動かせないため、Grok の refresh_token を
+# 無活動失効から守る目的で GitHub Actions から定期的に /api/cron/grok-refresh を叩く。
+# これにより認証チェーンが温まり続け、再接続が必要になる頻度を大きく下げる。
+
+on:
+  schedule:
+    # 6時間ごと（UTC基準。GitHub Actions は混雑時に多少遅延することがある）
+    - cron: "0 */6 * * *"
+  workflow_dispatch: {} # 手動実行も可能
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping grok-refresh
+        run: |
+          curl -fsS -X GET "${{ secrets.APP_BASE_URL }}/api/cron/grok-refresh" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            && echo "grok-refresh ok"

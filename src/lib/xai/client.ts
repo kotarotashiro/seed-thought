@@ -36,49 +36,72 @@ export interface XaiImagineResult {
   mimeType?: string;
 }
 
-export async function getAuthHeader(): Promise<string> {
-  if (process.env.XAI_CLIENT_ID) {
-    const oauth = await findXaiAuth();
+/**
+ * Attempts to resolve a valid xAI access token via OAuth.
+ * Returns the raw (decrypted) access token on success.
+ * Returns null when OAuth is not configured, not connected, or the refresh
+ * token has expired (stale tokens are deleted as a side effect — caller
+ * should fall back to the API key).
+ * Throws on non-auth errors (network, encryption issues, etc.).
+ */
+async function tryGetOAuthToken(): Promise<string | null> {
+  if (!process.env.XAI_CLIENT_ID) return null;
 
-    if (oauth?.accessToken) {
-      const encryptionKey = getXaiTokenEncryptionKey();
-      if (!encryptionKey) throw new Error("XAI_ENCRYPTION_KEY is not set");
+  const oauth = await findXaiAuth();
+  if (!oauth?.accessToken) return null;
 
-      const expiresAt = oauth.expiresAt?.getTime() ?? 0;
-      const shouldRefresh = expiresAt > 0 && expiresAt - Date.now() < 60_000;
+  const encryptionKey = getXaiTokenEncryptionKey();
+  if (!encryptionKey) throw new Error("XAI_ENCRYPTION_KEY is not set");
 
-      if (shouldRefresh && oauth.refreshToken) {
-        try {
-          const refreshed = await refreshXaiToken(decryptToken(oauth.refreshToken, encryptionKey));
-          await upsertXaiAuth({
-            accessToken: encryptToken(refreshed.accessToken, encryptionKey),
-            refreshToken: refreshed.refreshToken
-              ? encryptToken(refreshed.refreshToken, encryptionKey)
-              : oauth.refreshToken,
-            expiresAt: refreshed.expiresAt,
-            scope: refreshed.scope,
-          });
-          return `Bearer ${refreshed.accessToken}`;
-        } catch (refreshErr) {
-          // 401 / invalid_client / invalid_grant = refresh token itself is dead.
-          // Delete stale tokens so the UI shows "reconnect" state on next visit.
-          const msg = refreshErr instanceof Error ? refreshErr.message : "";
-          if (msg.includes("401") || msg.includes("invalid_client") || msg.includes("invalid_grant")) {
-            console.warn("[xai/client] refresh token expired — deleting stale auth");
-            await deleteXaiAuth().catch(() => {});
-            throw new XaiTokenExpiredError();
-          }
-          throw refreshErr;
-        }
+  // 期限の10分前から先行リフレッシュしてトークンチェーンを温め続ける
+  // （xAIは無活動でrefresh_tokenを失効させるため、利用のたびに更新しておく）。
+  const expiresAt = oauth.expiresAt?.getTime() ?? 0;
+  const shouldRefresh = expiresAt > 0 && expiresAt - Date.now() < 10 * 60_000;
+
+  if (shouldRefresh && oauth.refreshToken) {
+    try {
+      const refreshed = await refreshXaiToken(decryptToken(oauth.refreshToken, encryptionKey));
+      await upsertXaiAuth({
+        accessToken: encryptToken(refreshed.accessToken, encryptionKey),
+        refreshToken: refreshed.refreshToken
+          ? encryptToken(refreshed.refreshToken, encryptionKey)
+          : oauth.refreshToken,
+        expiresAt: refreshed.expiresAt,
+        scope: refreshed.scope,
+      });
+      return refreshed.accessToken;
+    } catch (refreshErr) {
+      // 401 / invalid_client / invalid_grant = refresh token itself is dead.
+      // Delete stale tokens, then signal the caller to try the API key fallback.
+      const msg = refreshErr instanceof Error ? refreshErr.message : "";
+      if (msg.includes("401") || msg.includes("invalid_client") || msg.includes("invalid_grant")) {
+        console.warn("[xai/client] refresh token expired — deleting stale auth, trying API key fallback");
+        await deleteXaiAuth().catch(() => {});
+        return null;
       }
-
-      return `Bearer ${decryptToken(oauth.accessToken, encryptionKey)}`;
+      throw refreshErr;
     }
   }
 
+  return decryptToken(oauth.accessToken, encryptionKey);
+}
+
+export async function getAuthHeader(): Promise<string> {
+  const oauthToken = await tryGetOAuthToken();
+  if (oauthToken !== null) {
+    return `Bearer ${oauthToken}`;
+  }
+
+  // OAuth not configured, not connected, or token expired — try API key fallback.
   const apiKey = process.env.GROK_API_KEY ?? process.env.XAI_API_KEY;
-  if (!apiKey) throw new Error("Grok認証が未設定です");
-  return `Bearer ${apiKey}`;
+  if (apiKey) return `Bearer ${apiKey}`;
+
+  // Nothing available at all.
+  if (process.env.XAI_CLIENT_ID) {
+    // OAuth was expected but is expired/missing, and no API key is configured.
+    throw new XaiTokenExpiredError();
+  }
+  throw new Error("Grok認証が未設定です");
 }
 
 export async function hasXaiAuthConfigured(): Promise<boolean> {

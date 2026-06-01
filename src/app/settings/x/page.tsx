@@ -91,6 +91,7 @@ export default function XSettingsPage() {
   } | null>(null);
   const [grokStatus, setGrokStatus] = useState<{
     connected: boolean;
+    fallbackActive?: boolean;
     auth: {
       expiresAt?: string | null;
       scope?: string | null;
@@ -405,6 +406,33 @@ export default function XSettingsPage() {
                 切断
               </Button>
             </div>
+          </div>
+        ) : grokStatus?.fallbackActive ? (
+          <div className="space-y-4">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="w-5 h-5 flex-shrink-0 text-warning mt-0.5" />
+              <div>
+                <p className="text-sm font-medium text-text">APIキーで稼働中</p>
+                <p className="text-xs text-text-muted mt-0.5">
+                  Grokの認証が切れています。現在はAPIキーで代替稼働中のため機能は止まっていません。
+                  ローカルで再接続するとサブスクの無料枠を使えます。
+                </p>
+              </div>
+            </div>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={handleGrokConnect}
+              disabled={
+                grokStatus?.config
+                  ? !grokStatus.config.clientIdConfigured ||
+                    !grokStatus.config.tokenEncryptionConfigured
+                  : false
+              }
+            >
+              <Sparkles className="w-4 h-4 mr-1" />
+              Grokを再接続（ローカル起動が必要）
+            </Button>
           </div>
         ) : (
           <div className="space-y-4">

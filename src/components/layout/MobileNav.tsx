@@ -11,10 +11,9 @@ import {
   Layers,
   Link2,
   Menu,
-  MessageSquare,
   PenSquare,
-  Search,
   Settings,
+  Sparkles,
   Sprout,
   TrendingUp,
   X as XIcon,
@@ -45,7 +44,7 @@ const drawerGroups: {
     title: "理解する",
     items: [
       { href: "/posts", label: "保存した投稿", icon: Archive },
-      { href: "/chat", label: "投稿に質問", icon: MessageSquare },
+      { href: "/chat", label: "AIに聞く", icon: Sparkles },
     ],
   },
   {
@@ -53,7 +52,6 @@ const drawerGroups: {
     items: [
       { href: "/knowhow", label: "学びメモ", icon: BookOpen },
       { href: "/collections", label: "コレクション", icon: Layers },
-      { href: "/search", label: "メモを検索", icon: Search },
       { href: "/insights", label: "保存傾向", icon: TrendingUp },
     ],
   },
@@ -79,6 +77,10 @@ function isActivePath(pathname: string, href: string) {
       (pathname === "/posts" || pathname.startsWith("/posts/")) &&
       pathname !== "/posts/new"
     );
+  }
+  // /search は /chat に統合済み。
+  if (href === "/chat") {
+    return pathname === "/chat" || pathname.startsWith("/chat/") || pathname === "/search";
   }
   return pathname === href || (href !== "/settings" && pathname.startsWith(`${href}/`));
 }
