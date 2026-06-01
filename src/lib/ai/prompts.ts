@@ -3,6 +3,7 @@ import type {
   ChatMessage,
   ClassifyPostInput,
   GenerateOutputInput,
+  GeneratedOutputResult,
   PostContext,
   PostSummaryForSearch,
   PostSummaryForTrend,
@@ -552,6 +553,89 @@ ${input.outputType === "seminar" ? `
 - セミナー告知文も作る
 - 抽象論だけでなく、実際に使える手順まで落とし込む` : ""}
 
+JSONのみ返してください。`;
+}
+
+/** 改稿パスを使う媒体と、そのラベル（散文・説得が効く媒体に限定。seminar/markdown_log は対象外）。 */
+export const REFINABLE_OUTPUT_TYPES: Record<string, string> = {
+  x: "X投稿（280字以内）",
+  instagram: "Instagramカルーセル",
+  short_video: "ショート動画台本（30〜45秒）",
+  note: "note記事（1000〜2000字）",
+};
+
+/**
+ * 2段生成の「改稿パス」。1回目で書いた下書きを外部入力として渡し、
+ * 編集者の視点で厳しく添削させてから書き直させる。
+ * 自己添削を同じ生成内でやらせても効かないため、別呼び出しに分けるのが要点。
+ * 散文・説得が効く媒体（X / Instagram / 動画 / note）でのみ使用する。
+ */
+export function buildOutputRefinePrompt(
+  input: GenerateOutputInput,
+  draft: GeneratedOutputResult
+): string {
+  const authorRef = input.postAuthorUsername
+    ? `@${input.postAuthorUsername}${input.postAuthorName ? `（${input.postAuthorName}）` : ""}`
+    : input.postAuthorName ?? "元投稿者";
+
+  const mediumLabel = REFINABLE_OUTPUT_TYPES[input.outputType] ?? input.outputType;
+  const mediumKnowledge = [outputMediumKnowledge[input.outputType] ?? "", outputSelfReview]
+    .filter(Boolean)
+    .join("\n\n");
+  const draftJson =
+    draft.contentJson && Object.keys(draft.contentJson).length > 0
+      ? JSON.stringify(draft.contentJson, null, 2)
+      : null;
+
+  return `あなたは発信コンテンツを仕上げる編集者です。
+以下は同じ素材から書かれた「下書き」です。${mediumLabel}として、編集者の視点で厳しく添削し、別物の完成度まで書き直してください。
+「だいたい良い」で止めず、有料でも読まれる水準を狙ってください。
+
+${KOTARO_LENS_PROFILE}
+
+## この媒体の狙いと構成
+${mediumKnowledge}
+
+## 元素材（事実の源。ここから外れた捏造は禁止）
+### 元投稿（${authorRef}、転載禁止）
+${input.postText}
+
+### 最終サマリー
+${input.finalSummary || "なし"}
+
+### ユーザーの最終メモ
+${input.userFinalNote || "なし"}
+
+## 下書き（これを書き直す）
+タイトル: ${draft.title}
+
+本文:
+${draft.content}${draftJson ? `\n\n構造データ(contentJson):\n${draftJson}` : ""}
+
+## 添削と改稿の手順（必ずこの順で行う）
+1. まず下書きの弱点を遠慮なく挙げる。特に次を疑う:
+   - 表面のなぞりで終わっていないか（本質・背景まで踏み込めているか）
+   - 安全側に逃げた一般論・体温のない正論になっていないか
+   - 冒頭で「誰向けか」が一瞬で分かるか
+   - 具体・手触り・固有の視点が足りているか
+   - 借り物の言葉・AIっぽい言い回し・浅い表現が混ざっていないか
+   - この媒体の読まれ方・文字数・構成に合っているか
+2. 挙げた弱点を全て潰すように書き直す。なぞりを具体に、抽象を手触りに置き換え、冗長は削る。
+3. この媒体の構成・文字数の制約を必ず守る。
+
+## 厳守
+- 元素材にない事実・数字・固有名・体験を捏造しない（盛らない）
+- 出典（${authorRef}）は自然な形で残す
+- 「いかがでしたか」「ぜひ」「素晴らしい」「印象的でした」等の浅い表現・締めの定型句は使わない
+- 下書きが構造データ(contentJson)を持つ媒体（カルーセル・動画台本など）は、同じ構造で改稿版の contentJson を必ず返す
+
+以下のJSON形式で返してください。critique は社内用（本文・UIには出さない）：
+{
+  "critique": "下書きの弱点（箇条書き）",
+  "title": "改稿後のタイトル",
+  "content": "改稿後の本文",
+  "contentJson": { /* 媒体の構造データ。下書きと同じ形を維持。無ければ {} */ }
+}
 JSONのみ返してください。`;
 }
 

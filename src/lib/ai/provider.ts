@@ -22,6 +22,8 @@ import {
   buildLearningCorePrompt,
   buildLearningSupplementPrompt,
   buildOutputPrompt,
+  buildOutputRefinePrompt,
+  REFINABLE_OUTPUT_TYPES,
   buildSemanticSearchPrompt,
   buildStrictLearningPrompt,
   buildTranslatePrompt,
@@ -220,8 +222,27 @@ export function getAiProvider(): AiProvider {
       if (ctx.isMock) return mockProvider.generateOutput(input);
       try {
         const prompt = await buildOutputPrompt(input);
-        const result = await ctx.client.chatJson(prompt);
-        return parseAiJson(result, isGeneratedOutputResult, "アウトプット生成");
+        const draftRaw = await ctx.client.chatJson(prompt);
+        const draft = parseAiJson(draftRaw, isGeneratedOutputResult, "アウトプット生成");
+
+        // 2段生成: 散文・説得が効く媒体は下書きを編集者視点で添削させてから書き直す（有料級の品質に引き上げる）。
+        // 改稿は別呼び出しに分けるのが要点（同一生成内の自己添削は効かない）。
+        // 改稿パスは temperature を上げて下書きの echo を避ける（Kimi 等の非対応モデルは自動で外れる）。
+        // 改稿に失敗しても下書きで続行する（品質は落ちるが出力は返す）。
+        if (input.outputType in REFINABLE_OUTPUT_TYPES) {
+          try {
+            const refinePrompt = buildOutputRefinePrompt(input, draft);
+            const refinedRaw = await ctx.client.chatJson(refinePrompt, { temperature: 0.6 });
+            return parseAiJson(refinedRaw, isGeneratedOutputResult, "アウトプット改稿");
+          } catch (refineErr) {
+            console.warn(
+              `[ai/generateOutput] ${input.outputType} の改稿に失敗、下書きで続行 provider=${ctx.provider} model=${ctx.model}:`,
+              refineErr instanceof Error ? refineErr.message : refineErr
+            );
+            return draft;
+          }
+        }
+        return draft;
       } catch (err) {
         logAiError("generateOutput", ctx.provider, ctx.model, err);
         throw err;
