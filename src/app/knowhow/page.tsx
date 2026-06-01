@@ -27,6 +27,7 @@ interface LearningCardItem {
   title: string;
   summary: string;
   coreInsight: string;
+  outputJson?: string | null;
   status: "draft" | "saved";
   updatedAt: string;
   userMemo?: string | null;
@@ -41,6 +42,20 @@ interface LearningCardItem {
       postType: string;
     } | null;
   };
+}
+
+// 新カードは coreInsight を保存しない（旧フィールド）。outputJson の originalIntent を
+// 「投稿者の意図」として優先表示し、旧カードは coreInsight にフォールバックする。
+function getInsightPreview(card: LearningCardItem): string {
+  if (card.outputJson) {
+    try {
+      const parsed = JSON.parse(card.outputJson) as { originalIntent?: string };
+      if (parsed.originalIntent?.trim()) return parsed.originalIntent.trim();
+    } catch {
+      // ignore malformed json
+    }
+  }
+  return card.coreInsight?.trim() ?? "";
 }
 
 function formatDate(value: string) {
@@ -376,15 +391,21 @@ export default function KnowhowPage() {
                   {card.summary}
                 </p>
 
-                <div className="rounded-xl bg-border-light px-4 py-3">
-                  <div className="mb-1 flex items-center gap-2">
-                    <Layers className="h-4 w-4 text-accent" />
-                    <p className="text-sm font-medium text-text">中心洞察</p>
-                  </div>
-                  <p className="text-sm leading-relaxed text-text-secondary">
-                    {card.coreInsight}
-                  </p>
-                </div>
+                {(() => {
+                  const insight = getInsightPreview(card);
+                  if (!insight) return null;
+                  return (
+                    <div className="rounded-xl bg-border-light px-4 py-3">
+                      <div className="mb-1 flex items-center gap-2">
+                        <Layers className="h-4 w-4 text-accent" />
+                        <p className="text-sm font-medium text-text">投稿者の狙い</p>
+                      </div>
+                      <p className="line-clamp-3 text-sm leading-relaxed text-text-secondary">
+                        {insight}
+                      </p>
+                    </div>
+                  );
+                })()}
 
                 <div className="mt-auto flex flex-col gap-3 border-t border-border pt-4 sm:flex-row sm:items-center sm:justify-between">
                   <div className="flex flex-wrap items-center gap-3 text-xs text-text-muted">
