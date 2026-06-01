@@ -4,6 +4,7 @@ import type {
   ClassifyPostInput,
   GenerateOutputInput,
   GeneratedOutputResult,
+  NoteSection,
   PostContext,
   PostSummaryForSearch,
   PostSummaryForTrend,
@@ -412,6 +413,40 @@ ${input.finalSummary || "なし"}
 ${mediumKnowledge ? `\n${mediumKnowledge}\n` : ""}
 ## 出力形式: ${outputTypeLabel[input.outputType] || input.outputType}
 
+${input.outputType === "note" ? `以下のJSON形式で必ず返してください：
+{
+  "title": "note記事のタイトル（バズタイトル禁止・内容を正確に表す）",
+  "content": "",
+  "contentJson": {
+    "source": "出典を一文で（例: @username（本名）の投稿）",
+    "sections": [
+      { "heading": "セクション1の小見出し", "body": "本文（最低450字。具体例・手触り・原理まで踏み込む。抽象論・メタなぞり禁止）" },
+      { "heading": "セクション2の小見出し", "body": "..." },
+      { "heading": "セクション3の小見出し", "body": "..." },
+      { "heading": "セクション4の小見出し", "body": "..." },
+      { "heading": "セクション5の小見出し", "body": "..." },
+      { "heading": "セクション6の小見出し", "body": "..." },
+      { "heading": "セクション7の小見出し", "body": "..." }
+    ]
+  }
+}
+
+## 7セクションの構成（この順で必ず書く）
+1. **出会い・なぜ取り上げるか**（フック＋出典明示。${authorRef}の投稿との出会いと、なぜこれを記事にしたいかを具体的に書く）
+2. **投稿が言っていること**（①学習カードの「投稿の中身」を素材に。中身を忠実に・要約でなく具体的に。読者がこの通りやれば同じ結果になる粒度で）
+3. **なぜ効くのか／背景・本質**（②学習カードの「背景・本質」を素材に。原理・根拠・時代背景まで踏み込む）
+4. **特に響いた点を場面に落として**（自分が引っかかった一点を具体的な場面・手順・体感で）
+5. **つまずきポイントと乗り越え方**（③学習カードの「初心者のつまずき」を素材に。読者が詰まりそうな所と打開策）
+6. **反例・例外・うまくいかないケース**（投稿の主張が崩れるケースを正直に。立体的・誠実に）
+7. **読者への含意**（押し付けない問い。「あなたなら何を試す？」レベルの締め。定型句「いかがでしたか」「ぜひ」禁止）
+
+## 各セクションの必達要件
+- body は最低450字。7セクション合計で3000〜6000字になるよう書く
+- 「記事が〜している」「投稿は〜を示している」というメタなぞり・要約の要約は禁止。中身そのものを書く
+- 抽象論で終わらせない。必ず具体的な場面・手触り・手順・数字まで踏み込む
+- 文末の定型句（「いかがでしたか」「ぜひ」「ありがとうございました」）は禁止
+- contentは空文字列でよい。コードがsectionsから組み立てる` : ""}
+
 ${input.outputType === "seminar" ? `以下のJSON形式で必ず返してください。contentは一文の要旨のみ。セミナーの全データをcontentJsonに入れること：
 {
   "title": "決定したセミナー名",
@@ -567,15 +602,56 @@ ${input.outputType === "seminar" ? `
 JSONのみ返してください。`;
 }
 
-/** note は字数が品質の核。改稿がこの下限を割ったら採用しない（provider 側のガードと共有）。 */
+/** note は字数が品質の核（provider 側のガードと共有）。 */
 export const MIN_NOTE_CONTENT_CHARS = 3000;
+/** 各セクションの目安下限字数（7セクション × 450字 ≈ 3150字）。 */
+export const MIN_NOTE_SECTION_CHARS = 450;
 
-/** 改稿パスを使う媒体と、そのラベル（散文・説得が効く媒体に限定。seminar/markdown_log は対象外）。 */
+/**
+ * note 拡張パス。初回生成でセクションの合計字数が下限に届かなかったときのみ呼ぶ。
+ * 不足しているセクションを具体例・原理で厚くさせ、同じ sections 配列を返させる。
+ * 1回だけ（provider でガード済み）。
+ */
+export function buildNoteExpandPrompt(
+  authorRef: string,
+  sections: NoteSection[],
+  currentLen: number
+): string {
+  const thinSections = sections
+    .map((s, i) => ({ i, heading: s.heading, len: s.body.replace(/[\r\n]/g, "").length }))
+    .filter((s) => s.len < MIN_NOTE_SECTION_CHARS);
+
+  const targetLen = MIN_NOTE_CONTENT_CHARS;
+  const sectionsJson = JSON.stringify(sections, null, 2);
+
+  return `あなたはnote記事の編集者です。
+以下のnote記事はセクション合計${currentLen}字で、目標の${targetLen}字に届いていません。
+特に薄いセクションを「掘り下げと具体例」で厚くして、合計${targetLen}〜6000字になるように書き直してください。
+
+## 薄いセクション（body が${MIN_NOTE_SECTION_CHARS}字未満）
+${thinSections.length > 0 ? thinSections.map((s) => `- セクション${s.i + 1}「${s.heading}」: 現在${s.len}字`).join("\n") : "（全セクション基準クリア済み）"}
+
+## 元の sections（これを厚くして返す）
+${sectionsJson}
+
+## 厚くするルール
+- 具体的な場面・手順・手触り・数字・比較例を加える
+- 「${authorRef}の投稿が〜している」というメタなぞりは禁止。中身そのものを書く
+- 捏造（実在しない数字・固有名・体験）は禁止
+- 文末の定型句（いかがでしたか等）は禁止
+
+以下のJSON形式のみ返してください：
+{
+  "sections": [ { "heading": "...", "body": "..." } ]
+}`;
+}
+
+/** 改稿パスを使う媒体と、そのラベル（散文・説得が効く媒体に限定。seminar/markdown_log/note は対象外）。
+ *  note はセクション分割1パス生成のため改稿パスを通さない。 */
 export const REFINABLE_OUTPUT_TYPES: Record<string, string> = {
   x: "X投稿（280字以内）",
   instagram: "Instagramカルーセル",
   short_video: "ショート動画台本（30〜45秒）",
-  note: "note記事（3000〜6000字）",
 };
 
 /**
@@ -596,15 +672,6 @@ export function buildOutputRefinePrompt(
   const mediumKnowledge = [outputMediumKnowledge[input.outputType] ?? "", outputSelfReview]
     .filter(Boolean)
     .join("\n\n");
-  // note は字数が命。改稿で削りすぎて要約になるのを防ぐため、下限と「掘り下げで満たす」方針を明記する。
-  const noteRequirement =
-    input.outputType === "note"
-      ? `\n\n## note の必達要件（最優先・ここを外したら不合格）
-- 本文は${MIN_NOTE_CONTENT_CHARS}〜6000字を死守する。下回ったら未完成として書き直す。
-- 字数は「水増し」ではなく「掘り下げと具体例」で満たす。改稿で削ってよいのは冗長・重複・体温のない一般論だけ。掘り下げ・具体例・原理・反例・下記の学習カード分析は減らさず、むしろ厚くする。
-- 「記事が何をしているか」を解説するのではなく、記事（投稿）の中身そのものを読者に教える。メタななぞり・要約の要約は禁止。
-- 各セクションを小見出しで区切り、抽象論で終わらせず、具体的な場面・手触り・原理まで踏み込む。`
-      : "";
   const stepsContext = buildLearningMaterialBlock(input.steps);
   const draftJson =
     draft.contentJson && Object.keys(draft.contentJson).length > 0
@@ -618,7 +685,7 @@ export function buildOutputRefinePrompt(
 ${KOTARO_LENS_PROFILE}
 
 ## この媒体の狙いと構成
-${mediumKnowledge}${noteRequirement}
+${mediumKnowledge}
 
 ## 元素材（事実の源。ここから外れた捏造は禁止）
 ### 元投稿（${authorRef}、転載禁止）
