@@ -360,7 +360,7 @@ export async function buildOutputPrompt(input: GenerateOutputInput): Promise<str
     x: "短く伝える（X投稿・280文字以内）",
     instagram: "図で伝える（Instagramカルーセル）",
     short_video: "動画で伝える（ショート動画台本・30〜45秒）",
-    note: "じっくり読ませる（note記事・1000-2000文字）",
+    note: "じっくり読ませる（note記事・3000-6000文字）",
     markdown_log: "学習ログ（Markdown形式）",
     seminar: "セミナーを作る（スライド構成＋台本）",
   };
@@ -509,8 +509,13 @@ ${input.outputType === "x" ? `X投稿（短く伝える）の構成:
 ${input.outputType === "note" ? `note記事（じっくり読ませる）の構成:
   ${authorRef}の投稿との出会い (3〜4行)
   → 投稿が言っていることの要約 (出典明示)
-  → 自分が特に響いた・引っかかった点
+  → なぜそれが効くのか／効かないのかの背景・原理を掘り下げる
+  → 自分が特に響いた・引っかかった点を、具体例や場面に落として書く
+  → 反対側・例外・うまくいかないケースにも触れて立体的にする
   → 読者への含意 (押し付けない問い「あなたなら何を試す？」レベル)
+3000〜6000字。長さは「水増し」でなく「掘り下げと具体例」で満たす。
+各セクションを抽象論で終わらせず、具体的な場面・手触り・原理まで踏み込む。
+読み飛ばされないよう小見出しで区切ってよい。
 文末に「いかがでしたか」「ぜひ」「ありがとうございました」は禁止。` : ""}
 
 ${input.outputType === "short_video" ? `ショート動画（動画で伝える）の台本:
@@ -561,7 +566,7 @@ export const REFINABLE_OUTPUT_TYPES: Record<string, string> = {
   x: "X投稿（280字以内）",
   instagram: "Instagramカルーセル",
   short_video: "ショート動画台本（30〜45秒）",
-  note: "note記事（1000〜2000字）",
+  note: "note記事（3000〜6000字）",
 };
 
 /**
