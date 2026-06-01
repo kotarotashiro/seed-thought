@@ -2,11 +2,11 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, ArrowUpDown, Layers, Plus, Search, Sparkles, Wand2 } from "lucide-react";
+import { ArrowRight, ArrowUpDown, Layers, Plus, Search, Sparkles, Trash2, Wand2 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
-import { useAlert } from "@/components/ui/DialogProvider";
+import { useAlert, useConfirm } from "@/components/ui/DialogProvider";
 
 interface CollectionListItem {
   id: string;
@@ -43,6 +43,7 @@ const SORT_LABELS: Record<SortKey, string> = {
 
 export default function CollectionsPage() {
   const alert = useAlert();
+  const confirm = useConfirm();
   const [collections, setCollections] = useState<CollectionListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
@@ -57,6 +58,7 @@ export default function CollectionsPage() {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [autoGenerating, setAutoGenerating] = useState(false);
   const [pendingAutoGenerate, setPendingAutoGenerate] = useState<string[]>([]);
+  const [listFilter, setListFilter] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -131,6 +133,16 @@ export default function CollectionsPage() {
     });
   }, [availableCards, search, sortBy]);
 
+  const filteredCollections = useMemo(() => {
+    const q = listFilter.trim().toLowerCase();
+    if (!q) return collections;
+    return collections.filter(
+      (c) =>
+        c.title.toLowerCase().includes(q) ||
+        (c.description?.toLowerCase() ?? "").includes(q)
+    );
+  }, [collections, listFilter]);
+
   const toggle = (id: string) => {
     setSelectedIds((prev) =>
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
@@ -191,6 +203,22 @@ export default function CollectionsPage() {
       await alert((e as Error).message);
     } finally {
       setCreating(false);
+    }
+  };
+
+  const deleteCollection = async (id: string) => {
+    const ok = await confirm({
+      message: "このコレクションを削除しますか？",
+      confirmLabel: "削除する",
+      variant: "danger",
+    });
+    if (!ok) return;
+    try {
+      const res = await fetch(`/api/collections/${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("削除に失敗しました");
+      setCollections((prev) => prev.filter((c) => c.id !== id));
+    } catch (e) {
+      await alert((e as Error).message);
     }
   };
 
@@ -365,36 +393,68 @@ export default function CollectionsPage() {
           </p>
         </Card>
       ) : (
-        <div className="space-y-3">
-          {collections.map((col) => (
-            <Link key={col.id} href={`/collections/${col.id}`} className="block">
-              <Card hoverable className="space-y-2">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <h2 className="truncate text-base font-bold text-text">{col.title}</h2>
-                    {col.description && (
-                      <p className="mt-1 line-clamp-2 text-xs text-text-secondary">
-                        {col.description}
-                      </p>
-                    )}
-                  </div>
-                  <ArrowRight className="h-4 w-4 flex-shrink-0 text-text-muted" />
-                </div>
-                <div className="flex flex-wrap items-center gap-2 text-xs">
-                  <Badge>{col.items.length} カード</Badge>
-                  {col.outputJson && (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-accent-light px-2 py-0.5 text-accent">
-                      <Sparkles className="h-3 w-3" />
-                      生成済み
-                    </span>
-                  )}
-                  <span className="text-text-muted">
-                    更新: {new Date(col.updatedAt).toLocaleDateString("ja-JP")}
-                  </span>
-                </div>
-              </Card>
-            </Link>
-          ))}
+        <div className="space-y-4">
+          {collections.length > 1 && (
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted" />
+              <input
+                type="text"
+                value={listFilter}
+                onChange={(e) => setListFilter(e.target.value)}
+                placeholder="タイトル・説明で絞り込む"
+                className="w-full rounded-xl border border-border bg-white py-2 pl-9 pr-4 text-sm focus:border-accent focus:outline-none"
+              />
+            </div>
+          )}
+          {filteredCollections.length === 0 ? (
+            <p className="py-4 text-center text-sm text-text-muted">該当するコレクションがありません</p>
+          ) : (
+            <div className="space-y-3">
+              {filteredCollections.map((col) => (
+                <Link key={col.id} href={`/collections/${col.id}`} className="block">
+                  <Card hoverable className="space-y-2">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <h2 className="truncate text-base font-bold text-text">{col.title}</h2>
+                        {col.description && (
+                          <p className="mt-1 line-clamp-2 text-xs text-text-secondary">
+                            {col.description}
+                          </p>
+                        )}
+                      </div>
+                      <div className="flex flex-shrink-0 items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            void deleteCollection(col.id);
+                          }}
+                          className="rounded-lg p-1.5 text-text-muted transition-colors hover:bg-danger-light hover:text-danger"
+                          title="削除"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                        <ArrowRight className="h-4 w-4 text-text-muted" />
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2 text-xs">
+                      <Badge>{col.items.length} カード</Badge>
+                      {col.outputJson && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-accent-light px-2 py-0.5 text-accent">
+                          <Sparkles className="h-3 w-3" />
+                          生成済み
+                        </span>
+                      )}
+                      <span className="text-text-muted">
+                        更新: {new Date(col.updatedAt).toLocaleDateString("ja-JP")}
+                      </span>
+                    </div>
+                  </Card>
+                </Link>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>
