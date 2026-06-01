@@ -23,6 +23,7 @@ import {
   buildLearningSupplementPrompt,
   buildOutputPrompt,
   buildOutputRefinePrompt,
+  MIN_NOTE_CONTENT_CHARS,
   REFINABLE_OUTPUT_TYPES,
   buildSemanticSearchPrompt,
   buildStrictLearningPrompt,
@@ -233,7 +234,20 @@ export function getAiProvider(): AiProvider {
           try {
             const refinePrompt = buildOutputRefinePrompt(input, draft);
             const refinedRaw = await ctx.client.chatJson(refinePrompt, { temperature: 0.6 });
-            return parseAiJson(refinedRaw, isGeneratedOutputResult, "アウトプット改稿");
+            const refined = parseAiJson(refinedRaw, isGeneratedOutputResult, "アウトプット改稿");
+            // note は字数が品質の核。改稿が規定下限を割り、かつ下書きの方が長いなら、
+            // 削りすぎた改稿ではなく下書きを採用する（下書きは3000〜6000字の指示込みで生成済み）。
+            if (
+              input.outputType === "note" &&
+              refined.content.length < MIN_NOTE_CONTENT_CHARS &&
+              draft.content.length > refined.content.length
+            ) {
+              console.warn(
+                `[ai/generateOutput] note 改稿が${refined.content.length}字で下限(${MIN_NOTE_CONTENT_CHARS})割れ、下書き(${draft.content.length}字)を採用 provider=${ctx.provider} model=${ctx.model}`
+              );
+              return draft;
+            }
+            return refined;
           } catch (refineErr) {
             console.warn(
               `[ai/generateOutput] ${input.outputType} の改稿に失敗、下書きで続行 provider=${ctx.provider} model=${ctx.model}:`,

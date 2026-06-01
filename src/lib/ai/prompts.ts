@@ -349,12 +349,18 @@ ${strictLearningKnowledge}
 JSONのみ返してください。説明文は不要です。`;
 }
 
+// 学習カードの分析（①投稿の中身 / ②背景・本質 / ③初心者ゾーン等）を素材ブロックに整形する。
+// 下書きと改稿の両方に同じ素材を渡し、改稿が下書きの要約だけを頼りに薄くなるのを防ぐ。
+function buildLearningMaterialBlock(steps: GenerateOutputInput["steps"]): string {
+  return steps
+    .map((s, i) => `### ステップ${i + 1}: ${s.title}\n問い: ${s.question}\nAI解説: ${s.aiContent}\nユーザーメモ: ${s.userNote || "なし"}`)
+    .join("\n\n");
+}
+
 export async function buildOutputPrompt(input: GenerateOutputInput): Promise<string> {
   // 「本質を絞る」(旧 strict_learning) は発信アウトプットではなく、学習カードのオンデマンド深掘り。
   // 専用ルート (./learning/strict) で生成するため、ここでは扱わない。
-  const stepsContext = input.steps
-    .map((s, i) => `### ステップ${i + 1}: ${s.title}\n問い: ${s.question}\nAI解説: ${s.aiContent}\nユーザーメモ: ${s.userNote || "なし"}`)
-    .join("\n\n");
+  const stepsContext = buildLearningMaterialBlock(input.steps);
 
   const outputTypeLabel: Record<string, string> = {
     x: "短く伝える（X投稿・280文字以内）",
@@ -561,6 +567,9 @@ ${input.outputType === "seminar" ? `
 JSONのみ返してください。`;
 }
 
+/** note は字数が品質の核。改稿がこの下限を割ったら採用しない（provider 側のガードと共有）。 */
+export const MIN_NOTE_CONTENT_CHARS = 3000;
+
 /** 改稿パスを使う媒体と、そのラベル（散文・説得が効く媒体に限定。seminar/markdown_log は対象外）。 */
 export const REFINABLE_OUTPUT_TYPES: Record<string, string> = {
   x: "X投稿（280字以内）",
@@ -587,6 +596,16 @@ export function buildOutputRefinePrompt(
   const mediumKnowledge = [outputMediumKnowledge[input.outputType] ?? "", outputSelfReview]
     .filter(Boolean)
     .join("\n\n");
+  // note は字数が命。改稿で削りすぎて要約になるのを防ぐため、下限と「掘り下げで満たす」方針を明記する。
+  const noteRequirement =
+    input.outputType === "note"
+      ? `\n\n## note の必達要件（最優先・ここを外したら不合格）
+- 本文は${MIN_NOTE_CONTENT_CHARS}〜6000字を死守する。下回ったら未完成として書き直す。
+- 字数は「水増し」ではなく「掘り下げと具体例」で満たす。改稿で削ってよいのは冗長・重複・体温のない一般論だけ。掘り下げ・具体例・原理・反例・下記の学習カード分析は減らさず、むしろ厚くする。
+- 「記事が何をしているか」を解説するのではなく、記事（投稿）の中身そのものを読者に教える。メタななぞり・要約の要約は禁止。
+- 各セクションを小見出しで区切り、抽象論で終わらせず、具体的な場面・手触り・原理まで踏み込む。`
+      : "";
+  const stepsContext = buildLearningMaterialBlock(input.steps);
   const draftJson =
     draft.contentJson && Object.keys(draft.contentJson).length > 0
       ? JSON.stringify(draft.contentJson, null, 2)
@@ -599,11 +618,14 @@ export function buildOutputRefinePrompt(
 ${KOTARO_LENS_PROFILE}
 
 ## この媒体の狙いと構成
-${mediumKnowledge}
+${mediumKnowledge}${noteRequirement}
 
 ## 元素材（事実の源。ここから外れた捏造は禁止）
 ### 元投稿（${authorRef}、転載禁止）
 ${input.postText}
+
+### 学習カードの分析（発信の素材。①投稿の中身そのもの／②背景・本質／③初心者がつまずく点を活かす）
+${stepsContext}
 
 ### 最終サマリー
 ${input.finalSummary || "なし"}
@@ -625,6 +647,7 @@ ${draft.content}${draftJson ? `\n\n構造データ(contentJson):\n${draftJson}` 
    - 具体・手触り・固有の視点が足りているか
    - 借り物の言葉・AIっぽい言い回し・浅い表現が混ざっていないか
    - この媒体の読まれ方・文字数・構成に合っているか
+   - 学習カードの分析（①投稿の中身・②背景や本質・③初心者のつまずき）を活かしきれているか。下書きが表面の要約やメタななぞりで止まっていないか
 2. 挙げた弱点を全て潰すように書き直す。なぞりを具体に、抽象を手触りに置き換え、冗長は削る。
 3. この媒体の構成・文字数の制約を必ず守る。
 
