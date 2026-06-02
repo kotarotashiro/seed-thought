@@ -4,8 +4,10 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
   ArrowRight,
+  BookmarkPlus,
   Clock,
   ExternalLink,
+  Globe,
   MessageSquare,
   Search,
   SendHorizonal,
@@ -22,7 +24,7 @@ import { useConfirm } from "@/components/ui/DialogProvider";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-type Mode = "chat" | "search";
+type Mode = "chat" | "search" | "research";
 
 interface ChatMessage {
   role: "user" | "assistant";
@@ -45,6 +47,19 @@ interface SearchResultItem {
       summary: string;
     } | null;
   };
+}
+
+interface ResearchHistoryItem {
+  id: string;
+  query: string;
+  createdAt: string;
+}
+
+interface ResearchResult {
+  id: string;
+  query: string;
+  answer: string;
+  createdAt: string;
 }
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -103,6 +118,15 @@ export default function AskAIPage() {
   const [searched, setSearched] = useState(false);
   const [searchError, setSearchError] = useState("");
   const [searchHistory, setSearchHistory] = useState<string[]>(loadSearchHistory);
+
+  // ── Research state ────────────────────────────────────────────────────────────
+  const [researchQuery, setResearchQuery] = useState("");
+  const [researchResult, setResearchResult] = useState<ResearchResult | null>(null);
+  const [researchLoading, setResearchLoading] = useState(false);
+  const [researchError, setResearchError] = useState("");
+  const [researchHistory, setResearchHistory] = useState<ResearchHistoryItem[]>([]);
+  const [researchHistoryLoaded, setResearchHistoryLoaded] = useState(false);
+  const [cardifying, setCardifying] = useState(false);
 
   // ── Chat effects ──────────────────────────────────────────────────────────────
 
@@ -211,6 +235,60 @@ export default function AskAIPage() {
     setSearchHistory(next);
   };
 
+  // ── Research handlers ─────────────────────────────────────────────────────────
+
+  const loadResearchHistory = async () => {
+    if (researchHistoryLoaded) return;
+    try {
+      const res = await fetch("/api/research");
+      if (res.ok) {
+        const data = await res.json() as { history: ResearchHistoryItem[] };
+        setResearchHistory(data.history ?? []);
+      }
+    } catch {
+      // ignore
+    }
+    setResearchHistoryLoaded(true);
+  };
+
+  const handleResearch = async (q?: string) => {
+    const rq = (q ?? researchQuery).trim();
+    if (!rq) return;
+    setResearchQuery(rq);
+    setResearchLoading(true);
+    setResearchError("");
+    setResearchResult(null);
+    try {
+      const res = await fetch("/api/research", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query: rq }),
+      });
+      const data = await res.json() as ResearchResult & { error?: string };
+      if (!res.ok) throw new Error(data.error || "リサーチに失敗しました");
+      setResearchResult(data);
+      setResearchHistory((prev) => [{ id: data.id, query: data.query, createdAt: data.createdAt }, ...prev]);
+    } catch (e) {
+      setResearchError(e instanceof Error ? e.message : "リサーチに失敗しました");
+    } finally {
+      setResearchLoading(false);
+    }
+  };
+
+  const handleCardify = async () => {
+    if (!researchResult) return;
+    setCardifying(true);
+    try {
+      const res = await fetch(`/api/research/${researchResult.id}/cardify`, { method: "POST" });
+      const data = await res.json() as { postId?: string; error?: string };
+      if (!res.ok || !data.postId) throw new Error(data.error || "カード化に失敗しました");
+      window.location.href = `/posts/${data.postId}/confirm`;
+    } catch (e) {
+      setResearchError(e instanceof Error ? e.message : "カード化に失敗しました");
+      setCardifying(false);
+    }
+  };
+
   // ── Render ────────────────────────────────────────────────────────────────────
 
   return (
@@ -232,7 +310,9 @@ export default function AskAIPage() {
             <p className="mt-1 text-xs text-text-secondary">
               {mode === "chat"
                 ? "保存した投稿をもとに質問できます"
-                : "悩みや目標を入力して関連メモを探す"}
+                : mode === "search"
+                ? "悩みや目標を入力して関連メモを探す"
+                : "X・ウェブをライブ検索して知見をまとめる"}
             </p>
           </div>
         </div>
@@ -270,6 +350,19 @@ export default function AskAIPage() {
             >
               <Search className="h-3.5 w-3.5" />
               検索
+            </button>
+            <button
+              type="button"
+              onClick={() => { setMode("research"); void loadResearchHistory(); }}
+              className={clsx(
+                "flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors",
+                mode === "research"
+                  ? "bg-white text-text shadow-sm"
+                  : "text-text-secondary hover:text-text"
+              )}
+            >
+              <Globe className="h-3.5 w-3.5" />
+              リサーチ
             </button>
           </div>
         </div>
@@ -492,6 +585,88 @@ export default function AskAIPage() {
                   </div>
                 </Card>
               ))}
+            </div>
+          )}
+        </>
+      )}
+
+      {/* ── Research mode ───────────────────────────────────────────────────────── */}
+      {mode === "research" && (
+        <>
+          <div className="space-y-3 rounded-2xl border border-border bg-white p-5">
+            <div className="mb-1 flex items-center gap-2 text-sm text-text-secondary">
+              <Globe className="h-4 w-4 text-blue-500" />
+              <span>X・ウェブをリアルタイム検索して知見をまとめます</span>
+            </div>
+            <textarea
+              value={researchQuery}
+              onChange={(e) => setResearchQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) void handleResearch();
+              }}
+              placeholder={"例: AIエージェントの最新動向\n例: Xのアルゴリズム変化と発信戦略"}
+              className="w-full min-h-[100px] resize-none rounded-xl border border-border px-4 py-3 text-sm focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20"
+              rows={3}
+            />
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-text-muted">Cmd+Enter でリサーチ開始</span>
+              <Button
+                onClick={() => void handleResearch()}
+                loading={researchLoading}
+                loadingLabel="リサーチ中…"
+                disabled={!researchQuery.trim()}
+              >
+                <Globe className="mr-1.5 h-4 w-4" />
+                リサーチする
+              </Button>
+            </div>
+          </div>
+
+          {researchError && (
+            <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+              {researchError}
+            </div>
+          )}
+
+          {researchResult && (
+            <Card className="space-y-4">
+              <div className="flex items-start justify-between gap-3">
+                <p className="text-sm font-semibold text-text">{researchResult.query}</p>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => void handleCardify()}
+                  disabled={cardifying}
+                  loading={cardifying}
+                  loadingLabel="カード化中…"
+                >
+                  <BookmarkPlus className="mr-1.5 h-4 w-4" />
+                  カード化
+                </Button>
+              </div>
+              <div className="border-t border-border pt-4">
+                <MarkdownText content={researchResult.answer} />
+              </div>
+            </Card>
+          )}
+
+          {!researchResult && researchHistory.length > 0 && (
+            <div className="space-y-2">
+              <p className="flex items-center gap-1 text-xs font-medium text-text-muted">
+                <Clock className="h-3.5 w-3.5" />
+                リサーチ履歴
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {researchHistory.map((h) => (
+                  <button
+                    key={h.id}
+                    onClick={() => void handleResearch(h.query)}
+                    className="max-w-[280px] truncate rounded-full border border-border bg-white px-3 py-1 text-xs text-text-secondary hover:border-accent/40 hover:text-text"
+                  >
+                    {h.query}
+                  </button>
+                ))}
+              </div>
             </div>
           )}
         </>
