@@ -6,6 +6,7 @@ import type {
   GenerateOutputInput,
   GeneratedOutputResult,
   LearningOutput,
+  NoteSection,
   PostClassificationResult,
   PostContext,
   PostSummaryForSearch,
@@ -21,8 +22,10 @@ import {
   buildClassifyPrompt,
   buildLearningCorePrompt,
   buildLearningSupplementPrompt,
+  buildNoteExpandPrompt,
   buildOutputPrompt,
   buildOutputRefinePrompt,
+  MIN_NOTE_CONTENT_CHARS,
   REFINABLE_OUTPUT_TYPES,
   buildSemanticSearchPrompt,
   buildStrictLearningPrompt,
@@ -34,6 +37,7 @@ import {
   isGeneratedOutputResult,
   isLearningCoreOutput,
   isLearningSupplementOutput,
+  isNoteSectionArray,
   isPostClassificationResult,
   isSemanticSearchResult,
   isStrictLearningOutput,
@@ -157,6 +161,60 @@ function logAiError(task: AiTaskName, provider: string, model: string, err: unkn
   console.error(`[ai/${task}] provider=${provider} model=${model} call failed: ${message}`);
 }
 
+// note セクション配列を連結して content 文字列を組み立てる。
+// 各セクションは「## heading\n\nbody」形式でつなぎ、コピーや既存のpre表示に馴染む。
+function assembleNoteContent(sections: NoteSection[]): string {
+  return sections.map((s) => `## ${s.heading}\n\n${s.body}`).join("\n\n");
+}
+
+// note 生成結果からセクションを取り出して content を組み立てる。
+// 下限割れなら expandFn（拡張パス）を1回だけ呼ぶ。失敗時は初回を採用。
+async function buildNoteResult(
+  raw: GeneratedOutputResult,
+  authorRef: string,
+  ctx: { provider: string; model: string },
+  input: GenerateOutputInput,
+  expandFn: (sections: NoteSection[], currentLen: number) => Promise<NoteSection[] | null>
+): Promise<GeneratedOutputResult> {
+  const cj = raw.contentJson as { source?: string; sections?: unknown } | undefined;
+  const sections: NoteSection[] = isNoteSectionArray(cj?.sections) ? cj.sections : [];
+
+  // セクションが取れなかった（モデルが構造を無視した等）→ そのまま返す
+  if (sections.length === 0) return raw;
+
+  let finalSections = sections;
+  let assembled = assembleNoteContent(finalSections);
+  const len = assembled.replace(/[\r\n]/g, "").length;
+
+  if (len < MIN_NOTE_CONTENT_CHARS) {
+    console.warn(
+      `[ai/generateOutput] note セクション合計${len}字で下限(${MIN_NOTE_CONTENT_CHARS})割れ、拡張パスを呼ぶ provider=${ctx.provider} model=${ctx.model}`
+    );
+    try {
+      const expanded = await expandFn(sections, len);
+      if (expanded && expanded.length > 0) {
+        const expandedContent = assembleNoteContent(expanded);
+        if (expandedContent.replace(/[\r\n]/g, "").length > len) {
+          finalSections = expanded;
+          assembled = expandedContent;
+        }
+      }
+    } catch (expandErr) {
+      console.warn(
+        `[ai/generateOutput] note 拡張パス失敗、初回を採用 provider=${ctx.provider} model=${ctx.model}:`,
+        expandErr instanceof Error ? expandErr.message : expandErr
+      );
+    }
+  }
+
+  return {
+    title: raw.title,
+    content: assembled,
+    contentJson: { source: cj?.source ?? authorRef, sections: finalSections },
+  };
+}
+
+
 export function getAiProvider(): AiProvider {
   return {
     async classifyPost(input: ClassifyPostInput): Promise<PostClassificationResult> {
@@ -222,16 +280,30 @@ export function getAiProvider(): AiProvider {
       if (ctx.isMock) return mockProvider.generateOutput(input);
       try {
         const prompt = await buildOutputPrompt(input);
-        const draftRaw = await ctx.client.chatJson(prompt);
-        const draft = parseAiJson(draftRaw, isGeneratedOutputResult, "アウトプット生成");
+        const raw = await ctx.client.chatJson(prompt);
+        const result = parseAiJson(raw, isGeneratedOutputResult, "アウトプット生成");
 
-        // 2段生成: 散文・説得が効く媒体は下書きを編集者視点で添削させてから書き直す（有料級の品質に引き上げる）。
+        // note は「セクション分割1パス生成」方式。改稿パスを通さず構造で字数を保証する。
+        // sections を連結して content を組み立て、下限割れなら拡張パスを1回だけ呼ぶ。
+        if (input.outputType === "note") {
+          const authorRef = input.postAuthorUsername
+            ? `@${input.postAuthorUsername}${input.postAuthorName ? `（${input.postAuthorName}）` : ""}`
+            : input.postAuthorName ?? "元投稿者";
+          return buildNoteResult(result, authorRef, ctx, input, async (sections, currentLen) => {
+            const expandPrompt = buildNoteExpandPrompt(authorRef, sections, currentLen);
+            const expandedRaw = await ctx.client.chatJson(expandPrompt);
+            const expandedParsed = JSON.parse(expandedRaw) as { sections?: unknown };
+            return isNoteSectionArray(expandedParsed.sections) ? expandedParsed.sections : null;
+          });
+        }
+
+        // 2段生成: 散文・説得が効く媒体（x/instagram/short_video）は下書きを編集者視点で添削させてから書き直す。
         // 改稿は別呼び出しに分けるのが要点（同一生成内の自己添削は効かない）。
-        // 改稿パスは temperature を上げて下書きの echo を避ける（Kimi 等の非対応モデルは自動で外れる）。
+        // 改稿パスは temperature を上げて下書きの echo を避ける。
         // 改稿に失敗しても下書きで続行する（品質は落ちるが出力は返す）。
         if (input.outputType in REFINABLE_OUTPUT_TYPES) {
           try {
-            const refinePrompt = buildOutputRefinePrompt(input, draft);
+            const refinePrompt = buildOutputRefinePrompt(input, result);
             const refinedRaw = await ctx.client.chatJson(refinePrompt, { temperature: 0.6 });
             return parseAiJson(refinedRaw, isGeneratedOutputResult, "アウトプット改稿");
           } catch (refineErr) {
@@ -239,10 +311,10 @@ export function getAiProvider(): AiProvider {
               `[ai/generateOutput] ${input.outputType} の改稿に失敗、下書きで続行 provider=${ctx.provider} model=${ctx.model}:`,
               refineErr instanceof Error ? refineErr.message : refineErr
             );
-            return draft;
+            return result;
           }
         }
-        return draft;
+        return result;
       } catch (err) {
         logAiError("generateOutput", ctx.provider, ctx.model, err);
         throw err;

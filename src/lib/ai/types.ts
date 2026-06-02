@@ -151,6 +151,16 @@ export type OutputType =
   | "seminar"
   | "strict_learning";
 
+export interface NoteSection {
+  heading: string;
+  body: string;
+}
+
+export interface NoteContentJson {
+  source?: string;
+  sections: NoteSection[];
+}
+
 export interface GenerateOutputInput {
   outputType: OutputType;
   postText: string;

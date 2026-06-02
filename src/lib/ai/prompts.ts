@@ -4,6 +4,7 @@ import type {
   ClassifyPostInput,
   GenerateOutputInput,
   GeneratedOutputResult,
+  NoteSection,
   PostContext,
   PostSummaryForSearch,
   PostSummaryForTrend,
@@ -349,12 +350,18 @@ ${strictLearningKnowledge}
 JSONのみ返してください。説明文は不要です。`;
 }
 
+// 学習カードの分析（①投稿の中身 / ②背景・本質 / ③初心者ゾーン等）を素材ブロックに整形する。
+// 下書きと改稿の両方に同じ素材を渡し、改稿が下書きの要約だけを頼りに薄くなるのを防ぐ。
+function buildLearningMaterialBlock(steps: GenerateOutputInput["steps"]): string {
+  return steps
+    .map((s, i) => `### ステップ${i + 1}: ${s.title}\n問い: ${s.question}\nAI解説: ${s.aiContent}\nユーザーメモ: ${s.userNote || "なし"}`)
+    .join("\n\n");
+}
+
 export async function buildOutputPrompt(input: GenerateOutputInput): Promise<string> {
   // 「本質を絞る」(旧 strict_learning) は発信アウトプットではなく、学習カードのオンデマンド深掘り。
   // 専用ルート (./learning/strict) で生成するため、ここでは扱わない。
-  const stepsContext = input.steps
-    .map((s, i) => `### ステップ${i + 1}: ${s.title}\n問い: ${s.question}\nAI解説: ${s.aiContent}\nユーザーメモ: ${s.userNote || "なし"}`)
-    .join("\n\n");
+  const stepsContext = buildLearningMaterialBlock(input.steps);
 
   const outputTypeLabel: Record<string, string> = {
     x: "短く伝える（X投稿・280文字以内）",
@@ -405,6 +412,40 @@ ${input.userFinalNote || "なし"}
 ${input.finalSummary || "なし"}
 ${mediumKnowledge ? `\n${mediumKnowledge}\n` : ""}
 ## 出力形式: ${outputTypeLabel[input.outputType] || input.outputType}
+
+${input.outputType === "note" ? `以下のJSON形式で必ず返してください：
+{
+  "title": "note記事のタイトル（バズタイトル禁止・内容を正確に表す）",
+  "content": "",
+  "contentJson": {
+    "source": "出典を一文で（例: @username（本名）の投稿）",
+    "sections": [
+      { "heading": "セクション1の小見出し", "body": "本文（最低450字。具体例・手触り・原理まで踏み込む。抽象論・メタなぞり禁止）" },
+      { "heading": "セクション2の小見出し", "body": "..." },
+      { "heading": "セクション3の小見出し", "body": "..." },
+      { "heading": "セクション4の小見出し", "body": "..." },
+      { "heading": "セクション5の小見出し", "body": "..." },
+      { "heading": "セクション6の小見出し", "body": "..." },
+      { "heading": "セクション7の小見出し", "body": "..." }
+    ]
+  }
+}
+
+## 7セクションの構成（この順で必ず書く）
+1. **出会い・なぜ取り上げるか**（フック＋出典明示。${authorRef}の投稿との出会いと、なぜこれを記事にしたいかを具体的に書く）
+2. **投稿が言っていること**（①学習カードの「投稿の中身」を素材に。中身を忠実に・要約でなく具体的に。読者がこの通りやれば同じ結果になる粒度で）
+3. **なぜ効くのか／背景・本質**（②学習カードの「背景・本質」を素材に。原理・根拠・時代背景まで踏み込む）
+4. **特に響いた点を場面に落として**（自分が引っかかった一点を具体的な場面・手順・体感で）
+5. **つまずきポイントと乗り越え方**（③学習カードの「初心者のつまずき」を素材に。読者が詰まりそうな所と打開策）
+6. **反例・例外・うまくいかないケース**（投稿の主張が崩れるケースを正直に。立体的・誠実に）
+7. **読者への含意**（押し付けない問い。「あなたなら何を試す？」レベルの締め。定型句「いかがでしたか」「ぜひ」禁止）
+
+## 各セクションの必達要件
+- body は最低450字。7セクション合計で3000〜6000字になるよう書く
+- 「記事が〜している」「投稿は〜を示している」というメタなぞり・要約の要約は禁止。中身そのものを書く
+- 抽象論で終わらせない。必ず具体的な場面・手触り・手順・数字まで踏み込む
+- 文末の定型句（「いかがでしたか」「ぜひ」「ありがとうございました」）は禁止
+- contentは空文字列でよい。コードがsectionsから組み立てる` : ""}
 
 ${input.outputType === "seminar" ? `以下のJSON形式で必ず返してください。contentは一文の要旨のみ。セミナーの全データをcontentJsonに入れること：
 {
@@ -561,12 +602,56 @@ ${input.outputType === "seminar" ? `
 JSONのみ返してください。`;
 }
 
-/** 改稿パスを使う媒体と、そのラベル（散文・説得が効く媒体に限定。seminar/markdown_log は対象外）。 */
+/** note は字数が品質の核（provider 側のガードと共有）。 */
+export const MIN_NOTE_CONTENT_CHARS = 3000;
+/** 各セクションの目安下限字数（7セクション × 450字 ≈ 3150字）。 */
+export const MIN_NOTE_SECTION_CHARS = 450;
+
+/**
+ * note 拡張パス。初回生成でセクションの合計字数が下限に届かなかったときのみ呼ぶ。
+ * 不足しているセクションを具体例・原理で厚くさせ、同じ sections 配列を返させる。
+ * 1回だけ（provider でガード済み）。
+ */
+export function buildNoteExpandPrompt(
+  authorRef: string,
+  sections: NoteSection[],
+  currentLen: number
+): string {
+  const thinSections = sections
+    .map((s, i) => ({ i, heading: s.heading, len: s.body.replace(/[\r\n]/g, "").length }))
+    .filter((s) => s.len < MIN_NOTE_SECTION_CHARS);
+
+  const targetLen = MIN_NOTE_CONTENT_CHARS;
+  const sectionsJson = JSON.stringify(sections, null, 2);
+
+  return `あなたはnote記事の編集者です。
+以下のnote記事はセクション合計${currentLen}字で、目標の${targetLen}字に届いていません。
+特に薄いセクションを「掘り下げと具体例」で厚くして、合計${targetLen}〜6000字になるように書き直してください。
+
+## 薄いセクション（body が${MIN_NOTE_SECTION_CHARS}字未満）
+${thinSections.length > 0 ? thinSections.map((s) => `- セクション${s.i + 1}「${s.heading}」: 現在${s.len}字`).join("\n") : "（全セクション基準クリア済み）"}
+
+## 元の sections（これを厚くして返す）
+${sectionsJson}
+
+## 厚くするルール
+- 具体的な場面・手順・手触り・数字・比較例を加える
+- 「${authorRef}の投稿が〜している」というメタなぞりは禁止。中身そのものを書く
+- 捏造（実在しない数字・固有名・体験）は禁止
+- 文末の定型句（いかがでしたか等）は禁止
+
+以下のJSON形式のみ返してください：
+{
+  "sections": [ { "heading": "...", "body": "..." } ]
+}`;
+}
+
+/** 改稿パスを使う媒体と、そのラベル（散文・説得が効く媒体に限定。seminar/markdown_log/note は対象外）。
+ *  note はセクション分割1パス生成のため改稿パスを通さない。 */
 export const REFINABLE_OUTPUT_TYPES: Record<string, string> = {
   x: "X投稿（280字以内）",
   instagram: "Instagramカルーセル",
   short_video: "ショート動画台本（30〜45秒）",
-  note: "note記事（3000〜6000字）",
 };
 
 /**
@@ -587,6 +672,7 @@ export function buildOutputRefinePrompt(
   const mediumKnowledge = [outputMediumKnowledge[input.outputType] ?? "", outputSelfReview]
     .filter(Boolean)
     .join("\n\n");
+  const stepsContext = buildLearningMaterialBlock(input.steps);
   const draftJson =
     draft.contentJson && Object.keys(draft.contentJson).length > 0
       ? JSON.stringify(draft.contentJson, null, 2)
@@ -604,6 +690,9 @@ ${mediumKnowledge}
 ## 元素材（事実の源。ここから外れた捏造は禁止）
 ### 元投稿（${authorRef}、転載禁止）
 ${input.postText}
+
+### 学習カードの分析（発信の素材。①投稿の中身そのもの／②背景・本質／③初心者がつまずく点を活かす）
+${stepsContext}
 
 ### 最終サマリー
 ${input.finalSummary || "なし"}
@@ -625,6 +714,7 @@ ${draft.content}${draftJson ? `\n\n構造データ(contentJson):\n${draftJson}` 
    - 具体・手触り・固有の視点が足りているか
    - 借り物の言葉・AIっぽい言い回し・浅い表現が混ざっていないか
    - この媒体の読まれ方・文字数・構成に合っているか
+   - 学習カードの分析（①投稿の中身・②背景や本質・③初心者のつまずき）を活かしきれているか。下書きが表面の要約やメタななぞりで止まっていないか
 2. 挙げた弱点を全て潰すように書き直す。なぞりを具体に、抽象を手触りに置き換え、冗長は削る。
 3. この媒体の構成・文字数の制約を必ず守る。
 

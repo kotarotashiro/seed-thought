@@ -1,6 +1,7 @@
 import type {
   GeneratedOutputResult,
   LearningOutput,
+  NoteSection,
   PostClassificationResult,
   SemanticSearchResult,
   StrictLearningOutput,
@@ -36,6 +37,18 @@ export function isGeneratedOutputResult(
     typeof value.title === "string" &&
     typeof value.content === "string" &&
     (value.contentJson === undefined || isRecord(value.contentJson))
+  );
+}
+
+export function isNoteSectionArray(value: unknown): value is NoteSection[] {
+  return (
+    Array.isArray(value) &&
+    value.every(
+      (item) =>
+        isRecord(item) &&
+        typeof item.heading === "string" &&
+        typeof item.body === "string"
+    )
   );
 }
 
