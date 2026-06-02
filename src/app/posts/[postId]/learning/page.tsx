@@ -15,6 +15,7 @@ import { LinkifiedText } from "@/components/ui/LinkifiedText";
 import { OpenInXButton } from "@/components/ui/OpenInXButton";
 import type { LearningOutput, StrictLearningOutput } from "@/lib/ai/types";
 import { parseArticleContent } from "@/lib/posts/articleParser";
+import { buildCardCopyText } from "@/lib/export/cardCopyText";
 import {
   AlertCircle,
   ArrowLeft,
@@ -193,6 +194,7 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
 
   const [articleExpanded, setArticleExpanded] = useState(false);
   const [postExpanded, setPostExpanded] = useState(false);
+  const [copiedAll, setCopiedAll] = useState(false);
 
   // Collapsible section states (secondary content starts closed)
   const [strictOpen, setStrictOpen] = useState(false);
@@ -242,6 +244,24 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
       setOutputHistory((prev) => prev.filter((o) => o.id !== outputId));
     } catch (e) {
       await alert({ title: "削除に失敗しました", message: (e as Error).message });
+    }
+  };
+
+  // 主要セクション（一言でいうと/投稿の中身/初心者ガイド/背景・周辺情報/本質を絞る/応用アイデア）を
+  // 1つのMarkdownにまとめてコピーする。他AIでの記事生成に貼り付ける用途。
+  const handleCopyAll = async () => {
+    if (!output) return;
+    const text = buildCardCopyText(output, strictLearning, {
+      title: output.title || card?.title,
+      sourceUrl: post?.sourceUrl,
+      author: post?.authorUsername ? `@${post.authorUsername}` : post?.authorName,
+    });
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedAll(true);
+      setTimeout(() => setCopiedAll(false), 2000);
+    } catch {
+      await alert({ title: "コピーに失敗しました", message: "クリップボードへのアクセスが拒否されました。" });
     }
   };
 
@@ -598,10 +618,19 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
             )}
           </div>
           {card && output && (
-            <Button size="sm" onClick={handleSave} loading={saving} loadingLabel="保存中...">
-              <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />
-              学習カードに保存
-            </Button>
+            <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+              <Button variant="secondary" size="sm" onClick={handleCopyAll}>
+                {copiedAll ? (
+                  <><CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />コピーしました</>
+                ) : (
+                  <><Copy className="mr-1.5 h-3.5 w-3.5" />記事用にコピー</>
+                )}
+              </Button>
+              <Button size="sm" onClick={handleSave} loading={saving} loadingLabel="保存中...">
+                <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />
+                学習カードに保存
+              </Button>
+            </div>
           )}
         </div>
       </div>
