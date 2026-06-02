@@ -21,13 +21,13 @@ import {
 } from "lucide-react";
 import { clsx } from "clsx";
 
-// ボトムタブ = 行為フロー4フェーズ + ホーム（ラベルは具体名で迷わないように）。
+// ボトムタブ = ホーム + 主要な行き先4つ（ラベルは具体名で迷わないように）。
 const mobileItems = [
   { href: "/", label: "ホーム", icon: Home },
-  { href: "/posts/new", label: "追加", icon: PenSquare },
-  { href: "/posts", label: "投稿", icon: Archive },
-  { href: "/knowhow", label: "メモ", icon: BookOpen },
-  { href: "/drafts", label: "下書き", icon: FileText },
+  { href: "/posts", label: "保存した投稿", icon: Archive },
+  { href: "/chat", label: "AIに聞く", icon: Sparkles },
+  { href: "/knowhow", label: "学びメモ", icon: BookOpen },
+  { href: "/collections", label: "コレクション", icon: Layers },
 ];
 
 // ドロワーは Sidebar と同じ「入れる → 理解する → 残す → 出す」グルーピング。
