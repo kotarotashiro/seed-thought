@@ -49,15 +49,19 @@ interface SearchResultItem {
   };
 }
 
+type ResearchMode = "quick" | "deep";
+
 interface ResearchHistoryItem {
   id: string;
   query: string;
+  mode: string;
   createdAt: string;
 }
 
 interface ResearchResult {
   id: string;
   query: string;
+  mode: ResearchMode;
   answer: string;
   createdAt: string;
 }
@@ -121,6 +125,7 @@ export default function AskAIPage() {
 
   // ── Research state ────────────────────────────────────────────────────────────
   const [researchQuery, setResearchQuery] = useState("");
+  const [researchMode, setResearchMode] = useState<ResearchMode>("quick");
   const [researchResult, setResearchResult] = useState<ResearchResult | null>(null);
   const [researchLoading, setResearchLoading] = useState(false);
   const [researchError, setResearchError] = useState("");
@@ -251,9 +256,10 @@ export default function AskAIPage() {
     setResearchHistoryLoaded(true);
   };
 
-  const handleResearch = async (q?: string) => {
+  const handleResearch = async (q?: string, modeOverride?: ResearchMode) => {
     const rq = (q ?? researchQuery).trim();
     if (!rq) return;
+    const mode = modeOverride ?? researchMode;
     setResearchQuery(rq);
     setResearchLoading(true);
     setResearchError("");
@@ -262,12 +268,12 @@ export default function AskAIPage() {
       const res = await fetch("/api/research", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query: rq }),
+        body: JSON.stringify({ query: rq, mode }),
       });
       const data = await res.json() as ResearchResult & { error?: string };
       if (!res.ok) throw new Error(data.error || "リサーチに失敗しました");
       setResearchResult(data);
-      setResearchHistory((prev) => [{ id: data.id, query: data.query, createdAt: data.createdAt }, ...prev]);
+      setResearchHistory((prev) => [{ id: data.id, query: data.query, mode: data.mode, createdAt: data.createdAt }, ...prev]);
     } catch (e) {
       setResearchError(e instanceof Error ? e.message : "リサーチに失敗しました");
     } finally {
@@ -608,16 +614,44 @@ export default function AskAIPage() {
               className="w-full min-h-[100px] resize-none rounded-xl border border-border px-4 py-3 text-sm focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20"
               rows={3}
             />
+            {/* Mode toggle: 通常 / 深掘り */}
+            <div className="flex rounded-xl border border-border bg-border-light p-0.5">
+              <button
+                type="button"
+                onClick={() => setResearchMode("quick")}
+                className={clsx(
+                  "flex-1 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors",
+                  researchMode === "quick" ? "bg-white text-text shadow-sm" : "text-text-secondary hover:text-text"
+                )}
+              >
+                通常（1回検索・速い）
+              </button>
+              <button
+                type="button"
+                onClick={() => setResearchMode("deep")}
+                className={clsx(
+                  "flex-1 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors",
+                  researchMode === "deep" ? "bg-white text-text shadow-sm" : "text-text-secondary hover:text-text"
+                )}
+              >
+                深掘り（複数観点・詳しい）
+              </button>
+            </div>
+            {researchMode === "deep" && (
+              <p className="text-xs text-amber-600">
+                テーマを複数の観点に分解して並列で調べ、統合レポートを作ります。時間と検索回数（コスト）が通常より増えます（目安: 30〜60秒）。
+              </p>
+            )}
             <div className="flex items-center justify-between">
               <span className="text-xs text-text-muted">Cmd+Enter でリサーチ開始</span>
               <Button
                 onClick={() => void handleResearch()}
                 loading={researchLoading}
-                loadingLabel="リサーチ中…"
+                loadingLabel={researchMode === "deep" ? "深掘り中…" : "リサーチ中…"}
                 disabled={!researchQuery.trim()}
               >
                 <Globe className="mr-1.5 h-4 w-4" />
-                リサーチする
+                {researchMode === "deep" ? "深掘りリサーチ" : "リサーチする"}
               </Button>
             </div>
           </div>
@@ -631,7 +665,10 @@ export default function AskAIPage() {
           {researchResult && (
             <Card className="space-y-4">
               <div className="flex items-start justify-between gap-3">
-                <p className="text-sm font-semibold text-text">{researchResult.query}</p>
+                <div className="flex items-center gap-2">
+                  {researchResult.mode === "deep" && <Badge variant="success">深掘り</Badge>}
+                  <p className="text-sm font-semibold text-text">{researchResult.query}</p>
+                </div>
                 <Button
                   size="sm"
                   variant="secondary"
@@ -660,10 +697,11 @@ export default function AskAIPage() {
                 {researchHistory.map((h) => (
                   <button
                     key={h.id}
-                    onClick={() => void handleResearch(h.query)}
-                    className="max-w-[280px] truncate rounded-full border border-border bg-white px-3 py-1 text-xs text-text-secondary hover:border-accent/40 hover:text-text"
+                    onClick={() => void handleResearch(h.query, h.mode === "deep" ? "deep" : "quick")}
+                    className="flex max-w-[280px] items-center gap-1.5 rounded-full border border-border bg-white px-3 py-1 text-xs text-text-secondary hover:border-accent/40 hover:text-text"
                   >
-                    {h.query}
+                    {h.mode === "deep" && <span className="text-[10px] font-semibold text-emerald-600">深</span>}
+                    <span className="truncate">{h.query}</span>
                   </button>
                 ))}
               </div>
