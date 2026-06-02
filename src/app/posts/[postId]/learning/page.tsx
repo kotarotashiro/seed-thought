@@ -5,7 +5,7 @@ import { useSafeBack } from "@/hooks/useSafeBack";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Badge, LearningStatusBadge } from "@/components/ui/Badge";
-import { useConfirm } from "@/components/ui/DialogProvider";
+import { useConfirm, useAlert } from "@/components/ui/DialogProvider";
 import { PostMediaGrid, parsePostMedia } from "@/components/posts/PostMediaGrid";
 import { LearningCardImages } from "@/components/posts/LearningCardImages";
 import { LearningCardVideos } from "@/components/posts/LearningCardVideos";
@@ -151,6 +151,7 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
   const { postId } = use(params);
   const safeBack = useSafeBack();
   const confirm = useConfirm();
+  const alert = useAlert();
   const [post, setPost] = useState<PostView | null>(null);
   const [card, setCard] = useState<LearningCardView | null>(null);
   const [loading, setLoading] = useState(true);
@@ -224,6 +225,23 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
       // ignore
     } finally {
       setHistoryLoading(false);
+    }
+  };
+
+  // 生成履歴から1件削除する。成功したらローカルstateからも除く。
+  const handleDeleteOutput = async (outputId: string) => {
+    if (!card) return;
+    try {
+      const res = await fetch(`/api/learning-cards/${card.id}/outputs/${outputId}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "生成履歴の削除に失敗しました");
+      }
+      setOutputHistory((prev) => prev.filter((o) => o.id !== outputId));
+    } catch (e) {
+      await alert({ title: "削除に失敗しました", message: (e as Error).message });
     }
   };
 
@@ -1434,6 +1452,7 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
                           content={item.content}
                           contentJson={parsedJson}
                           outputType={item.outputType}
+                          onDelete={() => handleDeleteOutput(item.id)}
                         />
                       );
                     })

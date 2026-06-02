@@ -2,7 +2,7 @@
 
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
-import { Copy, Check, ChevronDown, ChevronUp, ExternalLink, Send } from "lucide-react";
+import { Copy, Check, ChevronDown, ChevronUp, ExternalLink, Send, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { useConfirm } from "@/components/ui/DialogProvider";
 
@@ -11,6 +11,8 @@ interface OutputPreviewProps {
   content: string;
   contentJson?: Record<string, unknown> | null;
   outputType: string;
+  /** 渡されたときだけ削除ボタンを表示する（生成履歴で使用）。 */
+  onDelete?: () => Promise<void> | void;
 }
 
 function SeminarSection({ label, children }: { label: string; children: React.ReactNode }) {
@@ -30,12 +32,44 @@ function SeminarSection({ label, children }: { label: string; children: React.Re
   );
 }
 
-export function OutputPreview({ title, content, contentJson, outputType }: OutputPreviewProps) {
+export function OutputPreview({ title, content, contentJson, outputType, onDelete }: OutputPreviewProps) {
   const confirm = useConfirm();
   const [copied, setCopied] = useState(false);
   const [posting, setPosting] = useState(false);
   const [postedUrl, setPostedUrl] = useState<string | null>(null);
   const [postError, setPostError] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  const handleDelete = async () => {
+    if (!onDelete) return;
+    const ok = await confirm({
+      title: "生成履歴を削除",
+      message: "この生成結果を削除します。元に戻せません。",
+      confirmLabel: "削除する",
+      variant: "danger",
+    });
+    if (!ok) return;
+    setDeleting(true);
+    try {
+      await onDelete();
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const deleteButton = onDelete ? (
+    <Button
+      variant="ghost"
+      size="sm"
+      onClick={handleDelete}
+      loading={deleting}
+      loadingLabel="削除中..."
+      className="gap-1.5 text-danger hover:bg-danger/10"
+    >
+      <Trash2 className="h-3.5 w-3.5" />
+      削除
+    </Button>
+  ) : null;
 
   const handleCopy = async () => {
     await navigator.clipboard.writeText(content);
@@ -162,15 +196,18 @@ export function OutputPreview({ title, content, contentJson, outputType }: Outpu
 
     return (
       <Card>
-        <div className="mb-4 flex items-center justify-between">
+        <div className="mb-4 flex items-center justify-between gap-2">
           <h3 className="text-base font-bold text-text">{title}</h3>
-          <Button variant="secondary" size="sm" onClick={handleCopyFull} className="gap-1.5">
-            {copied ? (
-              <><Check className="h-3.5 w-3.5" />コピーしました</>
-            ) : (
-              <><Copy className="h-3.5 w-3.5" />全文コピー</>
-            )}
-          </Button>
+          <div className="flex flex-shrink-0 gap-2">
+            <Button variant="secondary" size="sm" onClick={handleCopyFull} className="gap-1.5">
+              {copied ? (
+                <><Check className="h-3.5 w-3.5" />コピーしました</>
+              ) : (
+                <><Copy className="h-3.5 w-3.5" />全文コピー</>
+              )}
+            </Button>
+            {deleteButton}
+          </div>
         </div>
 
         {j.oneLiner && (
@@ -311,11 +348,14 @@ export function OutputPreview({ title, content, contentJson, outputType }: Outpu
 
     return (
       <Card>
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center justify-between gap-2 mb-4">
           <h3 className="text-base font-bold text-text">{title}</h3>
-          <Button variant="secondary" size="sm" onClick={handleCopy} className="gap-1.5">
-            {copied ? <><Check className="w-3.5 h-3.5" />コピーしました</> : <><Copy className="w-3.5 h-3.5" />全文コピー</>}
-          </Button>
+          <div className="flex flex-shrink-0 gap-2">
+            <Button variant="secondary" size="sm" onClick={handleCopy} className="gap-1.5">
+              {copied ? <><Check className="w-3.5 h-3.5" />コピーしました</> : <><Copy className="w-3.5 h-3.5" />全文コピー</>}
+            </Button>
+            {deleteButton}
+          </div>
         </div>
 
         {s.seminar && (
@@ -484,6 +524,7 @@ export function OutputPreview({ title, content, contentJson, outputType }: Outpu
               Xに投稿
             </Button>
           )}
+          {deleteButton}
         </div>
       </div>
 
