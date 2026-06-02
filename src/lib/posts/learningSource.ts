@@ -9,6 +9,7 @@ type RawMediaItem = {
   previewUrl?: unknown;
   thumbnailUrl?: unknown;
   altText?: unknown;
+  description?: unknown;
 };
 
 export function parseTags(tagsJson?: string | null): string[] {
@@ -52,6 +53,7 @@ export function parseMedia(mediaJson?: string | null): SourcePostForLearning["me
         url: url || thumbnailUrl || "",
         thumbnailUrl,
         altText: typeof item.altText === "string" ? item.altText : undefined,
+        description: typeof item.description === "string" ? item.description : undefined,
       });
     });
     return parsed;
