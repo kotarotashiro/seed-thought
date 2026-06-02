@@ -5,6 +5,8 @@ export interface PostMediaItem {
   url: string | null;
   previewUrl: string | null;
   altText: string | null;
+  /** ビジョンモデルが読み取った画像の中身（あれば） */
+  description?: string | null;
 }
 
 export function parsePostMedia(mediaJson?: string | null): PostMediaItem[] {

@@ -86,6 +86,7 @@ ${input.text}
 const MAX_POST_TEXT_CHARS = 4000;
 const MAX_ARTICLE_CHARS = 6000;
 const MAX_TRANSCRIPT_CHARS = 8000;
+const MAX_IMAGE_CHARS = 4000;
 
 function truncateForPrompt(text: string | undefined | null, max: number): string | undefined {
   if (text == null) return undefined;
@@ -119,13 +120,23 @@ function learningModeInstruction(input: SourcePostForLearning): string {
 function buildLearningInputBlock(input: SourcePostForLearning): string {
   const articleDescription = truncateForPrompt(input.articleDescription, MAX_ARTICLE_CHARS);
   const videoTranscript = truncateForPrompt(input.videoTranscript, MAX_TRANSCRIPT_CHARS);
-  // 巨大ツリー対策：JSON に載せる本文系フィールドも切り詰めてから整形する
+  // 画像の中身（ビジョンモデルが読み取ったテキスト/図の説明）を専用セクションで明示する。
+  // 「画像で示す」とだけ書かれた投稿でも、中身まで踏み込んで学習できるようにする。
+  const imageDescriptions = (input.media ?? [])
+    .map((m) => truncateForPrompt(m.description, MAX_IMAGE_CHARS))
+    .filter((d): d is string => Boolean(d));
+  const imageBlock = imageDescriptions
+    .map((d, i) => `### 画像${i + 1}\n${d}`)
+    .join("\n\n");
+  // 巨大ツリー対策：JSON に載せる本文系フィールドも切り詰めてから整形する。
+  // 画像説明は上の専用セクションで渡すため、JSON 側の media からは除いて重複と肥大化を防ぐ。
   const trimmedInput: SourcePostForLearning = {
     ...input,
     text: truncateForPrompt(input.text, MAX_POST_TEXT_CHARS) ?? input.text,
     translatedText: truncateForPrompt(input.translatedText, MAX_POST_TEXT_CHARS),
     articleDescription,
     videoTranscript,
+    media: input.media?.map(({ description: _description, ...rest }) => rest),
   };
 
   return `${input.articleTitle || articleDescription ? `## 記事情報（投稿リンク先の内容）
@@ -133,6 +144,8 @@ ${input.articleTitle ? `タイトル: ${input.articleTitle}` : ""}
 ${articleDescription ? `内容: ${articleDescription}` : ""}
 ` : ""}${videoTranscript ? `## 動画文字起こし（ユーザーが貼り付けた動画の文字起こしテキスト）
 ${videoTranscript}
+` : ""}${imageBlock ? `## 画像の内容（投稿に添付された画像をAIが読み取ったもの。本文と同等に重視すること）
+${imageBlock}
 ` : ""}## 投稿データ
 ${JSON.stringify(trimmedInput, null, 2)}`;
 }

@@ -17,6 +17,7 @@ import {
   Cpu,
   ExternalLink,
   GitBranch,
+  Image as ImageIcon,
   Languages,
   Loader2,
   Newspaper,
@@ -65,6 +66,10 @@ export default function ConfirmPage({ params }: { params: Promise<{ postId: stri
   const [enrichingLinks, setEnrichingLinks] = useState(false);
   const [enrichMessage, setEnrichMessage] = useState<string | null>(null);
   const [enrichError, setEnrichError] = useState<string | null>(null);
+  // 画像の読み取り（ビジョン）
+  const [analyzingImages, setAnalyzingImages] = useState(false);
+  const [imageMessage, setImageMessage] = useState<string | null>(null);
+  const [imageError, setImageError] = useState<string | null>(null);
   type RelatedLink = {
     url: string;
     title: string | null;
@@ -248,6 +253,37 @@ export default function ConfirmPage({ params }: { params: Promise<{ postId: stri
     }
   };
 
+  // 投稿に添付された画像をビジョンモデルで読み取り、中身を学習素材に加える
+  const handleAnalyzeImages = async (force = false) => {
+    setAnalyzingImages(true);
+    setImageMessage(null);
+    setImageError(null);
+    try {
+      const res = await fetch(`/api/posts/${postId}/analyze-images`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ force }),
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) {
+        setImageError(data.error || "画像の読み取りに失敗しました");
+        return;
+      }
+      if (data.analyzedCount > 0) {
+        setImageMessage(`${data.analyzedCount}枚の画像を読み取りました。`);
+      } else if (data.skippedCount > 0) {
+        setImageMessage("読み取り済みの画像内容を表示しています。");
+      } else {
+        setImageMessage("読み取れる画像は見つかりませんでした。");
+      }
+      await loadPost();
+    } catch {
+      setImageError("画像の読み取りに失敗しました");
+    } finally {
+      setAnalyzingImages(false);
+    }
+  };
+
   const handleAddArticle = async () => {
     const url = articleUrl.trim();
     if (!url) {
@@ -419,6 +455,15 @@ export default function ConfirmPage({ params }: { params: Promise<{ postId: stri
   const threadPosts = post.threadPosts || [];
   const canFetchThread = (post.source === "user_like" || post.source === "user_bookmark") && post.sourcePostId;
   const postMedia = parsePostMedia(post.mediaJson);
+  const threadMedia = (threadPosts as Array<{ mediaJson?: string | null }>).flatMap((tp) =>
+    parsePostMedia(tp.mediaJson)
+  );
+  const imageMedia = [...postMedia, ...threadMedia].filter(
+    (m) => m.type === "photo" || m.type === "animated_gif"
+  );
+  const hasImages = imageMedia.length > 0;
+  const readImages = imageMedia.filter((m) => m.description && m.description.trim());
+  const allImagesRead = hasImages && readImages.length === imageMedia.length;
 
   return (
     <div className="mx-auto max-w-2xl space-y-5 sm:space-y-6">
@@ -761,6 +806,59 @@ export default function ConfirmPage({ params }: { params: Promise<{ postId: stri
             </div>
           )}
         </div>
+
+        {/* 画像の内容を読み取る（ビジョン） */}
+        {hasImages && (
+          <>
+            <div className="mt-5 border-t border-border-light pt-4" />
+            <div className="space-y-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="text-xs font-semibold text-text-secondary">
+                  投稿に添付された画像の内容を読み取る（{imageMedia.length}枚）
+                </p>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => handleAnalyzeImages(allImagesRead)}
+                  disabled={analyzingImages}
+                  loading={analyzingImages}
+                  loadingLabel="読み取り中..."
+                >
+                  <ImageIcon className="w-4 h-4 mr-1" />
+                  {allImagesRead ? "画像を再読み取り" : "画像の内容を読み取る"}
+                </Button>
+              </div>
+              <p className="text-xs text-text-muted">
+                「画像で示す」とだけ書かれた投稿でも、画像内のテキストや図をAIが読み取り、学習カードに反映します。
+              </p>
+              {imageMessage && <p className="text-xs text-success">{imageMessage}</p>}
+              {imageError && (
+                <div className="flex items-start gap-2 rounded-xl border border-danger/20 bg-danger-light px-3 py-2">
+                  <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0 text-danger" />
+                  <p className="text-xs text-danger">{imageError}</p>
+                </div>
+              )}
+              {readImages.length > 0 && (
+                <div className="mt-2 space-y-2">
+                  {readImages.map((img, idx) => (
+                    <div
+                      key={`${img.url || img.previewUrl}-${idx}`}
+                      className="rounded-xl border border-border bg-white px-3 py-2"
+                    >
+                      <p className="mb-1 flex items-center gap-1 text-[10px] font-semibold text-text-muted">
+                        <ImageIcon className="h-3 w-3 text-accent" />
+                        画像{idx + 1} の読み取り内容
+                      </p>
+                      <p className="whitespace-pre-wrap text-xs leading-relaxed text-text-secondary">
+                        {img.description}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </>
+        )}
 
         <div className="mt-5 border-t border-border-light pt-4" />
 

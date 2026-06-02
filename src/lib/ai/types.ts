@@ -25,6 +25,8 @@ export interface SourcePostForLearning {
     url: string;
     thumbnailUrl?: string;
     altText?: string;
+    /** ビジョンモデルが読み取った画像の中身（テキスト/図/スクショの説明） */
+    description?: string;
   }[];
   tags?: string[];
   genre?: string;
