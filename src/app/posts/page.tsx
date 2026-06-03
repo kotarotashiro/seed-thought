@@ -313,14 +313,9 @@ export default function PostsPage() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex min-w-0 items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-accent-light flex items-center justify-center">
-            <Archive className="w-5 h-5 text-accent" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold text-text">保存した投稿</h1>
-            <p className="text-sm text-text-secondary">{posts.length}件を表示中</p>
-          </div>
+        <div className="min-w-0">
+          <h1 className="text-2xl font-bold tracking-tight text-text sm:text-[28px]">保存した投稿</h1>
+          <p className="mt-1 text-sm text-text-secondary">{posts.length}件を表示中</p>
         </div>
         <div className="flex items-center gap-2 sm:flex-shrink-0">
           <Button
@@ -418,7 +413,7 @@ export default function PostsPage() {
           ))}
         </div>
       ) : posts.length === 0 ? (
-        <div className="text-center py-16 bg-white rounded-2xl border border-border">
+        <div className="text-center py-16 bg-white rounded-xl border border-border">
           {activeTab === "recommend" ? (
             <>
               <Sparkles className="w-12 h-12 text-text-muted mx-auto mb-3" />

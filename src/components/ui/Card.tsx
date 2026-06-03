@@ -13,15 +13,15 @@ export const Card = forwardRef<HTMLDivElement, CardProps>(
       <div
         ref={ref}
         className={clsx(
-          "bg-bg-card rounded-2xl border transition-all duration-200",
+          "bg-bg-card rounded-xl border transition-colors duration-150",
           selected
-            ? "border-accent shadow-md ring-1 ring-accent/20"
+            ? "border-accent ring-1 ring-accent/15"
             : "border-border",
-          hoverable && !selected && "hover:border-accent/30 hover:shadow-sm cursor-pointer",
+          hoverable && !selected && "hover:border-text-muted/40 cursor-pointer",
           {
-            "p-4": padding === "sm",
-            "p-4 sm:p-6": padding === "md",
-            "p-5 sm:p-8": padding === "lg",
+            "p-4 sm:p-5": padding === "sm",
+            "p-5 sm:p-6": padding === "md",
+            "p-6 sm:p-8": padding === "lg",
           },
           className
         )}

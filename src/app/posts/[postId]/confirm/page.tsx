@@ -438,8 +438,8 @@ export default function ConfirmPage({ params }: { params: Promise<{ postId: stri
     return (
       <div className="max-w-2xl mx-auto space-y-6 animate-pulse">
         <div className="h-8 bg-border-light rounded w-48" />
-        <div className="h-40 bg-border-light rounded-2xl" />
-        <div className="h-32 bg-border-light rounded-2xl" />
+        <div className="h-40 bg-border-light rounded-xl" />
+        <div className="h-32 bg-border-light rounded-xl" />
       </div>
     );
   }
@@ -478,8 +478,8 @@ export default function ConfirmPage({ params }: { params: Promise<{ postId: stri
 
       {/* Title */}
       <div>
-        <h1 className="mb-2 text-xl font-bold text-text sm:text-2xl">投稿の詳細</h1>
-        <p className="text-sm text-text-secondary">
+        <h1 className="text-2xl font-bold tracking-tight text-text sm:text-[28px]">投稿の詳細</h1>
+        <p className="mt-1 text-sm text-text-secondary">
           内容を確認し、必要なら情報を補ってから学習カードを生成できます。
         </p>
       </div>
@@ -621,7 +621,7 @@ export default function ConfirmPage({ params }: { params: Promise<{ postId: stri
           </div>
         )}
         {post.classification && (
-          <div className="flex gap-2 mt-3">
+          <div className="flex flex-wrap gap-2 mt-3">
             <PostTypeBadge type={post.classification.postType} />
             <Badge>{post.classification.primaryCategory}</Badge>
             <LearningStatusBadge learningCard={post.learningCard} />
@@ -700,7 +700,7 @@ export default function ConfirmPage({ params }: { params: Promise<{ postId: stri
       {threadPosts.length > 0 && (
         <Card>
           <div className="mb-4 flex items-center gap-2">
-            <GitBranch className="h-5 w-5 text-accent" />
+            <GitBranch className="h-5 w-5 text-text-secondary" />
             <h3 className="text-base font-bold text-text">取得済みツリー</h3>
             <Badge variant="success">{threadPosts.length + 1}投稿</Badge>
           </div>
@@ -750,7 +750,7 @@ export default function ConfirmPage({ params }: { params: Promise<{ postId: stri
       {/* 補助情報の追加（記事URL / 動画文字起こし / 投稿内リンク） */}
       <Card>
         <div className="mb-3 flex items-center gap-2">
-          <Newspaper className="h-5 w-5 text-accent" />
+          <Newspaper className="h-5 w-5 text-text-secondary" />
           <h3 className="text-base font-bold text-text">補助情報を追加</h3>
         </div>
         <p className="mb-4 text-xs text-text-muted">
@@ -902,7 +902,7 @@ export default function ConfirmPage({ params }: { params: Promise<{ postId: stri
             onChange={(e) => setTranscriptText(e.target.value)}
             placeholder={post.videoTranscriptText ? "（既存の文字起こしを上書きします）" : "動画の文字起こしテキストを貼り付け..."}
             rows={4}
-            className="w-full resize-none rounded-xl border border-border bg-white px-3 py-2 text-sm text-text outline-none focus:border-accent"
+            className="w-full resize-none rounded-lg border border-border bg-white px-3 py-2 text-sm text-text outline-none focus:border-accent"
           />
           <div className="flex justify-end">
             <Button

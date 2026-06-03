@@ -221,16 +221,11 @@ export default function KnowhowPage() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center">
-            <BookOpen className="w-5 h-5 text-blue-600" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold text-text">学びメモ</h1>
-            <p className="text-sm text-text-secondary">
-              {total !== null ? `${total}件のメモ` : `${cards.length}件のメモ`}
-            </p>
-          </div>
+        <div className="min-w-0">
+          <h1 className="text-2xl font-bold tracking-tight text-text sm:text-[28px]">学びメモ</h1>
+          <p className="mt-1 text-sm text-text-secondary">
+            {total !== null ? `${total}件のメモ` : `${cards.length}件のメモ`}
+          </p>
         </div>
         <div className="flex items-center gap-2">
           <Button
@@ -256,13 +251,13 @@ export default function KnowhowPage() {
             value={searchQuery}
             onChange={(event) => setSearchQuery(event.target.value)}
             placeholder="学習カードを検索..."
-            className="w-full rounded-xl border border-border bg-white py-2.5 pl-9 pr-4 text-sm text-text focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20"
+            className="w-full rounded-lg border border-border bg-white py-2.5 pl-9 pr-4 text-sm text-text focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20"
           />
         </label>
         <select
           value={selectedCategory}
           onChange={(event) => setSelectedCategory(event.target.value)}
-          className="w-full rounded-xl border border-border bg-white px-4 py-2.5 text-sm text-text focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20"
+          className="w-full rounded-lg border border-border bg-white px-4 py-2.5 text-sm text-text focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20"
         >
           <option value="">すべてのカテゴリ</option>
           {categories.map((category) => (
@@ -319,11 +314,11 @@ export default function KnowhowPage() {
           ))}
         </div>
       ) : cards.length === 0 && hasActiveFilter ? (
-        <div className="text-center py-14 bg-white rounded-2xl border border-border">
+        <div className="text-center py-14 bg-white rounded-xl border border-border">
           <p className="text-sm text-text-secondary">該当するメモが見つかりませんでした</p>
         </div>
       ) : cards.length === 0 ? (
-        <div className="text-center py-16 bg-white rounded-2xl border border-border">
+        <div className="text-center py-16 bg-white rounded-xl border border-border">
           <BookOpen className="w-12 h-12 text-text-muted mx-auto mb-3" />
           <h3 className="text-lg font-semibold text-text mb-2">学びメモがありません</h3>
           <p className="text-sm text-text-secondary mb-4">

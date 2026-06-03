@@ -324,7 +324,7 @@ export function PostCard({
         {/* Actions */}
         <div className="mt-auto flex items-center gap-1.5 pt-2" onClick={stop}>
           <Link href={`/posts/${post.id}/confirm`} className="min-w-0 flex-1" onClick={stop}>
-            <Button variant="primary" size="sm" className="w-full group-hover:shadow-md">
+            <Button variant="primary" size="sm" className="w-full">
               <BookOpen className="w-4 h-4 mr-1.5" />
               学習する
             </Button>

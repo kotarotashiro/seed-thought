@@ -18,7 +18,7 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
         <textarea
           ref={ref}
           className={clsx(
-            "w-full rounded-xl border bg-white px-4 py-3 text-sm text-text placeholder:text-text-muted transition-colors duration-200",
+            "w-full rounded-lg border bg-white px-4 py-3 text-sm text-text placeholder:text-text-muted transition-colors duration-200",
             "focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent",
             "resize-y min-h-[100px]",
             error ? "border-danger" : "border-border",

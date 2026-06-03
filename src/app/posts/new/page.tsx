@@ -193,14 +193,9 @@ export default function NewPostPage() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-5 sm:space-y-6">
-      <div className="flex items-center gap-3">
-        <div className="w-10 h-10 rounded-xl bg-accent-light flex items-center justify-center">
-          <PenSquare className="w-5 h-5 text-accent" />
-        </div>
-        <div>
-          <h1 className="text-2xl font-bold text-text">投稿を追加</h1>
-          <p className="text-sm text-text-secondary">学びにしたい投稿を手動で追加できます</p>
-        </div>
+      <div>
+        <h1 className="text-2xl font-bold tracking-tight text-text sm:text-[28px]">投稿を追加</h1>
+        <p className="mt-1 text-sm text-text-secondary">学びにしたい投稿を手動で追加できます</p>
       </div>
 
       <SegmentedControl
@@ -336,7 +331,7 @@ export default function NewPostPage() {
               tabIndex={0}
               onClick={() => fileInputRef.current?.click()}
               onKeyDown={(e) => e.key === "Enter" && fileInputRef.current?.click()}
-              className="flex cursor-pointer flex-col items-center gap-3 rounded-2xl border-2 border-dashed border-border p-10 transition-colors hover:border-accent hover:bg-accent-light/30"
+              className="flex cursor-pointer flex-col items-center gap-3 rounded-xl border-2 border-dashed border-border p-10 transition-colors hover:border-accent hover:bg-accent-light/30"
             >
               <Upload className="h-8 w-8 text-text-muted" />
               <p className="text-sm font-medium text-text-secondary">

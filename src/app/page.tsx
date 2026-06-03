@@ -16,7 +16,7 @@ type Post = any;
 
 function TodayHeroSkeleton() {
   return (
-    <div className="rounded-2xl border border-border bg-bg-card p-6 sm:p-8 animate-pulse">
+    <div className="rounded-xl border border-border bg-bg-card p-6 sm:p-8 animate-pulse">
       <div className="flex items-center gap-3 mb-5">
         <div className="w-12 h-12 rounded-full bg-border-light flex-shrink-0" />
         <div className="space-y-2 flex-1">
@@ -49,7 +49,7 @@ function TodayHero({
   if (error) {
     return (
       <Card className="text-center py-10">
-        <div className="w-14 h-14 rounded-2xl bg-danger-light flex items-center justify-center mx-auto mb-4">
+        <div className="w-14 h-14 rounded-xl bg-danger-light flex items-center justify-center mx-auto mb-4">
           <Sprout className="w-7 h-7 text-danger" />
         </div>
         <h3 className="font-semibold text-text mb-2">読み込みに失敗しました</h3>
@@ -63,7 +63,7 @@ function TodayHero({
   if (!post) {
     return (
       <Card className="text-center py-10">
-        <div className="w-14 h-14 rounded-2xl bg-accent-light flex items-center justify-center mx-auto mb-4">
+        <div className="w-14 h-14 rounded-xl bg-accent-light flex items-center justify-center mx-auto mb-4">
           <GraduationCap className="w-7 h-7 text-accent" />
         </div>
         <h3 className="text-lg font-semibold text-text mb-2">未学習はありません</h3>
@@ -114,7 +114,7 @@ function TodayHero({
         <Button
           variant="primary"
           size="lg"
-          className="w-full group-hover:shadow-md pointer-events-none"
+          className="w-full pointer-events-none"
         >
           <BookOpen className="w-5 h-5 mr-2" />
           学ぶ
@@ -135,7 +135,7 @@ function StatBar({
     <div className="flex gap-3">
       <Link
         href="/posts"
-        className="flex-1 flex items-center justify-between rounded-xl border border-border bg-bg-card px-4 py-3 hover:border-accent/40 hover:bg-border-light transition-colors"
+        className="flex-1 flex items-center justify-between rounded-xl border border-border bg-bg-card px-4 py-3 hover:border-text-muted/40 hover:bg-border-light transition-colors"
       >
         <span className="text-sm text-text-secondary">未学習</span>
         <span className="text-base font-bold text-text">
@@ -144,7 +144,7 @@ function StatBar({
       </Link>
       <Link
         href="/knowhow"
-        className="flex-1 flex items-center justify-between rounded-xl border border-border bg-bg-card px-4 py-3 hover:border-accent/40 hover:bg-border-light transition-colors"
+        className="flex-1 flex items-center justify-between rounded-xl border border-border bg-bg-card px-4 py-3 hover:border-text-muted/40 hover:bg-border-light transition-colors"
       >
         <span className="text-sm text-text-secondary">学びメモ</span>
         <span className="text-base font-bold text-text">
@@ -277,11 +277,13 @@ export default function HomePage() {
   return (
     <div className="space-y-6 sm:space-y-8">
       {/* Header */}
-      <div className="flex items-center gap-3">
-        <div className="w-10 h-10 rounded-xl bg-accent-light flex items-center justify-center">
-          <Sprout className="w-5 h-5 text-accent" />
-        </div>
-        <h1 className="text-xl font-bold text-text sm:text-2xl">今これを学ぶ</h1>
+      <div>
+        <h1 className="text-2xl font-bold tracking-tight text-text sm:text-[28px]">
+          今これを学ぶ
+        </h1>
+        <p className="mt-1.5 text-sm text-text-secondary">
+          保存した投稿から1件を選んで深掘りしましょう
+        </p>
       </div>
 
       {/* Hero */}
@@ -311,7 +313,7 @@ export default function HomePage() {
             {[1, 2, 3].map((i) => (
               <div
                 key={i}
-                className="bg-bg-card rounded-2xl border border-border p-6 animate-pulse"
+                className="bg-bg-card rounded-xl border border-border p-4 sm:p-5 animate-pulse"
               >
                 <div className="flex items-center gap-3 mb-4">
                   <div className="w-10 h-10 rounded-full bg-border-light" />
@@ -331,12 +333,9 @@ export default function HomePage() {
         ) : gridError ? (
           <div className="text-center py-12">
             <p className="text-sm text-text-secondary mb-4">候補の取得に失敗しました。</p>
-            <button
-              onClick={() => loadGrid()}
-              className="rounded-xl bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90"
-            >
+            <Button variant="primary" onClick={() => loadGrid()}>
               再試行
-            </button>
+            </Button>
           </div>
         ) : gridPosts.length === 0 ? (
           <div className="text-center py-12">

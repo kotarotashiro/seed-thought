@@ -147,7 +147,7 @@ export function PostChatModal({ post, onClose }: { post: PostInfo; onClose: () =
             </div>
           )}
           {error && (
-            <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-xs text-red-700">
+            <div className="bg-danger-light border border-danger/20 rounded-lg p-3 text-xs text-danger">
               {error}
             </div>
           )}

@@ -252,21 +252,21 @@ export default function CollectionDetailPage({
                 type="text"
                 value={editTitle}
                 onChange={(e) => setEditTitle(e.target.value)}
-                className="w-full rounded-xl border border-border bg-white px-3 py-2 text-base font-bold text-text focus:border-accent focus:outline-none"
+                className="w-full rounded-lg border border-border bg-white px-3 py-2 text-base font-bold text-text focus:border-accent focus:outline-none"
                 placeholder="タイトル"
                 autoFocus
               />
               <textarea
                 value={editDescription}
                 onChange={(e) => setEditDescription(e.target.value)}
-                className="w-full resize-y rounded-xl border border-border bg-white px-3 py-2 text-sm text-text-secondary focus:border-accent focus:outline-none"
+                className="w-full resize-y rounded-lg border border-border bg-white px-3 py-2 text-sm text-text-secondary focus:border-accent focus:outline-none"
                 placeholder="説明（任意）"
                 rows={2}
               />
               <textarea
                 value={editIdea}
                 onChange={(e) => setEditIdea(e.target.value)}
-                className="w-full resize-y rounded-xl border border-border bg-white px-3 py-2 text-sm text-text-secondary focus:border-accent focus:outline-none"
+                className="w-full resize-y rounded-lg border border-border bg-white px-3 py-2 text-sm text-text-secondary focus:border-accent focus:outline-none"
                 placeholder="自分のアイディア・視点（任意）"
                 rows={3}
               />

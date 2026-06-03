@@ -107,7 +107,7 @@ function parseLearningOutput(card?: LearningCardView | null): LearningOutput | n
 function SectionHeader({ icon: Icon, title }: { icon: typeof BookOpen; title: string }) {
   return (
     <div className="mb-4 flex items-center gap-2">
-      <Icon className="h-5 w-5 text-accent" />
+      <Icon className="h-5 w-5 text-text-secondary" />
       <h2 className="text-base font-bold text-text">{title}</h2>
     </div>
   );
@@ -131,7 +131,7 @@ function CollapsibleHeader({
       className="flex w-full items-center justify-between gap-2 text-left"
     >
       <div className="flex items-center gap-2">
-        <Icon className="h-5 w-5 text-accent" />
+        <Icon className="h-5 w-5 text-text-secondary" />
         <h2 className="text-base font-bold text-text">{title}</h2>
       </div>
       {open ? <ChevronUp className="h-4 w-4 text-text-muted" /> : <ChevronDown className="h-4 w-4 text-text-muted" />}
@@ -530,8 +530,8 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
     return (
       <div className="mx-auto max-w-4xl space-y-5 animate-pulse">
         <div className="h-8 w-48 rounded bg-border-light" />
-        <div className="h-48 rounded-2xl bg-border-light" />
-        <div className="h-80 rounded-2xl bg-border-light" />
+        <div className="h-48 rounded-xl bg-border-light" />
+        <div className="h-80 rounded-xl bg-border-light" />
       </div>
     );
   }
@@ -557,11 +557,8 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
       {/* Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <div className="mb-2 flex items-center gap-2">
-            <BookOpen className="h-6 w-6 text-accent" />
-            <h1 className="text-xl font-bold text-text sm:text-2xl">学習カード</h1>
-          </div>
-          <p className="text-sm text-text-secondary">
+          <h1 className="text-2xl font-bold tracking-tight text-text sm:text-[28px]">学習カード</h1>
+          <p className="mt-1 text-sm text-text-secondary">
             保存済み投稿を、実践マニュアルと応用メモに変換します。
           </p>
         </div>
@@ -1360,7 +1357,7 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
                 <textarea
                   value={memo}
                   onChange={(event) => setMemo(event.target.value)}
-                  className="min-h-[180px] w-full resize-y rounded-xl border border-border px-4 py-3 text-sm leading-relaxed text-text focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20"
+                  className="min-h-[180px] w-full resize-y rounded-lg border border-border px-4 py-3 text-sm leading-relaxed text-text focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20"
                   placeholder="あとで見返すためのメモを書いてください"
                 />
                 <div className="mt-3 flex gap-2">
@@ -1387,7 +1384,7 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
           {/* 発信コンテンツを作る */}
           <Card>
             <div className="mb-4 flex items-center gap-2">
-              <Sparkles className="h-5 w-5 text-accent" />
+              <Sparkles className="h-5 w-5 text-text-secondary" />
               <h3 className="text-base font-bold text-text">発信コンテンツを作る</h3>
             </div>
             <p className="mb-4 text-sm text-text-secondary">

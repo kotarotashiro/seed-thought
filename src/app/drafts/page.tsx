@@ -14,7 +14,6 @@ import {
   Loader2,
   RefreshCw,
   Send,
-  Share2,
   Trash2,
   X as XIcon,
 } from "lucide-react";
@@ -183,7 +182,7 @@ function XDraftsSection() {
             <span
               className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
                 draft.status === "approved"
-                  ? "bg-emerald-100 text-emerald-700"
+                  ? "bg-success-light text-success"
                   : "bg-border-light text-text-muted"
               }`}
             >
@@ -200,7 +199,7 @@ function XDraftsSection() {
                 value={editContent}
                 onChange={(e) => setEditContent(e.target.value)}
                 rows={5}
-                className="w-full resize-y rounded-xl border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none"
+                className="w-full resize-y rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none"
               />
               <div className="flex gap-2">
                 <Button
@@ -421,14 +420,9 @@ function ExportSection() {
 export default function DraftsPage() {
   return (
     <div className="space-y-8">
-      <div className="flex items-center gap-3">
-        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent-light">
-          <Share2 className="h-5 w-5 text-accent" />
-        </div>
-        <div>
-          <h1 className="text-xl font-bold text-text sm:text-2xl">出す</h1>
-          <p className="mt-0.5 text-xs text-text-secondary">発信・書き出し</p>
-        </div>
+      <div>
+        <h1 className="text-2xl font-bold tracking-tight text-text sm:text-[28px]">出す</h1>
+        <p className="mt-1 text-sm text-text-secondary">発信・書き出し</p>
       </div>
 
       {/* X下書き */}

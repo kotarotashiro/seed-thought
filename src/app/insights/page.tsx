@@ -38,7 +38,7 @@ function InsightSection({
   color: string;
 }) {
   return (
-    <div className="bg-white rounded-2xl border border-border p-5">
+    <div className="bg-white rounded-xl border border-border p-5">
       <div className="flex items-center gap-2 mb-3">
         <Icon className={`w-5 h-5 ${color}`} />
         <h3 className="text-sm font-semibold text-text">{title}</h3>
@@ -146,18 +146,13 @@ export default function InsightsPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-rose-50 flex items-center justify-center">
-            <TrendingUp className="w-5 h-5 text-rose-500" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold text-text">保存傾向</h1>
-            <p className="text-sm text-text-secondary">
-              {data
-                ? `${data.count}件のいいねを分析${data.cachedAt ? ` • 最終分析: ${formatCachedAt(data.cachedAt)}` : ""}`
-                : "いいねした投稿から傾向を分析"}
-            </p>
-          </div>
+        <div className="min-w-0">
+          <h1 className="text-2xl font-bold tracking-tight text-text sm:text-[28px]">保存傾向</h1>
+          <p className="mt-1 text-sm text-text-secondary">
+            {data
+              ? `${data.count}件のいいねを分析${data.cachedAt ? ` • 最終分析: ${formatCachedAt(data.cachedAt)}` : ""}`
+              : "いいねした投稿から傾向を分析"}
+          </p>
         </div>
         <Button variant="ghost" size="sm" onClick={() => load(true)} disabled={loading || reanalyzing}>
           <RefreshCw className={`w-4 h-4 mr-1.5 ${reanalyzing ? "animate-spin" : ""}`} />
@@ -168,7 +163,7 @@ export default function InsightsPage() {
       {loading && (
         <div className="space-y-4">
           {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="bg-white rounded-2xl border border-border p-5 animate-pulse">
+            <div key={i} className="bg-white rounded-xl border border-border p-5 animate-pulse">
               <div className="h-4 bg-border-light rounded w-1/4 mb-3" />
               <div className="flex gap-2">
                 <div className="h-7 bg-border-light rounded-full w-20" />
@@ -181,13 +176,13 @@ export default function InsightsPage() {
       )}
 
       {error && (
-        <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-sm text-red-700">
+        <div className="bg-danger-light border border-danger/20 rounded-xl p-4 text-sm text-danger">
           {error}
         </div>
       )}
 
       {!loading && data && data.count === 0 && (
-        <div className="text-center py-16 bg-white rounded-2xl border border-border">
+        <div className="text-center py-16 bg-white rounded-xl border border-border">
           <Heart className="w-12 h-12 text-text-muted mx-auto mb-3" />
           <h3 className="text-lg font-semibold text-text mb-2">いいねした投稿がありません</h3>
           <p className="text-sm text-text-secondary">
@@ -198,27 +193,27 @@ export default function InsightsPage() {
 
       {!loading && data?.insight && (
         <div className="space-y-4">
-          <div className="bg-gradient-to-br from-rose-50 to-pink-50 rounded-2xl border border-rose-100 p-5">
+          <div className="bg-accent-subtle rounded-xl border border-accent/15 p-5">
             <div className="flex items-center gap-2 mb-2">
-              <Heart className="w-5 h-5 text-rose-500 fill-rose-200" />
-              <span className="text-sm font-semibold text-rose-700">あなたの傾向まとめ</span>
+              <Heart className="w-5 h-5 text-accent" />
+              <span className="text-sm font-semibold text-accent">あなたの傾向まとめ</span>
             </div>
             <p className="text-sm text-text leading-relaxed">{data.insight.summary}</p>
           </div>
 
-          <div className="bg-white rounded-2xl border border-border p-5">
+          <div className="bg-white rounded-xl border border-border p-5">
             <div className="flex items-center gap-2 mb-2">
-              <Lightbulb className="w-5 h-5 text-amber-500" />
+              <Lightbulb className="w-5 h-5 text-text-secondary" />
               <h3 className="text-sm font-semibold text-text">学習スタイル</h3>
             </div>
             <p className="text-sm text-text-secondary leading-relaxed">{data.insight.learningStyle}</p>
           </div>
 
-          <InsightSection title="よく見るカテゴリ" icon={Star} items={data.insight.topCategories} color="text-blue-500" />
-          <InsightSection title="好きなテーマ" icon={Heart} items={data.insight.favoriteThemes} color="text-rose-500" />
-          <InsightSection title="あなたの強み" icon={TrendingUp} items={data.insight.strengths} color="text-green-500" />
+          <InsightSection title="よく見るカテゴリ" icon={Star} items={data.insight.topCategories} color="text-text-secondary" />
+          <InsightSection title="好きなテーマ" icon={Heart} items={data.insight.favoriteThemes} color="text-text-secondary" />
+          <InsightSection title="あなたの強み" icon={TrendingUp} items={data.insight.strengths} color="text-text-secondary" />
 
-          <div className="bg-white rounded-2xl border border-border p-5">
+          <div className="bg-white rounded-xl border border-border p-5">
             <div className="flex items-center gap-2 mb-3">
               <ArrowRight className="w-5 h-5 text-accent" />
               <h3 className="text-sm font-semibold text-text">次に学ぶとよいトピック</h3>
@@ -235,10 +230,10 @@ export default function InsightsPage() {
             </ol>
           </div>
 
-          <div className="bg-white rounded-2xl border border-border p-5">
+          <div className="bg-white rounded-xl border border-border p-5">
             <div className="mb-3 flex items-center justify-between gap-3">
               <div className="flex items-center gap-2">
-                <Globe className="h-5 w-5 text-sky-500" />
+                <Globe className="h-5 w-5 text-text-secondary" />
                 <h3 className="text-sm font-semibold text-text">X 最新トレンド（あなたのカテゴリ）</h3>
               </div>
               <Button variant="ghost" size="sm" onClick={() => loadTrend(true)} disabled={trendLoading}>
@@ -263,7 +258,7 @@ export default function InsightsPage() {
           </div>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div className="bg-white rounded-2xl border border-border p-5">
+            <div className="bg-white rounded-xl border border-border p-5">
               <h3 className="text-sm font-semibold text-text mb-3">カテゴリ分布</h3>
               <div className="space-y-2">
                 {Object.entries(data.stats.categoryCount)
@@ -283,7 +278,7 @@ export default function InsightsPage() {
               </div>
             </div>
 
-            <div className="bg-white rounded-2xl border border-border p-5">
+            <div className="bg-white rounded-xl border border-border p-5">
               <h3 className="text-sm font-semibold text-text mb-3">投稿タイプ分布</h3>
               <div className="space-y-2">
                 {Object.entries(data.stats.typeCount)
@@ -295,7 +290,7 @@ export default function InsightsPage() {
                         <span className="text-xs text-text-muted">{count}</span>
                       </div>
                       <div className="h-1.5 bg-border-light rounded-full overflow-hidden">
-                        <div className="h-full bg-rose-400 rounded-full" style={{ width: `${(count / data.count) * 100}%` }} />
+                        <div className="h-full bg-text-muted rounded-full" style={{ width: `${(count / data.count) * 100}%` }} />
                       </div>
                     </div>
                   ))}

@@ -134,10 +134,10 @@ export function MobileNav() {
                 key={item.href}
                 href={item.href}
                 className={clsx(
-                  "flex min-w-0 flex-col items-center justify-center gap-1 rounded-xl px-1 py-2 text-[10px] font-medium transition-colors",
+                  "flex min-w-0 flex-col items-center justify-center gap-1 rounded-xl px-1 py-1.5 text-[10px] font-medium transition-colors",
                   active
-                    ? "bg-accent-light text-accent"
-                    : "text-text-secondary hover:bg-border-light hover:text-text"
+                    ? "text-accent"
+                    : "text-text-muted hover:text-text"
                 )}
               >
                 <Icon className="h-5 w-5" />
@@ -193,10 +193,10 @@ export function MobileNav() {
                           href={item.href}
                           onClick={closeDrawer}
                           className={clsx(
-                            "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
+                            "flex items-center gap-2.5 rounded-md px-3 py-2 text-sm transition-colors",
                             active
-                              ? "bg-accent-light text-accent"
-                              : "text-text-secondary hover:bg-border-light hover:text-text"
+                              ? "bg-border-light text-text font-semibold"
+                              : "font-medium text-text-secondary hover:bg-border-light hover:text-text"
                           )}
                         >
                           <Icon className="h-[18px] w-[18px] flex-shrink-0" />

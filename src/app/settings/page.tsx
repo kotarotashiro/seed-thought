@@ -12,7 +12,6 @@ import {
   Database,
   Loader2,
   Save,
-  Settings,
   User,
 } from "lucide-react";
 
@@ -531,14 +530,9 @@ export default function SettingsPage() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-5 sm:space-y-6">
-      <div className="flex items-start gap-3 sm:items-center">
-        <div className="w-10 h-10 rounded-xl bg-accent-light flex items-center justify-center">
-          <Settings className="w-5 h-5 text-accent" />
-        </div>
-        <div>
-          <h1 className="text-xl font-bold text-text sm:text-2xl">設定</h1>
-          <p className="text-sm text-text-secondary">アプリケーションの設定を編集</p>
-        </div>
+      <div>
+        <h1 className="text-2xl font-bold tracking-tight text-text sm:text-[28px]">設定</h1>
+        <p className="mt-1 text-sm text-text-secondary">アプリケーションの設定を編集</p>
       </div>
 
       {error && (
@@ -606,7 +600,7 @@ export default function SettingsPage() {
                   value={notionApiKey}
                   onChange={(e) => setNotionApiKey(e.target.value)}
                   placeholder={notionHasApiKey ? "（設定済み・変更する場合のみ入力）" : "secret_..."}
-                  className="flex-1 rounded-xl border border-border bg-white px-4 py-2.5 text-sm text-text outline-none focus:border-accent"
+                  className="flex-1 rounded-lg border border-border bg-white px-4 py-2.5 text-sm text-text outline-none focus:border-accent"
                 />
               </div>
             </div>
@@ -617,7 +611,7 @@ export default function SettingsPage() {
                 value={notionDatabaseId}
                 onChange={(e) => setNotionDatabaseId(e.target.value)}
                 placeholder="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-                className="w-full rounded-xl border border-border bg-white px-4 py-2.5 text-sm text-text outline-none focus:border-accent"
+                className="w-full rounded-lg border border-border bg-white px-4 py-2.5 text-sm text-text outline-none focus:border-accent"
               />
               <p className="text-xs text-text-muted">NotionのデータベースURLの末尾32文字</p>
             </div>
@@ -667,7 +661,7 @@ export default function SettingsPage() {
                   <input
                     value={profile.name}
                     onChange={(e) => setProfile((c) => ({ ...c, name: e.target.value }))}
-                    className="w-full rounded-xl border border-border bg-white px-4 py-3 text-sm text-text outline-none focus:border-accent"
+                    className="w-full rounded-lg border border-border bg-white px-4 py-3 text-sm text-text outline-none focus:border-accent"
                   />
                 </label>
                 <label className="block">
@@ -677,7 +671,7 @@ export default function SettingsPage() {
                     value={profile.role}
                     onChange={(e) => setProfile((c) => ({ ...c, role: e.target.value }))}
                     placeholder="例）AI活用を発信する個人クリエイター"
-                    className="w-full rounded-xl border border-border bg-white px-4 py-3 text-sm text-text outline-none focus:border-accent"
+                    className="w-full rounded-lg border border-border bg-white px-4 py-3 text-sm text-text outline-none focus:border-accent"
                   />
                   <datalist id="role-options">
                     {roleOptions.map((value) => (
@@ -726,7 +720,7 @@ export default function SettingsPage() {
                         }
                       }}
                       placeholder="その他のテーマを追加（Enter）"
-                      className="flex-1 rounded-xl border border-border bg-white px-3 py-2 text-sm text-text outline-none focus:border-accent"
+                      className="flex-1 rounded-lg border border-border bg-white px-3 py-2 text-sm text-text outline-none focus:border-accent"
                     />
                   </div>
                 </div>
@@ -773,7 +767,7 @@ export default function SettingsPage() {
                         }
                       }}
                       placeholder="その他のチャンネルを追加（Enter）"
-                      className="flex-1 rounded-xl border border-border bg-white px-3 py-2 text-sm text-text outline-none focus:border-accent"
+                      className="flex-1 rounded-lg border border-border bg-white px-3 py-2 text-sm text-text outline-none focus:border-accent"
                     />
                   </div>
                 </div>
@@ -784,7 +778,7 @@ export default function SettingsPage() {
                     value={profile.tone}
                     onChange={(e) => setProfile((c) => ({ ...c, tone: e.target.value }))}
                     placeholder="例）やさしく、実用的で、行動につながる文章"
-                    className="w-full rounded-xl border border-border bg-white px-4 py-3 text-sm text-text outline-none focus:border-accent"
+                    className="w-full rounded-lg border border-border bg-white px-4 py-3 text-sm text-text outline-none focus:border-accent"
                   />
                   <datalist id="tone-options">
                     {toneOptions.map((value) => (
@@ -804,7 +798,7 @@ export default function SettingsPage() {
                     onChange={(e) => setProfile((c) => ({ ...c, knowledge: e.target.value }))}
                     placeholder={"例）私はAI活用×Instagram集客を専門とする個人クリエイターです。\n主なターゲットは地方の女性起業家（30〜50代）で、難しい専門用語を使わず、すぐに行動できる実用的なノウハウを届けています。\nSNSの発信歴は3年で、フォロワーは約2,000人です。"}
                     rows={6}
-                    className="w-full rounded-xl border border-border bg-white px-4 py-3 text-sm text-text outline-none focus:border-accent resize-none leading-relaxed"
+                    className="w-full rounded-lg border border-border bg-white px-4 py-3 text-sm text-text outline-none focus:border-accent resize-none leading-relaxed"
                   />
                 </label>
               </div>

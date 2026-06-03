@@ -56,16 +56,11 @@ export default function BookmarkletPage() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-5 sm:space-y-6">
-      <div className="flex items-start gap-3 sm:items-center">
-        <div className="w-10 h-10 rounded-xl bg-accent-light flex items-center justify-center">
-          <Bookmark className="w-5 h-5 text-accent" />
-        </div>
-        <div>
-          <h1 className="text-xl font-bold text-text sm:text-2xl">ブックマークレット</h1>
-          <p className="text-sm text-text-secondary">
-            スマホで X Article 本文を取得するためのブックマーク
-          </p>
-        </div>
+      <div>
+        <h1 className="text-2xl font-bold tracking-tight text-text sm:text-[28px]">ブックマークレット</h1>
+        <p className="mt-1 text-sm text-text-secondary">
+          スマホで X Article 本文を取得するためのブックマーク
+        </p>
       </div>
 
       <Card>
@@ -80,7 +75,7 @@ export default function BookmarkletPage() {
               value={apiBase}
               onChange={(e) => setApiBase(e.target.value)}
               placeholder="https://your-host.example.com"
-              className="w-full rounded-xl border border-border bg-white px-4 py-3 text-sm text-text placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent"
+              className="w-full rounded-lg border border-border bg-white px-4 py-3 text-sm text-text placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent"
             />
             <p className="text-xs text-text-muted">
               スマホからアクセス可能な URL を入れてください（VPN 経由の localhost / Vercel など）。
@@ -96,7 +91,7 @@ export default function BookmarkletPage() {
               value={token}
               onChange={(e) => setToken(e.target.value)}
               placeholder="EXTENSION_TOKEN を設定している場合のみ"
-              className="w-full rounded-xl border border-border bg-white px-4 py-3 text-sm text-text placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent"
+              className="w-full rounded-lg border border-border bg-white px-4 py-3 text-sm text-text placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent"
             />
             <p className="text-xs text-text-muted">
               サーバの環境変数 EXTENSION_TOKEN を設定している場合のみ入力。

@@ -359,27 +359,22 @@ export default function AskAIPage() {
       }
     >
       {/* Header */}
-      <div className="flex flex-shrink-0 items-start justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent-light">
-            <Sparkles className="h-5 w-5 text-accent" />
-          </div>
-          <div>
-            <h1 className="text-xl font-bold text-text sm:text-2xl">AIに聞く</h1>
-            <p className="mt-1 text-xs text-text-secondary">
-              {mode === "chat"
-                ? "保存した投稿をもとに質問できます"
-                : mode === "search"
-                ? "悩みや目標を入力して関連メモを探す"
-                : mode === "research"
-                ? "X・ウェブをライブ検索して知見をまとめる"
-                : "Xアカウントを調べて競合分析する"}
-            </p>
-          </div>
+      <div className="flex flex-shrink-0 flex-col gap-3 md:flex-row md:items-start md:justify-between">
+        <div className="min-w-0">
+          <h1 className="text-2xl font-bold tracking-tight text-text sm:text-[28px]">AIに聞く</h1>
+          <p className="mt-1 text-sm text-text-secondary">
+            {mode === "chat"
+              ? "保存した投稿をもとに質問できます"
+              : mode === "search"
+              ? "悩みや目標を入力して関連メモを探す"
+              : mode === "research"
+              ? "X・ウェブをライブ検索して知見をまとめる"
+              : "Xアカウントを調べて競合分析する"}
+          </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 overflow-x-auto">
           {mode === "chat" && messages.length > 0 && (
-            <Button variant="ghost" size="sm" onClick={clearChat}>
+            <Button variant="ghost" size="sm" onClick={clearChat} className="flex-shrink-0">
               <Trash2 className="mr-1.5 h-4 w-4" />
               履歴をクリア
             </Button>
@@ -387,6 +382,7 @@ export default function AskAIPage() {
           {/* Mode tabs */}
           <SegmentedControl
             size="sm"
+            collapseLabelsOnMobile
             value={mode}
             onChange={(next) => {
               setMode(next);
@@ -408,7 +404,7 @@ export default function AskAIPage() {
           <div ref={scrollRef} className="flex-1 space-y-4 overflow-y-auto px-1 py-2">
             {messages.length === 0 ? (
               <div className="flex h-full flex-col items-center justify-center text-center">
-                <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-accent-light">
+                <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-accent-light">
                   <Sparkles className="h-6 w-6 text-accent" />
                 </div>
                 <p className="text-sm font-semibold text-text">
@@ -478,7 +474,7 @@ export default function AskAIPage() {
               }}
               placeholder="保存した投稿に質問する… (Ctrl/Cmd + Enter で送信)"
               rows={2}
-              className="flex-1 resize-none rounded-xl border border-border bg-white px-3 py-2 text-sm text-text placeholder:text-text-muted focus:border-accent focus:outline-none"
+              className="flex-1 resize-none rounded-lg border border-border bg-white px-3 py-2 text-sm text-text placeholder:text-text-muted focus:border-accent focus:outline-none"
             />
             <Button
               type="submit"
@@ -495,9 +491,9 @@ export default function AskAIPage() {
       {/* ── Search mode ────────────────────────────────────────────────────────── */}
       {mode === "search" && (
         <>
-          <div className="space-y-3 rounded-2xl border border-border bg-white p-5">
+          <div className="space-y-3 rounded-xl border border-border bg-white p-5">
             <div className="mb-1 flex items-center gap-2 text-sm text-text-secondary">
-              <Sparkles className="h-4 w-4 text-purple-500" />
+              <Sparkles className="h-4 w-4 text-accent" />
               <span>AIがあなたの悩みに合った投稿を見つけます</span>
             </div>
             <textarea
@@ -507,7 +503,7 @@ export default function AskAIPage() {
                 if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) void handleSearch();
               }}
               placeholder={"例: SNSのフォロワーを増やすには？\n例: 文章を読みやすくするコツが知りたい"}
-              className="w-full min-h-[100px] resize-none rounded-xl border border-border px-4 py-3 text-sm focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20"
+              className="w-full min-h-[100px] resize-none rounded-lg border border-border px-4 py-3 text-sm focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20"
               rows={3}
             />
             <div className="flex items-center justify-between">
@@ -554,13 +550,13 @@ export default function AskAIPage() {
           )}
 
           {searchError && (
-            <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+            <div className="rounded-xl border border-danger/20 bg-danger-light p-4 text-sm text-danger">
               {searchError}
             </div>
           )}
 
           {searched && results.length === 0 && (
-            <div className="rounded-2xl border border-border bg-white py-12 text-center">
+            <div className="rounded-xl border border-border bg-white py-12 text-center">
               <Search className="mx-auto mb-3 h-10 w-10 text-text-muted" />
               <p className="text-sm text-text-secondary">該当するメモが見つかりませんでした</p>
               <p className="mt-1 text-xs text-text-muted">別のキーワードやフレーズで試してみてください</p>
@@ -580,7 +576,7 @@ export default function AskAIPage() {
                           <Badge>{item.post.classification.primaryCategory}</Badge>
                         </>
                       )}
-                      <span className="rounded-full bg-purple-50 px-2 py-0.5 text-xs font-medium text-purple-600">
+                      <span className="rounded-full bg-accent-light px-2 py-0.5 text-xs font-medium text-accent">
                         関連度 {item.relevanceScore}%
                       </span>
                     </div>
@@ -600,8 +596,8 @@ export default function AskAIPage() {
                     {item.post.classification?.summary || item.post.text}
                   </p>
 
-                  <div className="rounded-lg bg-purple-50 px-3 py-2 text-xs text-purple-700">
-                    <span className="font-medium">関連理由: </span>
+                  <div className="rounded-lg bg-border-light px-3 py-2 text-xs text-text-secondary">
+                    <span className="font-medium text-text">関連理由: </span>
                     {item.reason}
                   </div>
 
@@ -627,9 +623,9 @@ export default function AskAIPage() {
       {/* ── Research mode ───────────────────────────────────────────────────────── */}
       {mode === "research" && (
         <>
-          <div className="space-y-3 rounded-2xl border border-border bg-white p-5">
+          <div className="space-y-3 rounded-xl border border-border bg-white p-5">
             <div className="mb-1 flex items-center gap-2 text-sm text-text-secondary">
-              <Globe className="h-4 w-4 text-blue-500" />
+              <Globe className="h-4 w-4 text-accent" />
               <span>X・ウェブをリアルタイム検索して知見をまとめます</span>
             </div>
             <textarea
@@ -639,7 +635,7 @@ export default function AskAIPage() {
                 if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) void handleResearch();
               }}
               placeholder={"例: AIエージェントの最新動向\n例: Xのアルゴリズム変化と発信戦略"}
-              className="w-full min-h-[100px] resize-none rounded-xl border border-border px-4 py-3 text-sm focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20"
+              className="w-full min-h-[100px] resize-none rounded-lg border border-border px-4 py-3 text-sm focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20"
               rows={3}
             />
             {/* Mode toggle: 通常 / 深掘り */}
@@ -654,7 +650,7 @@ export default function AskAIPage() {
               ]}
             />
             {researchMode === "deep" && (
-              <p className="text-xs text-amber-600">
+              <p className="text-xs text-warning">
                 テーマを複数の観点に分解して並列で調べ、統合レポートを作ります。時間と検索回数（コスト）が通常より増えます（目安: 30〜60秒）。
               </p>
             )}
@@ -673,7 +669,7 @@ export default function AskAIPage() {
           </div>
 
           {researchError && (
-            <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+            <div className="rounded-xl border border-danger/20 bg-danger-light p-4 text-sm text-danger">
               {researchError}
             </div>
           )}
@@ -681,13 +677,14 @@ export default function AskAIPage() {
           {researchResult && (
             <Card className="space-y-4">
               <div className="flex items-start justify-between gap-3">
-                <div className="flex items-center gap-2">
+                <div className="flex min-w-0 items-center gap-2">
                   {researchResult.mode === "deep" && <Badge variant="success">深掘り</Badge>}
-                  <p className="text-sm font-semibold text-text">{researchResult.query}</p>
+                  <p className="min-w-0 break-words text-sm font-semibold text-text">{researchResult.query}</p>
                 </div>
                 <Button
                   size="sm"
                   variant="secondary"
+                  className="flex-shrink-0"
                   onClick={() => void handleCardify()}
                   disabled={cardifying}
                   loading={cardifying}
@@ -719,7 +716,7 @@ export default function AskAIPage() {
                       onClick={() => void handleResearch(h.query, h.mode === "deep" ? "deep" : "quick")}
                       className="flex max-w-[280px] items-center gap-1.5 rounded-full border border-border bg-white px-3 py-1 text-xs text-text-secondary hover:border-accent/40 hover:text-text"
                     >
-                      {h.mode === "deep" && <span className="text-[10px] font-semibold text-emerald-600">深</span>}
+                      {h.mode === "deep" && <span className="text-[10px] font-semibold text-accent">深</span>}
                       <span className="truncate">{h.query}</span>
                     </button>
                   ))}
@@ -733,9 +730,9 @@ export default function AskAIPage() {
       {/* ── Account analysis mode ───────────────────────────────────────────────── */}
       {mode === "account" && (
         <>
-          <div className="space-y-3 rounded-2xl border border-border bg-white p-5">
+          <div className="space-y-3 rounded-xl border border-border bg-white p-5">
             <div className="mb-1 flex items-center gap-2 text-sm text-text-secondary">
-              <AtSign className="h-4 w-4 text-sky-500" />
+              <AtSign className="h-4 w-4 text-accent" />
               <span>Xアカウントの発信傾向・型・強みを競合分析します</span>
             </div>
             <div className="flex flex-col gap-2 sm:flex-row">
@@ -748,7 +745,7 @@ export default function AskAIPage() {
                     if (e.key === "Enter") void handleAccountAnalyze();
                   }}
                   placeholder="調べたいアカウント（例: naikoutetsugaku / @handle / プロフィールURL）"
-                  className="w-full rounded-xl border border-border py-3 pl-9 pr-4 text-sm focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20"
+                  className="w-full rounded-lg border border-border py-3 pl-9 pr-4 text-sm focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20"
                 />
               </div>
               <Button
@@ -769,7 +766,7 @@ export default function AskAIPage() {
               }}
               placeholder="知りたいこと（任意）。例: なぜ短期間でフォロワーを伸ばせているか／伸びた投稿の共通点は？"
               rows={2}
-              className="w-full resize-none rounded-xl border border-border px-4 py-2.5 text-sm focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20"
+              className="w-full resize-none rounded-lg border border-border px-4 py-2.5 text-sm focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20"
             />
             <p className="text-xs text-text-muted">
               対象アカウントの投稿だけをライブ検索して分析します（Grok接続が必要）。質問を書くとそこを重点的に深掘りします。
@@ -777,7 +774,7 @@ export default function AskAIPage() {
           </div>
 
           {accountError && (
-            <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+            <div className="rounded-xl border border-danger/20 bg-danger-light p-4 text-sm text-danger">
               {accountError}
             </div>
           )}
@@ -785,13 +782,14 @@ export default function AskAIPage() {
           {accountResult && (
             <Card className="space-y-4">
               <div className="flex items-start justify-between gap-3">
-                <div className="flex items-center gap-2">
+                <div className="flex min-w-0 items-center gap-2">
                   <Badge variant="success">アカウント分析</Badge>
-                  <p className="text-sm font-semibold text-text">{accountResult.query}</p>
+                  <p className="min-w-0 break-words text-sm font-semibold text-text">{accountResult.query}</p>
                 </div>
                 <Button
                   size="sm"
                   variant="secondary"
+                  className="flex-shrink-0"
                   onClick={() => void handleAccountCardify()}
                   disabled={accountCardifying}
                   loading={accountCardifying}

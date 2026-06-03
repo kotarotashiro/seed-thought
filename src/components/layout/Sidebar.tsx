@@ -174,10 +174,10 @@ export function Sidebar({
                     href={item.href}
                     title={collapsed ? item.label : undefined}
                     className={clsx(
-                      "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200",
+                      "flex items-center gap-2.5 px-3 py-2 rounded-md text-sm transition-colors duration-150",
                       isActive
-                        ? "bg-accent-light text-accent"
-                        : "text-text-secondary hover:bg-border-light hover:text-text"
+                        ? "bg-border-light text-text font-semibold"
+                        : "font-medium text-text-secondary hover:bg-border-light hover:text-text"
                     )}
                   >
                     <Icon className="w-[18px] h-[18px] flex-shrink-0" />

@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/Button";
 export default function NotFound() {
   return (
     <div className="flex min-h-[60vh] flex-col items-center justify-center space-y-6 text-center px-4">
-      <div className="w-16 h-16 rounded-2xl bg-accent-light flex items-center justify-center">
+      <div className="w-16 h-16 rounded-xl bg-accent-light flex items-center justify-center">
         <Sprout className="w-8 h-8 text-accent" />
       </div>
       <div>

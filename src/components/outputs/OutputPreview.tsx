@@ -424,8 +424,8 @@ export function OutputPreview({ title, content, contentJson, outputType, onDelet
             <SeminarSection label="6. 実演パート">
               <div className="space-y-3 text-sm">
                 {s.demonstration.theme && <p className="font-medium text-text">{s.demonstration.theme}</p>}
-                {s.demonstration.badExample && <div className="rounded-lg bg-red-50 px-3 py-2"><p className="text-xs text-red-600 font-medium mb-1">❌ 悪い例</p><p className="text-text-secondary whitespace-pre-wrap">{s.demonstration.badExample}</p></div>}
-                {s.demonstration.goodExample && <div className="rounded-lg bg-green-50 px-3 py-2"><p className="text-xs text-success font-medium mb-1">✅ 良い例</p><p className="text-text-secondary whitespace-pre-wrap">{s.demonstration.goodExample}</p></div>}
+                {s.demonstration.badExample && <div className="rounded-lg bg-danger-light px-3 py-2"><p className="text-xs text-danger font-medium mb-1">❌ 悪い例</p><p className="text-text-secondary whitespace-pre-wrap">{s.demonstration.badExample}</p></div>}
+                {s.demonstration.goodExample && <div className="rounded-lg bg-success-light px-3 py-2"><p className="text-xs text-success font-medium mb-1">✅ 良い例</p><p className="text-text-secondary whitespace-pre-wrap">{s.demonstration.goodExample}</p></div>}
                 {s.demonstration.prompt && <div className="rounded-lg bg-border-light px-3 py-2"><p className="text-xs text-text-muted font-medium mb-1">プロンプト</p><p className="text-text whitespace-pre-wrap font-mono text-xs">{s.demonstration.prompt}</p></div>}
               </div>
             </SeminarSection>

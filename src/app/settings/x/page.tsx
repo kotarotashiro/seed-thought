@@ -262,7 +262,7 @@ export default function XSettingsPage() {
     return (
       <div className="mx-auto max-w-2xl space-y-5 animate-pulse sm:space-y-6">
         <div className="h-8 bg-border-light rounded w-32" />
-        <div className="h-40 bg-border-light rounded-2xl" />
+        <div className="h-40 bg-border-light rounded-xl" />
       </div>
     );
   }
@@ -270,16 +270,11 @@ export default function XSettingsPage() {
   return (
     <div className="mx-auto max-w-2xl space-y-5 sm:space-y-6">
       {/* Header */}
-      <div className="flex items-start gap-3 sm:items-center">
-        <div className="w-10 h-10 rounded-xl bg-accent-light flex items-center justify-center">
-          <Link2 className="w-5 h-5 text-accent" />
-        </div>
-        <div>
-          <h1 className="text-xl font-bold text-text sm:text-2xl">X連携</h1>
-          <p className="text-sm text-text-secondary">
-            Xアカウントを接続して、いいね・ブックマークを同期
-          </p>
-        </div>
+      <div>
+        <h1 className="text-2xl font-bold tracking-tight text-text sm:text-[28px]">X連携</h1>
+        <p className="mt-1 text-sm text-text-secondary">
+          Xアカウントを接続して、いいね・ブックマークを同期
+        </p>
       </div>
 
       {/* Error Display */}

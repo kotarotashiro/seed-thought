@@ -58,7 +58,7 @@ export function PostFilters({
         placeholder="投稿を検索..."
         value={searchQuery}
         onChange={(e) => onSearchChange(e.target.value)}
-        className="w-full rounded-xl border border-border bg-white px-4 py-2.5 text-sm text-text placeholder:text-text-muted transition-colors focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent"
+        className="w-full rounded-lg border border-border bg-white px-4 py-2.5 text-sm text-text placeholder:text-text-muted transition-colors focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent"
       />
 
       {/* Primary filters */}
@@ -101,7 +101,7 @@ export function PostFilters({
         <button
           type="button"
           onClick={() => setExpanded((v) => !v)}
-          className={`flex items-center gap-1.5 rounded-xl border px-3 py-2 text-sm transition-colors ${
+          className={`flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm transition-colors ${
             expanded || detailFilterCount > 0
               ? "border-accent bg-accent-subtle text-accent"
               : "border-border bg-white text-text-secondary hover:border-accent/40 hover:text-text"

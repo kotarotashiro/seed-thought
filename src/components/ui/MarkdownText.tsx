@@ -7,7 +7,7 @@ function renderInline(text: string): React.ReactNode {
       return <strong key={i} className="font-semibold">{seg.slice(2, -2)}</strong>;
     }
     if (seg.startsWith("`") && seg.endsWith("`")) {
-      return <code key={i} className="bg-border-light rounded px-1 py-0.5 text-xs font-mono">{seg.slice(1, -1)}</code>;
+      return <code key={i} className="bg-border-light rounded px-1 py-0.5 text-xs font-mono break-all">{seg.slice(1, -1)}</code>;
     }
     return <Fragment key={i}>{seg}</Fragment>;
   });
@@ -46,7 +46,7 @@ export function MarkdownText({ content, className = "" }: { content: string; cla
           {items.map((item, j) => (
             <li key={j} className="flex gap-1.5 text-sm leading-relaxed">
               <span className="mt-1.5 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-text-muted" />
-              <span>{renderInline(item)}</span>
+              <span className="min-w-0 break-words">{renderInline(item)}</span>
             </li>
           ))}
         </ul>
@@ -64,7 +64,7 @@ export function MarkdownText({ content, className = "" }: { content: string; cla
           {items.map((item, j) => (
             <li key={j} className="flex gap-2 text-sm leading-relaxed">
               <span className="flex-shrink-0 font-mono text-xs text-text-muted mt-0.5">{j + 1}.</span>
-              <span>{renderInline(item)}</span>
+              <span className="min-w-0 break-words">{renderInline(item)}</span>
             </li>
           ))}
         </ol>
@@ -85,5 +85,5 @@ export function MarkdownText({ content, className = "" }: { content: string; cla
     }
   }
 
-  return <div className={`space-y-0.5 ${className}`}>{elements}</div>;
+  return <div className={`space-y-0.5 break-words ${className}`}>{elements}</div>;
 }

@@ -1,29 +1,45 @@
 @import "../../node_modules/tailwindcss/index.css";
 
 @theme {
-  --color-bg: #FAFAF7;
+  /* Surfaces — Notion流の温かいニュートラル。面は白、土台はごく薄い生成り */
+  --color-bg: #FBFBFA;
   --color-bg-card: #FFFFFF;
-  --color-accent: #1B7A6E;
-  --color-accent-light: #E8F5F1;
-  --color-accent-hover: #156B60;
-  --color-accent-subtle: #F0F9F7;
-  --color-text: #1A1A1A;
-  --color-text-secondary: #6B7280;
-  --color-text-muted: #9CA3AF;
-  --color-border: #E5E7EB;
-  --color-border-light: #F3F4F6;
-  --color-danger: #DC2626;
-  --color-danger-light: #FEF2F2;
-  --color-warning: #D97706;
-  --color-warning-light: #FFFBEB;
-  --color-success: #059669;
-  --color-success-light: #ECFDF5;
 
-  --font-sans: 'Inter', 'Noto Sans JP', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  /* Accent — ブランド緑。彩度を抑えた light で「面塗り」しても主張しすぎない */
+  --color-accent: #1B7A6E;
+  --color-accent-light: #EDF4F2;
+  --color-accent-hover: #15665C;
+  --color-accent-subtle: #F5FAF8;
+
+  /* Text — 純黒を避けた温かいダーク。3階調で静かな階層を作る */
+  --color-text: #2C2B29;
+  --color-text-secondary: #6E6D69;
+  --color-text-muted: #9B9A95;
+
+  /* Borders — 構造は影でなく細い境界線で出す（Notion流） */
+  --color-border: #E8E7E4;
+  --color-border-light: #F2F1EF;
+
+  /* Status — 意味があるときだけ使う。彩度はやや落とす */
+  --color-danger: #C0392B;
+  --color-danger-light: #FBF1F0;
+  --color-warning: #B97A1E;
+  --color-warning-light: #FBF6EC;
+  --color-success: #1B7A6E;
+  --color-success-light: #EDF4F2;
+
+  /* System fonts first — Apple/Notion のネイティブな質感に寄せる */
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', 'Noto Sans JP', system-ui, sans-serif;
 }
 
 @layer base {
   body {
     @apply bg-bg text-text font-sans;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* 大見出しは字間を詰めて引き締める（Apple流のタイポ） */
+  h1, h2, h3 {
+    letter-spacing: -0.011em;
   }
 }

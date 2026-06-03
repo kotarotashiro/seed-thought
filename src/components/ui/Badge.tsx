@@ -8,16 +8,17 @@ interface BadgeProps {
   className?: string;
 }
 
+// 彩度を落とした静かなトーンで統一。色は「分類が一目で分かる」最小限に留める。
 const variantStyles = {
   default: "bg-border-light text-text-secondary",
-  thought: "bg-purple-50 text-purple-700",
-  learning: "bg-blue-50 text-blue-700",
-  output: "bg-amber-50 text-amber-700",
+  thought: "bg-[#F4F1F9] text-[#7A5DA8]",
+  learning: "bg-[#EEF3FA] text-[#4A6FA0]",
+  output: "bg-[#FAF4EA] text-[#A87B3C]",
   success: "bg-success-light text-success",
   warning: "bg-warning-light text-warning",
-  like: "bg-rose-50 text-rose-700",
-  bookmark: "bg-sky-50 text-sky-700",
-  manual: "bg-slate-100 text-slate-700",
+  like: "bg-[#FAF1F3] text-[#A85E72]",
+  bookmark: "bg-[#EEF4F9] text-[#4A78A0]",
+  manual: "bg-border-light text-text-secondary",
 };
 
 export function Badge({ children, variant = "default", size = "sm", className }: BadgeProps) {

@@ -45,8 +45,8 @@ type ReviewResult = "again" | "good" | "easy";
 
 const RESULT_LABELS: Record<ReviewResult, { label: string; desc: string; tone: string }> = {
   again: { label: "もう一度", desc: "明日もう一度復習", tone: "border-danger/40 text-danger hover:bg-danger/5" },
-  good: { label: "OK", desc: "間隔を伸ばす", tone: "border-accent/40 text-accent hover:bg-accent/5" },
-  easy: { label: "簡単", desc: "大幅に伸ばす", tone: "border-emerald-400/50 text-emerald-700 hover:bg-emerald-50" },
+  good: { label: "OK", desc: "間隔を伸ばす", tone: "border-warning/40 text-warning hover:bg-warning/5" },
+  easy: { label: "簡単", desc: "大幅に伸ばす", tone: "border-accent/40 text-accent hover:bg-accent/5" },
 };
 
 export default function ReviewPage() {
@@ -142,7 +142,7 @@ export default function ReviewPage() {
       <div className="space-y-6">
         <Header reviewedCount={0} total={0} upcomingCount={upcomingCount} progress={0} />
         <Card className="text-center">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-accent-light">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-accent-light">
             <CheckCircle2 className="h-7 w-7 text-accent" />
           </div>
           <h2 className="text-lg font-bold text-text">今日の復習は完了です 🎉</h2>
@@ -170,7 +170,7 @@ export default function ReviewPage() {
           progress={100}
         />
         <Card className="text-center">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-accent-light">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-accent-light">
             <Sparkles className="h-7 w-7 text-accent" />
           </div>
           <h2 className="text-lg font-bold text-text">本日のセッション完了！</h2>
@@ -234,7 +234,7 @@ export default function ReviewPage() {
         </div>
 
         {/* Question side: summary */}
-        <div className="rounded-2xl border border-border bg-white p-4">
+        <div className="rounded-xl border border-border bg-white p-4">
           <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-text-muted">
             要約
           </p>
@@ -255,7 +255,7 @@ export default function ReviewPage() {
           </div>
         ) : (
           <div className="space-y-4">
-            <div className="rounded-2xl border border-accent/30 bg-accent-light/40 p-4">
+            <div className="rounded-xl border border-accent/30 bg-accent-light/40 p-4">
               <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-accent">
                 核心
               </p>
@@ -273,7 +273,7 @@ export default function ReviewPage() {
               {showManual ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
             </button>
             {showManual && (
-              <div className="rounded-2xl border border-border bg-white p-4">
+              <div className="rounded-xl border border-border bg-white p-4">
                 <p className="whitespace-pre-wrap text-sm leading-relaxed text-text">
                   {current.manual}
                 </p>
@@ -281,7 +281,7 @@ export default function ReviewPage() {
             )}
 
             {current.userMemo && (
-              <div className="rounded-2xl border border-border bg-white p-4">
+              <div className="rounded-xl border border-border bg-white p-4">
                 <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-text-muted">
                   あなたのメモ
                 </p>
@@ -350,17 +350,12 @@ function Header({
 }) {
   return (
     <div>
-      <div className="flex items-center gap-3">
-        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent-light">
-          <Flame className="h-5 w-5 text-accent" />
-        </div>
-        <div className="min-w-0">
-          <h1 className="text-xl font-bold text-text sm:text-2xl">今日の復習</h1>
-          <p className="mt-1 text-xs text-text-secondary">
-            {total > 0 ? `本日 ${total} 件、` : "今日の予定なし、"}
-            将来 {upcomingCount} 件が予定済み
-          </p>
-        </div>
+      <div className="min-w-0">
+        <h1 className="text-2xl font-bold tracking-tight text-text sm:text-[28px]">今日の復習</h1>
+        <p className="mt-1 text-sm text-text-secondary">
+          {total > 0 ? `本日 ${total} 件、` : "今日の予定なし、"}
+          将来 {upcomingCount} 件が予定済み
+        </p>
       </div>
       {total > 0 && (
         <div className="mt-4 h-2 w-full overflow-hidden rounded-full bg-border-light">

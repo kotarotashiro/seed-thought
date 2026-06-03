@@ -225,16 +225,11 @@ export default function CollectionsPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-start justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent-light">
-            <Layers className="h-5 w-5 text-accent" />
-          </div>
-          <div>
-            <h1 className="text-xl font-bold text-text sm:text-2xl">コレクション</h1>
-            <p className="mt-1 text-xs text-text-secondary">
-              複数の学習カードを束ねて、セミナー・メール講座・note記事に再構成
-            </p>
-          </div>
+        <div className="min-w-0">
+          <h1 className="text-2xl font-bold tracking-tight text-text sm:text-[28px]">コレクション</h1>
+          <p className="mt-1 text-sm text-text-secondary">
+            複数の学習カードを束ねて、セミナー・メール講座・note記事に再構成
+          </p>
         </div>
         <Button onClick={() => setShowForm((v) => !v)} size="sm">
           <Plus className="mr-1.5 h-4 w-4" />
@@ -265,7 +260,7 @@ export default function CollectionsPage() {
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="例: AI活用 7日間ミニ講座"
-              className="w-full rounded-xl border border-border bg-white px-3 py-2 text-sm focus:border-accent focus:outline-none"
+              className="w-full rounded-lg border border-border bg-white px-3 py-2 text-sm focus:border-accent focus:outline-none"
             />
           </div>
 
@@ -279,7 +274,7 @@ export default function CollectionsPage() {
               onChange={(e) => setDescription(e.target.value)}
               placeholder="このコレクションの狙い・対象者など"
               rows={2}
-              className="w-full resize-y rounded-xl border border-border bg-white px-3 py-2 text-sm focus:border-accent focus:outline-none"
+              className="w-full resize-y rounded-lg border border-border bg-white px-3 py-2 text-sm focus:border-accent focus:outline-none"
             />
           </div>
 
@@ -296,7 +291,7 @@ export default function CollectionsPage() {
               onChange={(e) => setIdea(e.target.value)}
               placeholder={"例）AIツールを使いこなす前提として「問いを立てる力」が必要だと感じている。\n自分の経験では〇〇の壁にぶつかる受講者が多い。そこを軸にしたい。"}
               rows={3}
-              className="w-full resize-y rounded-xl border border-border bg-white px-3 py-2 text-sm focus:border-accent focus:outline-none"
+              className="w-full resize-y rounded-lg border border-border bg-white px-3 py-2 text-sm focus:border-accent focus:outline-none"
             />
           </div>
 
@@ -384,7 +379,7 @@ export default function CollectionsPage() {
         <p className="py-12 text-center text-sm text-text-muted">読み込み中…</p>
       ) : collections.length === 0 ? (
         <Card className="text-center">
-          <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-border-light">
+          <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-border-light">
             <Layers className="h-6 w-6 text-text-muted" />
           </div>
           <p className="text-sm font-semibold text-text">まだコレクションがありません</p>
@@ -402,7 +397,7 @@ export default function CollectionsPage() {
                 value={listFilter}
                 onChange={(e) => setListFilter(e.target.value)}
                 placeholder="タイトル・説明で絞り込む"
-                className="w-full rounded-xl border border-border bg-white py-2 pl-9 pr-4 text-sm focus:border-accent focus:outline-none"
+                className="w-full rounded-lg border border-border bg-white py-2 pl-9 pr-4 text-sm focus:border-accent focus:outline-none"
               />
             </div>
           )}
