@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/Button";
 import { Textarea } from "@/components/ui/Textarea";
 import { Select } from "@/components/ui/Select";
 import { Card } from "@/components/ui/Card";
+import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { Image as ImageIcon, Mic, PenSquare, Square, Upload } from "lucide-react";
 
 type Tab = "text" | "voice" | "image";
@@ -184,10 +185,10 @@ export default function NewPostPage() {
     analyzeImage(file);
   };
 
-  const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
-    { id: "text", label: "テキスト", icon: <PenSquare className="w-4 h-4" /> },
-    { id: "voice", label: "音声メモ", icon: <Mic className="w-4 h-4" /> },
-    { id: "image", label: "画像解析", icon: <ImageIcon className="w-4 h-4" /> },
+  const TABS: { value: Tab; label: string; icon: React.ReactNode }[] = [
+    { value: "text", label: "テキスト", icon: <PenSquare className="w-4 h-4" /> },
+    { value: "voice", label: "音声メモ", icon: <Mic className="w-4 h-4" /> },
+    { value: "image", label: "画像解析", icon: <ImageIcon className="w-4 h-4" /> },
   ];
 
   return (
@@ -202,21 +203,13 @@ export default function NewPostPage() {
         </div>
       </div>
 
-      <div className="flex gap-1 rounded-xl bg-border-light p-1">
-        {TABS.map(({ id, label, icon }) => (
-          <button
-            key={id}
-            type="button"
-            onClick={() => setTab(id)}
-            className={`flex flex-1 items-center justify-center gap-2 rounded-lg py-2 text-sm font-medium transition-all ${
-              tab === id ? "bg-white text-text shadow-sm" : "text-text-secondary hover:text-text"
-            }`}
-          >
-            {icon}
-            <span className="hidden sm:inline">{label}</span>
-          </button>
-        ))}
-      </div>
+      <SegmentedControl
+        fullWidth
+        collapseLabelsOnMobile
+        value={tab}
+        onChange={setTab}
+        items={TABS}
+      />
 
       <Card>
         {tab === "text" && (
