@@ -2,12 +2,13 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { PostFilters } from "@/components/posts/PostFilters";
 import { PostCard } from "@/components/posts/PostCard";
 import { Button } from "@/components/ui/Button";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
-import { useConfirm } from "@/components/ui/DialogProvider";
-import { Archive, Trash2, CheckSquare, Square, Sparkles } from "lucide-react";
+import { useConfirm, useAlert } from "@/components/ui/DialogProvider";
+import { Archive, Trash2, CheckSquare, Square, Sparkles, BookOpen } from "lucide-react";
 
 interface Author {
   username: string;
@@ -64,6 +65,8 @@ function buildParams(opts: {
 
 export default function PostsPage() {
   const confirm = useConfirm();
+  const alert = useAlert();
+  const router = useRouter();
   const [posts, setPosts] = useState<PostListItem[]>([]);
   const [genres, setGenres] = useState<string[]>([]);
   const [authors, setAuthors] = useState<Author[]>([]);
@@ -83,6 +86,7 @@ export default function PostsPage() {
   const [selectMode, setSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [genProgress, setGenProgress] = useState<{ done: number; total: number } | null>(null);
 
   const sentinelRef = useRef<HTMLDivElement>(null);
 
@@ -239,6 +243,73 @@ export default function PostsPage() {
     }
   };
 
+  // 選択した投稿の学習カードを一括生成する。
+  // 1回の生成がLLM呼び出し（数分かかる場合あり）でVercelの300秒上限に近いため、
+  // サーバ側でループせずクライアント側で1件ずつ逐次に投げる（既存の単体生成APIを再利用）。
+  const handleBulkGenerate = async () => {
+    const targets = posts.filter((p) => selectedIds.has(p.id) && !p.learningCard);
+    const alreadyCount = selectedIds.size - targets.length;
+    if (targets.length === 0) {
+      await alert("選択した投稿はすべて学習カードを作成済みです。");
+      return;
+    }
+    const ok = await confirm({
+      message:
+        `${targets.length}件の学習カードを生成します` +
+        (alreadyCount > 0 ? `（作成済み${alreadyCount}件はスキップ）` : "") +
+        "。\n1件ずつ生成するため数分かかることがあります。完了するまでこのタブを開いたままにしてください。",
+      confirmLabel: "生成する",
+    });
+    if (!ok) return;
+
+    setGenProgress({ done: 0, total: targets.length });
+    let success = 0;
+    let failed = 0;
+    let aborted = false;
+
+    for (let i = 0; i < targets.length; i++) {
+      try {
+        const res = await fetch(`/api/posts/${targets[i].id}/learning`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ learningMode: "content" }),
+        });
+        if (res.ok) {
+          success++;
+        } else {
+          const data = await res.json().catch(() => ({}));
+          if (res.status === 503 && (data as { code?: string }).code === "GROK_TOKEN_EXPIRED") {
+            aborted = true;
+            break;
+          }
+          failed++;
+        }
+      } catch {
+        failed++;
+      }
+      setGenProgress({ done: i + 1, total: targets.length });
+    }
+
+    setGenProgress(null);
+    setSelectMode(false);
+    setSelectedIds(new Set());
+    await reloadPosts();
+
+    if (aborted) {
+      await alert("Grokの認証が切れています。設定から再接続してから、もう一度お試しください。");
+      return;
+    }
+    const go = await confirm({
+      message:
+        `学習カードを${success}件生成しました` +
+        (failed > 0 ? `（失敗${failed}件）` : "") +
+        "。学びメモを見ますか？",
+      confirmLabel: "学びメモを見る",
+      cancelLabel: "閉じる",
+    });
+    if (go) router.push("/knowhow");
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -255,6 +326,7 @@ export default function PostsPage() {
           <Button
             variant={selectMode ? "primary" : "secondary"}
             onClick={toggleSelectMode}
+            disabled={genProgress !== null}
           >
             <CheckSquare className="w-4 h-4 mr-1.5" />
             {selectMode ? "選択を終了" : "選択"}
@@ -299,6 +371,7 @@ export default function PostsPage() {
           <Button
             variant="ghost"
             size="sm"
+            disabled={genProgress !== null}
             onClick={selectedIds.size === posts.length && posts.length > 0 ? deselectAll : selectAll}
           >
             {posts.length > 0 && selectedIds.size === posts.length ? (
@@ -310,12 +383,23 @@ export default function PostsPage() {
           </Button>
           <div className="flex flex-wrap gap-2">
             <Button
+              variant="primary"
+              size="sm"
+              onClick={handleBulkGenerate}
+              loading={genProgress !== null}
+              loadingLabel={genProgress ? `生成中... ${genProgress.done}/${genProgress.total}件` : "生成中..."}
+              disabled={selectedIds.size === 0}
+            >
+              <BookOpen className="h-4 w-4 mr-1.5" />
+              学習カードを生成 ({selectedIds.size})
+            </Button>
+            <Button
               variant="danger"
               size="sm"
               onClick={handleBulkDelete}
               loading={bulkDeleting}
               loadingLabel="削除中..."
-              disabled={selectedIds.size === 0}
+              disabled={selectedIds.size === 0 || genProgress !== null}
             >
               <Trash2 className="h-4 w-4 mr-1.5" />
               削除 ({selectedIds.size})
