@@ -7,7 +7,8 @@ export type ResearchMode = "quick" | "deep";
 export interface ResearchResult {
   id: string;
   query: string;
-  mode: ResearchMode;
+  // "quick" | "deep" | "account"
+  mode: string;
   answer: string;
   createdAt: Date;
 }
@@ -155,10 +156,78 @@ function toResult(session: {
   return {
     id: session.id,
     query: session.query,
-    mode: session.mode === "deep" ? "deep" : "quick",
+    mode: session.mode,
     answer: session.answer,
     createdAt: session.createdAt,
   };
+}
+
+// ── Account analysis（競合分析）─────────────────────────────────────────────────
+// 指定したXアカウントの投稿だけを x_search の allowed_x_handles で絞り込み、
+// 発信傾向・型・強みを競合分析レポートにまとめる。既存の quick/deep と同じく
+// xaiChat（サブスクOAuth優先・APIキーfallback）に乗るため追加課金は基本なし。
+
+/** "@name" / URL / 余分な記号 を取り除き、X handle 本体（英数字と _）を取り出す */
+export function normalizeHandle(input: string): string {
+  let h = input.trim();
+  const urlMatch = h.match(/(?:x|twitter)\.com\/(?:#!\/)?@?([A-Za-z0-9_]{1,15})/i);
+  if (urlMatch) h = urlMatch[1];
+  h = h.replace(/^@+/, "");
+  return h.replace(/[^A-Za-z0-9_]/g, "");
+}
+
+const ACCOUNT_SYSTEM_PROMPT =
+  "あなたはSNS発信・グロースの競合分析が得意なアナリストです。日本語で回答してください。" +
+  "指定されたXアカウントを徹底的に調べ、競合分析レポートとしてMarkdownでまとめてください。" +
+  "分析は直近1〜2日の投稿だけに偏らせず、できるだけ多くの投稿と幅広い期間・話題を確認したうえで一般化してください。" +
+  "定量データを積極的に取得すること: フォロワー数、認証(Blue)バッジの有無、bio（自己紹介）、" +
+  "アカウントの開設時期や本格的な活動開始の時期、投稿頻度、そして代表的に伸びた投稿は" +
+  "『いいね数・リポスト数・閲覧数』の具体的な数値と投稿URLを添えて挙げること。" +
+  "構成: 「## アカウント概要」（何者か・主な発信領域・フォロワー数や規模感・投稿頻度。3〜5行）→" +
+  "「## 主要テーマ」（繰り返し扱う話題を箇条書き）→" +
+  "「## 投稿の型・スタイル」（フック・構成・長さ・メディアの有無・語り口の特徴）→" +
+  "「## 代表的な伸びた投稿」（いいね/リポスト/閲覧数とURL付きで2〜5件。取得できた範囲で）→" +
+  "「## 強み・差別化点」→" +
+  "「## なぜ伸びている / 支持されているか」（フォロワーやエンゲージメントを獲得できている要因を因果で分析）→" +
+  "「## 自分の発信に活かすヒント」（取り入れられる点を3つ）→" +
+  "「## 出典」（参照した投稿のURLや日付。確認できた投稿が少ない場合はサンプルが限定的である旨も明記）。" +
+  "数値が取得できなかった項目は『不明』と明記し、推測は断定せず『〜の傾向』と表現してください。";
+
+export async function runAccountAnalysis(
+  handleInput: string,
+  focus?: string
+): Promise<ResearchResult> {
+  const handle = normalizeHandle(handleInput);
+  if (!handle) {
+    throw new Error("Xアカウント名（@ハンドル）を入力してください");
+  }
+
+  const focusText = focus?.trim();
+  const userContent = focusText
+    ? `@${handle} というXアカウントを徹底的に調べてください。` +
+      `特に次の問いに重点的に答えてください:「${focusText}」。` +
+      "レポートの冒頭に「## ご質問への回答」セクションを置き、そのあとに通常の競合分析を続けてください。"
+    : `@${handle} というXアカウントを競合分析してください。`;
+
+  const result = await xaiChat({
+    messages: [
+      { role: "system", content: ACCOUNT_SYSTEM_PROMPT },
+      { role: "user", content: userContent },
+    ],
+    tools: [
+      {
+        type: "x_search",
+        allowed_x_handles: [handle],
+        enable_image_understanding: true,
+      },
+    ],
+  });
+
+  const session = await prisma.researchSession.create({
+    data: { query: `@${handle}`, mode: "account", source: "manual", answer: result.content },
+  });
+
+  return toResult(session);
 }
 
 export async function getResearchById(id: string): Promise<ResearchResult | null> {

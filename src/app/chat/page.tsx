@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
   ArrowRight,
+  AtSign,
   BookmarkPlus,
   Clock,
   ExternalLink,
@@ -24,7 +25,7 @@ import { useConfirm } from "@/components/ui/DialogProvider";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-type Mode = "chat" | "search" | "research";
+type Mode = "chat" | "search" | "research" | "account";
 
 interface ChatMessage {
   role: "user" | "assistant";
@@ -132,6 +133,14 @@ export default function AskAIPage() {
   const [researchHistory, setResearchHistory] = useState<ResearchHistoryItem[]>([]);
   const [researchHistoryLoaded, setResearchHistoryLoaded] = useState(false);
   const [cardifying, setCardifying] = useState(false);
+
+  // ── Account analysis state ──────────────────────────────────────────────────────
+  const [accountHandle, setAccountHandle] = useState("");
+  const [accountFocus, setAccountFocus] = useState("");
+  const [accountResult, setAccountResult] = useState<{ id: string; query: string; answer: string } | null>(null);
+  const [accountLoading, setAccountLoading] = useState(false);
+  const [accountError, setAccountError] = useState("");
+  const [accountCardifying, setAccountCardifying] = useState(false);
 
   // ── Chat effects ──────────────────────────────────────────────────────────────
 
@@ -295,6 +304,50 @@ export default function AskAIPage() {
     }
   };
 
+  // ── Account analysis handlers ───────────────────────────────────────────────────
+
+  const handleAccountAnalyze = async (h?: string, f?: string) => {
+    const raw = (h ?? accountHandle).trim();
+    if (!raw) return;
+    const focus = (f ?? accountFocus).trim();
+    setAccountHandle(raw);
+    setAccountLoading(true);
+    setAccountError("");
+    setAccountResult(null);
+    try {
+      const res = await fetch("/api/research", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query: raw, mode: "account", focus: focus || undefined }),
+      });
+      const data = (await res.json()) as { id: string; query: string; answer: string; error?: string };
+      if (!res.ok) throw new Error(data.error || "アカウント分析に失敗しました");
+      setAccountResult({ id: data.id, query: data.query, answer: data.answer });
+      setResearchHistory((prev) => [
+        { id: data.id, query: data.query, mode: "account", createdAt: new Date().toISOString() },
+        ...prev,
+      ]);
+    } catch (e) {
+      setAccountError(e instanceof Error ? e.message : "アカウント分析に失敗しました");
+    } finally {
+      setAccountLoading(false);
+    }
+  };
+
+  const handleAccountCardify = async () => {
+    if (!accountResult) return;
+    setAccountCardifying(true);
+    try {
+      const res = await fetch(`/api/research/${accountResult.id}/cardify`, { method: "POST" });
+      const data = (await res.json()) as { postId?: string; error?: string };
+      if (!res.ok || !data.postId) throw new Error(data.error || "カード化に失敗しました");
+      window.location.href = `/posts/${data.postId}/confirm`;
+    } catch (e) {
+      setAccountError(e instanceof Error ? e.message : "カード化に失敗しました");
+      setAccountCardifying(false);
+    }
+  };
+
   // ── Render ────────────────────────────────────────────────────────────────────
 
   return (
@@ -318,7 +371,9 @@ export default function AskAIPage() {
                 ? "保存した投稿をもとに質問できます"
                 : mode === "search"
                 ? "悩みや目標を入力して関連メモを探す"
-                : "X・ウェブをライブ検索して知見をまとめる"}
+                : mode === "research"
+                ? "X・ウェブをライブ検索して知見をまとめる"
+                : "Xアカウントを調べて競合分析する"}
             </p>
           </div>
         </div>
@@ -335,12 +390,13 @@ export default function AskAIPage() {
             value={mode}
             onChange={(next) => {
               setMode(next);
-              if (next === "research") void loadResearchHistory();
+              if (next === "research" || next === "account") void loadResearchHistory();
             }}
             items={[
               { value: "chat", label: "質問", icon: <MessageSquare className="h-3.5 w-3.5" /> },
               { value: "search", label: "検索", icon: <Search className="h-3.5 w-3.5" /> },
               { value: "research", label: "リサーチ", icon: <Globe className="h-3.5 w-3.5" /> },
+              { value: "account", label: "アカウント分析", icon: <AtSign className="h-3.5 w-3.5" /> },
             ]}
           />
         </div>
@@ -647,26 +703,134 @@ export default function AskAIPage() {
             </Card>
           )}
 
-          {!researchResult && researchHistory.length > 0 && (
-            <div className="space-y-2">
-              <p className="flex items-center gap-1 text-xs font-medium text-text-muted">
-                <Clock className="h-3.5 w-3.5" />
-                リサーチ履歴
-              </p>
-              <div className="flex flex-wrap gap-2">
-                {researchHistory.map((h) => (
-                  <button
-                    key={h.id}
-                    onClick={() => void handleResearch(h.query, h.mode === "deep" ? "deep" : "quick")}
-                    className="flex max-w-[280px] items-center gap-1.5 rounded-full border border-border bg-white px-3 py-1 text-xs text-text-secondary hover:border-accent/40 hover:text-text"
-                  >
-                    {h.mode === "deep" && <span className="text-[10px] font-semibold text-emerald-600">深</span>}
-                    <span className="truncate">{h.query}</span>
-                  </button>
-                ))}
+          {(() => {
+            const items = researchHistory.filter((h) => h.mode !== "account");
+            if (researchResult || items.length === 0) return null;
+            return (
+              <div className="space-y-2">
+                <p className="flex items-center gap-1 text-xs font-medium text-text-muted">
+                  <Clock className="h-3.5 w-3.5" />
+                  リサーチ履歴
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {items.map((h) => (
+                    <button
+                      key={h.id}
+                      onClick={() => void handleResearch(h.query, h.mode === "deep" ? "deep" : "quick")}
+                      className="flex max-w-[280px] items-center gap-1.5 rounded-full border border-border bg-white px-3 py-1 text-xs text-text-secondary hover:border-accent/40 hover:text-text"
+                    >
+                      {h.mode === "deep" && <span className="text-[10px] font-semibold text-emerald-600">深</span>}
+                      <span className="truncate">{h.query}</span>
+                    </button>
+                  ))}
+                </div>
               </div>
+            );
+          })()}
+        </>
+      )}
+
+      {/* ── Account analysis mode ───────────────────────────────────────────────── */}
+      {mode === "account" && (
+        <>
+          <div className="space-y-3 rounded-2xl border border-border bg-white p-5">
+            <div className="mb-1 flex items-center gap-2 text-sm text-text-secondary">
+              <AtSign className="h-4 w-4 text-sky-500" />
+              <span>Xアカウントの発信傾向・型・強みを競合分析します</span>
+            </div>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <div className="relative flex-1">
+                <AtSign className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted" />
+                <input
+                  value={accountHandle}
+                  onChange={(e) => setAccountHandle(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") void handleAccountAnalyze();
+                  }}
+                  placeholder="調べたいアカウント（例: naikoutetsugaku / @handle / プロフィールURL）"
+                  className="w-full rounded-xl border border-border py-3 pl-9 pr-4 text-sm focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20"
+                />
+              </div>
+              <Button
+                onClick={() => void handleAccountAnalyze()}
+                loading={accountLoading}
+                loadingLabel="分析中…"
+                disabled={!accountHandle.trim()}
+              >
+                <AtSign className="mr-1.5 h-4 w-4" />
+                分析する
+              </Button>
+            </div>
+            <textarea
+              value={accountFocus}
+              onChange={(e) => setAccountFocus(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) void handleAccountAnalyze();
+              }}
+              placeholder="知りたいこと（任意）。例: なぜ短期間でフォロワーを伸ばせているか／伸びた投稿の共通点は？"
+              rows={2}
+              className="w-full resize-none rounded-xl border border-border px-4 py-2.5 text-sm focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20"
+            />
+            <p className="text-xs text-text-muted">
+              対象アカウントの投稿だけをライブ検索して分析します（Grok接続が必要）。質問を書くとそこを重点的に深掘りします。
+            </p>
+          </div>
+
+          {accountError && (
+            <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+              {accountError}
             </div>
           )}
+
+          {accountResult && (
+            <Card className="space-y-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <Badge variant="success">アカウント分析</Badge>
+                  <p className="text-sm font-semibold text-text">{accountResult.query}</p>
+                </div>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => void handleAccountCardify()}
+                  disabled={accountCardifying}
+                  loading={accountCardifying}
+                  loadingLabel="カード化中…"
+                >
+                  <BookmarkPlus className="mr-1.5 h-4 w-4" />
+                  カード化
+                </Button>
+              </div>
+              <div className="border-t border-border pt-4">
+                <MarkdownText content={accountResult.answer} />
+              </div>
+            </Card>
+          )}
+
+          {(() => {
+            const items = researchHistory.filter((h) => h.mode === "account");
+            if (accountResult || items.length === 0) return null;
+            return (
+              <div className="space-y-2">
+                <p className="flex items-center gap-1 text-xs font-medium text-text-muted">
+                  <Clock className="h-3.5 w-3.5" />
+                  分析履歴
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {items.map((h) => (
+                    <button
+                      key={h.id}
+                      onClick={() => void handleAccountAnalyze(h.query, "")}
+                      className="flex max-w-[280px] items-center gap-1.5 rounded-full border border-border bg-white px-3 py-1 text-xs text-text-secondary hover:border-accent/40 hover:text-text"
+                    >
+                      <AtSign className="h-3 w-3 text-text-muted" />
+                      <span className="truncate">{h.query}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
         </>
       )}
     </div>

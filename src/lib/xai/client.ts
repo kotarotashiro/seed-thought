@@ -10,7 +10,21 @@ import {
 
 const XAI_API_BASE = "https://api.x.ai/v1";
 
-export type XaiTool = { type: "web_search" | "x_search" | "code_interpreter" };
+export type XaiTool =
+  | { type: "web_search" | "code_interpreter" }
+  | {
+      type: "x_search";
+      /** 指定ハンドルの投稿のみを対象にする（最大20件）。excluded とは併用不可。 */
+      allowed_x_handles?: string[];
+      /** 指定ハンドルの投稿を除外する（最大20件）。allowed とは併用不可。 */
+      excluded_x_handles?: string[];
+      /** ISO8601 (YYYY-MM-DD) 期間の下限 */
+      from_date?: string;
+      /** ISO8601 (YYYY-MM-DD) 期間の上限 */
+      to_date?: string;
+      enable_image_understanding?: boolean;
+      enable_video_understanding?: boolean;
+    };
 
 export interface XaiChatOptions {
   model?: string;
