@@ -7,7 +7,8 @@ export type ResearchMode = "quick" | "deep";
 export interface ResearchResult {
   id: string;
   query: string;
-  mode: ResearchMode;
+  // "quick" | "deep" | "account"
+  mode: string;
   answer: string;
   createdAt: Date;
 }
@@ -155,10 +156,61 @@ function toResult(session: {
   return {
     id: session.id,
     query: session.query,
-    mode: session.mode === "deep" ? "deep" : "quick",
+    mode: session.mode,
     answer: session.answer,
     createdAt: session.createdAt,
   };
+}
+
+// ── Account analysis（競合分析）─────────────────────────────────────────────────
+// 指定したXアカウントの投稿だけを x_search の allowed_x_handles で絞り込み、
+// 発信傾向・型・強みを競合分析レポートにまとめる。既存の quick/deep と同じく
+// xaiChat（サブスクOAuth優先・APIキーfallback）に乗るため追加課金は基本なし。
+
+/** "@name" / URL / 余分な記号 を取り除き、X handle 本体（英数字と _）を取り出す */
+export function normalizeHandle(input: string): string {
+  let h = input.trim();
+  const urlMatch = h.match(/(?:x|twitter)\.com\/(?:#!\/)?@?([A-Za-z0-9_]{1,15})/i);
+  if (urlMatch) h = urlMatch[1];
+  h = h.replace(/^@+/, "");
+  return h.replace(/[^A-Za-z0-9_]/g, "");
+}
+
+const ACCOUNT_SYSTEM_PROMPT =
+  "あなたはSNS発信の競合分析が得意なアナリストです。日本語で回答してください。" +
+  "指定されたXアカウントの最近の投稿を調べ、その発信を競合分析レポートとしてMarkdownでまとめてください。" +
+  "構成: 「## アカウント概要」（何者か・主な発信領域を2〜3行）→" +
+  "「## 主要テーマ」（繰り返し扱う話題を箇条書き）→" +
+  "「## 投稿の型・スタイル」（フック・構成・長さ・語り口の特徴）→" +
+  "「## 強み・差別化点」→「## 反応が良い投稿の傾向」（伸びている投稿の共通点。分かる範囲で）→" +
+  "「## 自分の発信に活かすヒント」（取り入れられる点を3つ）→「## 出典」（参照した投稿のURLや日付）。" +
+  "推測は断定せず『〜の傾向』と表現し、投稿が十分に取得できない場合はその旨を明記してください。";
+
+export async function runAccountAnalysis(handleInput: string): Promise<ResearchResult> {
+  const handle = normalizeHandle(handleInput);
+  if (!handle) {
+    throw new Error("Xアカウント名（@ハンドル）を入力してください");
+  }
+
+  const result = await xaiChat({
+    messages: [
+      { role: "system", content: ACCOUNT_SYSTEM_PROMPT },
+      { role: "user", content: `@${handle} というXアカウントを競合分析してください。` },
+    ],
+    tools: [
+      {
+        type: "x_search",
+        allowed_x_handles: [handle],
+        enable_image_understanding: true,
+      },
+    ],
+  });
+
+  const session = await prisma.researchSession.create({
+    data: { query: `@${handle}`, mode: "account", source: "manual", answer: result.content },
+  });
+
+  return toResult(session);
 }
 
 export async function getResearchById(id: string): Promise<ResearchResult | null> {

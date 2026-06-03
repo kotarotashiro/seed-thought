@@ -12,12 +12,14 @@ export async function POST(
       return NextResponse.json({ error: "リサーチセッションが見つかりません" }, { status: 404 });
     }
 
+    const isAccount = session.mode === "account";
+    const label = isAccount ? "アカウント分析" : "リサーチ";
     const post = await prisma.post.create({
       data: {
         source: "user_manual",
         savedType: "manual",
-        text: `【リサーチ】${session.query}\n\n${session.answer}`,
-        authorName: "リサーチ結果",
+        text: `【${label}】${session.query}\n\n${session.answer}`,
+        authorName: isAccount ? "アカウント分析" : "リサーチ結果",
         authorUsername: "research",
         enrichmentStatus: "done",
       },

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { runResearch, runDeepResearch, getResearchHistory } from "@/lib/research/run";
+import { runResearch, runDeepResearch, runAccountAnalysis, getResearchHistory } from "@/lib/research/run";
 
 export const maxDuration = 300;
 
@@ -20,7 +20,12 @@ export async function POST(request: Request) {
     if (!query) {
       return NextResponse.json({ error: "クエリを入力してください" }, { status: 400 });
     }
-    const result = body.mode === "deep" ? await runDeepResearch(query) : await runResearch(query);
+    const result =
+      body.mode === "account"
+        ? await runAccountAnalysis(query)
+        : body.mode === "deep"
+        ? await runDeepResearch(query)
+        : await runResearch(query);
     return NextResponse.json(result);
   } catch (error) {
     const message = error instanceof Error ? error.message : "failed";
