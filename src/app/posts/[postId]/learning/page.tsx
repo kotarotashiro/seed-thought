@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState, use } from "react";
 import { useSafeBack } from "@/hooks/useSafeBack";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { Badge, LearningStatusBadge } from "@/components/ui/Badge";
 import { useConfirm, useAlert } from "@/components/ui/DialogProvider";
 import { PostMediaGrid, parsePostMedia } from "@/components/posts/PostMediaGrid";
@@ -567,30 +568,15 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
         <div className="flex flex-col items-start gap-2 sm:items-end">
           <div className="flex items-center gap-2">
             {/* Mode toggle */}
-            <div className="flex rounded-full border border-border bg-border-light p-0.5">
-              <button
-                type="button"
-                onClick={() => handleModeToggle("content")}
-                className={
-                  learningMode === "content"
-                    ? "rounded-full bg-white px-3 py-1 text-xs font-medium text-text shadow-sm"
-                    : "rounded-full px-3 py-1 text-xs font-medium text-text-secondary hover:text-text"
-                }
-              >
-                内容
-              </button>
-              <button
-                type="button"
-                onClick={() => handleModeToggle("format")}
-                className={
-                  learningMode === "format"
-                    ? "rounded-full bg-white px-3 py-1 text-xs font-medium text-text shadow-sm"
-                    : "rounded-full px-3 py-1 text-xs font-medium text-text-secondary hover:text-text"
-                }
-              >
-                型
-              </button>
-            </div>
+            <SegmentedControl
+              size="sm"
+              value={learningMode}
+              onChange={handleModeToggle}
+              items={[
+                { value: "content", label: "内容" },
+                { value: "format", label: "型" },
+              ]}
+            />
             <LearningStatusBadge learningCard={card} />
             {card && (
               <div className="relative" ref={menuRef}>

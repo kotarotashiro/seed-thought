@@ -15,10 +15,10 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { clsx } from "clsx";
 import { Badge, PostTypeBadge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { MarkdownText } from "@/components/ui/MarkdownText";
 import { useConfirm } from "@/components/ui/DialogProvider";
 
@@ -330,47 +330,19 @@ export default function AskAIPage() {
             </Button>
           )}
           {/* Mode tabs */}
-          <div className="flex rounded-xl border border-border bg-border-light p-0.5">
-            <button
-              type="button"
-              onClick={() => setMode("chat")}
-              className={clsx(
-                "flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors",
-                mode === "chat"
-                  ? "bg-white text-text shadow-sm"
-                  : "text-text-secondary hover:text-text"
-              )}
-            >
-              <MessageSquare className="h-3.5 w-3.5" />
-              質問
-            </button>
-            <button
-              type="button"
-              onClick={() => setMode("search")}
-              className={clsx(
-                "flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors",
-                mode === "search"
-                  ? "bg-white text-text shadow-sm"
-                  : "text-text-secondary hover:text-text"
-              )}
-            >
-              <Search className="h-3.5 w-3.5" />
-              検索
-            </button>
-            <button
-              type="button"
-              onClick={() => { setMode("research"); void loadResearchHistory(); }}
-              className={clsx(
-                "flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors",
-                mode === "research"
-                  ? "bg-white text-text shadow-sm"
-                  : "text-text-secondary hover:text-text"
-              )}
-            >
-              <Globe className="h-3.5 w-3.5" />
-              リサーチ
-            </button>
-          </div>
+          <SegmentedControl
+            size="sm"
+            value={mode}
+            onChange={(next) => {
+              setMode(next);
+              if (next === "research") void loadResearchHistory();
+            }}
+            items={[
+              { value: "chat", label: "質問", icon: <MessageSquare className="h-3.5 w-3.5" /> },
+              { value: "search", label: "検索", icon: <Search className="h-3.5 w-3.5" /> },
+              { value: "research", label: "リサーチ", icon: <Globe className="h-3.5 w-3.5" /> },
+            ]}
+          />
         </div>
       </div>
 
@@ -615,28 +587,16 @@ export default function AskAIPage() {
               rows={3}
             />
             {/* Mode toggle: 通常 / 深掘り */}
-            <div className="flex rounded-xl border border-border bg-border-light p-0.5">
-              <button
-                type="button"
-                onClick={() => setResearchMode("quick")}
-                className={clsx(
-                  "flex-1 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors",
-                  researchMode === "quick" ? "bg-white text-text shadow-sm" : "text-text-secondary hover:text-text"
-                )}
-              >
-                通常（1回検索・速い）
-              </button>
-              <button
-                type="button"
-                onClick={() => setResearchMode("deep")}
-                className={clsx(
-                  "flex-1 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors",
-                  researchMode === "deep" ? "bg-white text-text shadow-sm" : "text-text-secondary hover:text-text"
-                )}
-              >
-                深掘り（複数観点・詳しい）
-              </button>
-            </div>
+            <SegmentedControl
+              size="sm"
+              fullWidth
+              value={researchMode}
+              onChange={setResearchMode}
+              items={[
+                { value: "quick", label: "通常（1回検索・速い）" },
+                { value: "deep", label: "深掘り（複数観点・詳しい）" },
+              ]}
+            />
             {researchMode === "deep" && (
               <p className="text-xs text-amber-600">
                 テーマを複数の観点に分解して並列で調べ、統合レポートを作ります。時間と検索回数（コスト）が通常より増えます（目安: 30〜60秒）。

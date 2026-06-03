@@ -19,6 +19,7 @@ import {
 import { Badge, LearningStatusBadge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { SelectionBadge } from "@/components/ui/SelectionBadge";
 import { useConfirm } from "@/components/ui/DialogProvider";
 import { ExportButton } from "@/components/share/ExportButton";
 
@@ -341,20 +342,16 @@ export default function KnowhowPage() {
               <Card
                 key={card.id}
                 hoverable={selectMode}
-                className={`flex flex-col gap-4 ${selectMode && isSelected ? "ring-2 ring-accent" : ""}`}
+                className={`relative flex flex-col gap-4 ${selectMode && isSelected ? "ring-2 ring-accent" : ""}`}
                 onClick={selectMode ? () => toggleCard(card.id) : undefined}
               >
+                {selectMode && (
+                  <div className="absolute top-3 right-3 z-10">
+                    <SelectionBadge selected={isSelected} />
+                  </div>
+                )}
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
-                    {selectMode && (
-                      <div className="mb-2 flex items-center gap-2">
-                        {isSelected ? (
-                          <CheckSquare className="h-4 w-4 flex-shrink-0 text-accent" />
-                        ) : (
-                          <Square className="h-4 w-4 flex-shrink-0 text-text-muted" />
-                        )}
-                      </div>
-                    )}
                     <div className="mb-2 flex flex-wrap items-center gap-2">
                       <LearningStatusBadge learningCard={card} />
                       <Badge>{category}</Badge>

@@ -5,8 +5,9 @@ import Link from "next/link";
 import { PostFilters } from "@/components/posts/PostFilters";
 import { PostCard } from "@/components/posts/PostCard";
 import { Button } from "@/components/ui/Button";
+import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { useConfirm } from "@/components/ui/DialogProvider";
-import { Archive, Trash2, CheckSquare, Sparkles } from "lucide-react";
+import { Archive, Trash2, CheckSquare, Square, Sparkles } from "lucide-react";
 
 interface Author {
   username: string;
@@ -250,68 +251,29 @@ export default function PostsPage() {
             <p className="text-sm text-text-secondary">{posts.length}件を表示中</p>
           </div>
         </div>
-        <div className="flex gap-2 sm:flex-shrink-0">
-          {selectMode ? (
-            <>
-              <Button variant="ghost" size="sm" onClick={selectedIds.size === posts.length ? deselectAll : selectAll}>
-                {selectedIds.size === posts.length ? "全解除" : "全選択"}
-              </Button>
-              <Button
-                variant="danger"
-                size="sm"
-                onClick={handleBulkDelete}
-                loading={bulkDeleting}
-                loadingLabel="削除中..."
-                disabled={selectedIds.size === 0}
-              >
-                <Trash2 className="w-4 h-4 mr-1" />
-                削除 ({selectedIds.size})
-              </Button>
-              <Button variant="secondary" size="sm" onClick={toggleSelectMode}>
-                キャンセル
-              </Button>
-            </>
-          ) : (
-            <>
-              <Button variant="secondary" className="w-full sm:w-auto" onClick={toggleSelectMode}>
-                <CheckSquare className="w-4 h-4 mr-1.5" />
-                選択
-              </Button>
-              <Link href="/posts/new" className="sm:flex-shrink-0">
-                <Button className="w-full sm:w-auto">投稿を追加</Button>
-              </Link>
-            </>
-          )}
+        <div className="flex items-center gap-2 sm:flex-shrink-0">
+          <Button
+            variant={selectMode ? "primary" : "secondary"}
+            onClick={toggleSelectMode}
+          >
+            <CheckSquare className="w-4 h-4 mr-1.5" />
+            {selectMode ? "選択を終了" : "選択"}
+          </Button>
+          <Link href="/posts/new" className="sm:flex-shrink-0">
+            <Button>投稿を追加</Button>
+          </Link>
         </div>
       </div>
 
       {/* Source tabs */}
-      <div className="flex rounded-full border border-border bg-border-light p-1 w-fit">
-        <button
-          type="button"
-          onClick={() => setActiveTab("saved")}
-          className={`flex items-center gap-1.5 rounded-full px-4 py-1.5 text-sm font-medium transition-all ${
-            activeTab === "saved"
-              ? "bg-white text-text shadow-sm"
-              : "text-text-secondary hover:text-text"
-          }`}
-        >
-          <Archive className="h-3.5 w-3.5" />
-          保存済み
-        </button>
-        <button
-          type="button"
-          onClick={() => setActiveTab("recommend")}
-          className={`flex items-center gap-1.5 rounded-full px-4 py-1.5 text-sm font-medium transition-all ${
-            activeTab === "recommend"
-              ? "bg-white text-accent shadow-sm"
-              : "text-text-secondary hover:text-text"
-          }`}
-        >
-          <Sparkles className="h-3.5 w-3.5" />
-          おすすめ
-        </button>
-      </div>
+      <SegmentedControl
+        value={activeTab}
+        onChange={setActiveTab}
+        items={[
+          { value: "saved", label: "保存済み", icon: <Archive className="h-3.5 w-3.5" /> },
+          { value: "recommend", label: "おすすめ", icon: <Sparkles className="h-3.5 w-3.5" /> },
+        ]}
+      />
 
       <PostFilters
         genres={genres}
@@ -331,6 +293,36 @@ export default function PostsPage() {
         onAuthorChange={setSelectedAuthor}
         onSearchChange={setSearchQuery}
       />
+
+      {selectMode && (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border bg-white px-4 py-3">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={selectedIds.size === posts.length && posts.length > 0 ? deselectAll : selectAll}
+          >
+            {posts.length > 0 && selectedIds.size === posts.length ? (
+              <CheckSquare className="h-4 w-4 mr-1.5 text-accent" />
+            ) : (
+              <Square className="h-4 w-4 mr-1.5 text-text-muted" />
+            )}
+            全選択
+          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="danger"
+              size="sm"
+              onClick={handleBulkDelete}
+              loading={bulkDeleting}
+              loadingLabel="削除中..."
+              disabled={selectedIds.size === 0}
+            >
+              <Trash2 className="h-4 w-4 mr-1.5" />
+              削除 ({selectedIds.size})
+            </Button>
+          </div>
+        </div>
+      )}
 
       {loading ? (
         <div className="space-y-3">
