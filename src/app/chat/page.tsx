@@ -136,6 +136,7 @@ export default function AskAIPage() {
 
   // ── Account analysis state ──────────────────────────────────────────────────────
   const [accountHandle, setAccountHandle] = useState("");
+  const [accountFocus, setAccountFocus] = useState("");
   const [accountResult, setAccountResult] = useState<{ id: string; query: string; answer: string } | null>(null);
   const [accountLoading, setAccountLoading] = useState(false);
   const [accountError, setAccountError] = useState("");
@@ -305,9 +306,10 @@ export default function AskAIPage() {
 
   // ── Account analysis handlers ───────────────────────────────────────────────────
 
-  const handleAccountAnalyze = async (h?: string) => {
+  const handleAccountAnalyze = async (h?: string, f?: string) => {
     const raw = (h ?? accountHandle).trim();
     if (!raw) return;
+    const focus = (f ?? accountFocus).trim();
     setAccountHandle(raw);
     setAccountLoading(true);
     setAccountError("");
@@ -316,7 +318,7 @@ export default function AskAIPage() {
       const res = await fetch("/api/research", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query: raw, mode: "account" }),
+        body: JSON.stringify({ query: raw, mode: "account", focus: focus || undefined }),
       });
       const data = (await res.json()) as { id: string; query: string; answer: string; error?: string };
       if (!res.ok) throw new Error(data.error || "アカウント分析に失敗しました");
@@ -759,8 +761,18 @@ export default function AskAIPage() {
                 分析する
               </Button>
             </div>
+            <textarea
+              value={accountFocus}
+              onChange={(e) => setAccountFocus(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) void handleAccountAnalyze();
+              }}
+              placeholder="知りたいこと（任意）。例: なぜ短期間でフォロワーを伸ばせているか／伸びた投稿の共通点は？"
+              rows={2}
+              className="w-full resize-none rounded-xl border border-border px-4 py-2.5 text-sm focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20"
+            />
             <p className="text-xs text-text-muted">
-              対象アカウントの投稿だけをライブ検索して分析します（Grok接続が必要）。
+              対象アカウントの投稿だけをライブ検索して分析します（Grok接続が必要）。質問を書くとそこを重点的に深掘りします。
             </p>
           </div>
 
@@ -808,7 +820,7 @@ export default function AskAIPage() {
                   {items.map((h) => (
                     <button
                       key={h.id}
-                      onClick={() => void handleAccountAnalyze(h.query)}
+                      onClick={() => void handleAccountAnalyze(h.query, "")}
                       className="flex max-w-[280px] items-center gap-1.5 rounded-full border border-border bg-white px-3 py-1 text-xs text-text-secondary hover:border-accent/40 hover:text-text"
                     >
                       <AtSign className="h-3 w-3 text-text-muted" />

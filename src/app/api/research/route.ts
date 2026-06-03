@@ -15,14 +15,14 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json() as { query?: string; mode?: string };
+    const body = await request.json() as { query?: string; mode?: string; focus?: string };
     const query = body.query?.trim();
     if (!query) {
       return NextResponse.json({ error: "クエリを入力してください" }, { status: 400 });
     }
     const result =
       body.mode === "account"
-        ? await runAccountAnalysis(query)
+        ? await runAccountAnalysis(query, body.focus)
         : body.mode === "deep"
         ? await runDeepResearch(query)
         : await runResearch(query);
