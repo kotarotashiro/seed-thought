@@ -266,6 +266,10 @@ export interface PostContext {
   tags?: string[];
   sourceUrl?: string | null;
   authorUsername?: string | null;
+  /** 学習カードが生成済みの場合に含まれるフィールド */
+  cardId?: string | null;
+  cardTitle?: string | null;
+  coreInsight?: string | null;
 }
 
 // 工程ごとの設定（settings）を上書きして、その場限りで使うモデルを指定する。

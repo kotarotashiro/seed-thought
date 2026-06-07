@@ -20,26 +20,50 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "メッセージを入力してください" }, { status: 400 });
     }
 
-    // If a specific postId is given, fetch it first so it leads the context
+    // フォーカス投稿（カード経由で会話に入った場合）を最優先で文脈に入れる
     const focusPost = postId
       ? await prisma.post.findUnique({
           where: { id: postId },
-          include: { classification: true },
+          include: {
+            classification: true,
+            learningCard: true,
+          },
         })
       : null;
 
-    const posts = await prisma.post.findMany({
+    // 学習カード済みの投稿を優先取得（カード未生成の投稿も補完として含める）
+    const postsWithCards = await prisma.post.findMany({
       where: {
         classification: { isNot: null },
+        learningCard: { isNot: null },
         ...(postId ? { id: { not: postId } } : {}),
       },
-      include: { classification: true },
+      include: {
+        classification: true,
+        learningCard: true,
+      },
       orderBy: { savedAt: "desc" },
-      take: 30,
+      take: 25,
     });
 
-    type PostWithClassification = (typeof posts)[0];
-    const toContext = (p: PostWithClassification) => ({
+    const postsWithoutCards = await prisma.post.findMany({
+      where: {
+        classification: { isNot: null },
+        learningCard: null,
+        ...(postId ? { id: { not: postId } } : {}),
+      },
+      include: {
+        classification: true,
+        learningCard: true,
+      },
+      orderBy: { savedAt: "desc" },
+      take: Math.max(0, 30 - postsWithCards.length),
+    });
+
+    const allPosts = [...postsWithCards, ...postsWithoutCards];
+
+    type PostWithCard = (typeof allPosts)[0];
+    const toContext = (p: PostWithCard) => ({
       id: p.id,
       text: p.text,
       summary: p.classification?.summary,
@@ -47,11 +71,15 @@ export async function POST(request: Request) {
       tags: p.classification ? (JSON.parse(p.classification.tagsJson || "[]") as string[]) : [],
       sourceUrl: p.sourceUrl,
       authorUsername: p.authorUsername,
+      // 学習カード情報（生成済みの場合のみ）
+      cardId: p.learningCard?.id ?? null,
+      cardTitle: p.learningCard?.title ?? null,
+      coreInsight: p.learningCard?.coreInsight ?? null,
     });
 
     const postContexts = [
       ...(focusPost ? [toContext(focusPost)] : []),
-      ...posts.map(toContext),
+      ...allPosts.map(toContext),
     ];
 
     const reply = await getAiProvider().chat(message.trim(), history, postContexts);

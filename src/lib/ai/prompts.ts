@@ -888,6 +888,10 @@ export async function buildChatPrompt(
       parts.push(`本文: ${p.text.slice(0, 300)}${p.text.length > 300 ? "..." : ""}`);
       if (p.authorUsername) parts.push(`投稿者: @${p.authorUsername}`);
       if (p.sourceUrl) parts.push(`URL: ${p.sourceUrl}`);
+      // 学習カード情報（生成済みの場合のみ）
+      if (p.cardTitle) parts.push(`学習カードタイトル: ${p.cardTitle}`);
+      if (p.coreInsight) parts.push(`核心・本質: ${p.coreInsight}`);
+      if (p.cardId) parts.push(`学習カードURL: /posts/${p.id}/learning`);
       return parts.join("\n");
     })
     .join("\n\n---\n\n");
@@ -915,6 +919,12 @@ ${message}
 ## 回答ルール
 - 上記の保存投稿を参考にして回答してください
 - 投稿の内容に触れるときは「投稿1によると」「@username の投稿では」のように出典を明示してください
+- 学習カードが生成済みの投稿（「学習カードURL」フィールドがあるもの）に触れる場合は、
+  [カードタイトル](学習カードURL) の形式でMarkdownリンクを含めてください
+- 「関連するカードは？」「似た内容は？」などの質問には、上記の学習カード一覧から
+  関連するものを探し、リンク付きで列挙してください
+- 「発信ネタにして」「Xツイートにして」などの指示には、まずどのカードの内容を使うか提案し、
+  ユーザーが選んだら /posts/{postId}/learning を開いて発信機能を使うよう案内してください
 - 投稿に関係ない質問も、プロフィールのテーマに沿って答えてください
 - マークダウンで読みやすく整理してください
 - 回答は日本語で、${profile.name}さんに向けた丁寧なトーンで書いてください`;

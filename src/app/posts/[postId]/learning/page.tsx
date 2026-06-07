@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, use } from "react";
+import Link from "next/link";
 import { useSafeBack } from "@/hooks/useSafeBack";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -21,6 +22,7 @@ import {
   AlertCircle,
   ArrowLeft,
   BookOpen,
+  MessageSquare,
   CheckCircle2,
   ChevronDown,
   ChevronUp,
@@ -602,6 +604,12 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
           </div>
           {card && output && (
             <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+              <Link href={`/chat?postId=${post.id}`}>
+                <Button variant="secondary" size="sm" type="button">
+                  <MessageSquare className="mr-1.5 h-3.5 w-3.5" />
+                  AIに聞く
+                </Button>
+              </Link>
               <Button variant="secondary" size="sm" onClick={handleCopyAll}>
                 {copiedAll ? (
                   <><CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />コピーしました</>

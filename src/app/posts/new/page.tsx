@@ -7,9 +7,9 @@ import { Textarea } from "@/components/ui/Textarea";
 import { Select } from "@/components/ui/Select";
 import { Card } from "@/components/ui/Card";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
-import { Image as ImageIcon, Mic, PenSquare, Square, Upload } from "lucide-react";
+import { Globe, Image as ImageIcon, Loader2, Mic, PenSquare, Square, Upload, Video } from "lucide-react";
 
-type Tab = "text" | "voice" | "image";
+type Tab = "text" | "article" | "youtube" | "voice" | "image";
 
 interface SpeechRecognitionResultLike {
   isFinal: boolean;
@@ -67,6 +67,15 @@ export default function NewPostPage() {
   const [analyzing, setAnalyzing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
+  // Article tab
+  const [articleUrl, setArticleUrl] = useState("");
+  const [articleFetching, setArticleFetching] = useState(false);
+
+  // YouTube tab
+  const [youtubeUrl, setYoutubeUrl] = useState("");
+  const [youtubeFetching, setYoutubeFetching] = useState(false);
+
+  // テキストタブ: 保存
   const handleSave = async (andLearn: boolean = false) => {
     if (!text.trim()) {
       setError("投稿本文を入力してください");
@@ -107,6 +116,73 @@ export default function NewPostPage() {
     }
   };
 
+  // 記事URL: 取り込み
+  const handleArticleSave = async (andLearn: boolean = false) => {
+    if (!articleUrl.trim()) {
+      setError("URLを入力してください");
+      return;
+    }
+    if (!/^https?:\/\/.+/.test(articleUrl.trim())) {
+      setError("有効なURLを入力してください（https://... の形式）");
+      return;
+    }
+    setArticleFetching(true);
+    setError("");
+    try {
+      const res = await fetch("/api/posts/from-article", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: articleUrl.trim(), andLearn }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "記事の取り込みに失敗しました");
+        return;
+      }
+      if (andLearn && data.postId) {
+        router.push(`/posts/${data.postId}/confirm`);
+      } else {
+        router.push("/posts");
+      }
+    } catch {
+      setError("記事の取り込みに失敗しました");
+    } finally {
+      setArticleFetching(false);
+    }
+  };
+
+  // YouTube URL: 取り込み
+  const handleYoutubeSave = async (andLearn: boolean = false) => {
+    if (!youtubeUrl.trim()) {
+      setError("YouTubeのURLを入力してください");
+      return;
+    }
+    setYoutubeFetching(true);
+    setError("");
+    try {
+      const res = await fetch("/api/posts/from-youtube", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: youtubeUrl.trim(), andLearn }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "YouTube動画の取り込みに失敗しました");
+        return;
+      }
+      if (andLearn && data.postId) {
+        router.push(`/posts/${data.postId}/confirm`);
+      } else {
+        router.push("/posts");
+      }
+    } catch {
+      setError("YouTube動画の取り込みに失敗しました");
+    } finally {
+      setYoutubeFetching(false);
+    }
+  };
+
+  // 音声: 録音
   const startRecording = () => {
     setError("");
     const Ctor = getSpeechRecognitionCtor();
@@ -156,6 +232,7 @@ export default function NewPostPage() {
     setTab("text");
   };
 
+  // 画像解析
   const analyzeImage = async (file: File) => {
     setAnalyzing(true);
     setError("");
@@ -186,16 +263,18 @@ export default function NewPostPage() {
   };
 
   const TABS: { value: Tab; label: string; icon: React.ReactNode }[] = [
-    { value: "text", label: "テキスト", icon: <PenSquare className="w-4 h-4" /> },
-    { value: "voice", label: "音声メモ", icon: <Mic className="w-4 h-4" /> },
-    { value: "image", label: "画像解析", icon: <ImageIcon className="w-4 h-4" /> },
+    { value: "text",    label: "テキスト", icon: <PenSquare className="w-4 h-4" /> },
+    { value: "article", label: "記事URL",  icon: <Globe className="w-4 h-4" /> },
+    { value: "youtube", label: "YouTube",  icon: <Video className="w-4 h-4" /> },
+    { value: "voice",   label: "音声メモ", icon: <Mic className="w-4 h-4" /> },
+    { value: "image",   label: "画像解析", icon: <ImageIcon className="w-4 h-4" /> },
   ];
 
   return (
     <div className="mx-auto max-w-2xl space-y-5 sm:space-y-6">
       <div>
         <h1 className="text-2xl font-bold tracking-tight text-text sm:text-[28px]">投稿を追加</h1>
-        <p className="mt-1 text-sm text-text-secondary">学びにしたい投稿を手動で追加できます</p>
+        <p className="mt-1 text-sm text-text-secondary">テキスト・記事URL・YouTube・音声・画像から取り込めます</p>
       </div>
 
       <SegmentedControl
@@ -207,6 +286,7 @@ export default function NewPostPage() {
       />
 
       <Card>
+        {/* テキスト */}
         {tab === "text" && (
           <div className="space-y-5">
             <Textarea
@@ -245,21 +325,51 @@ export default function NewPostPage() {
               />
             </div>
             <div className="flex flex-col gap-3 pt-2 sm:flex-row">
+              <Button onClick={() => handleSave(false)} disabled={saving} loading={saving} loadingLabel="保存中..." variant="secondary" className="flex-1">
+                保存する
+              </Button>
+              <Button onClick={() => handleSave(true)} disabled={saving} loading={saving} loadingLabel="保存中..." className="flex-1">
+                保存して学ぶ
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* 記事URL */}
+        {tab === "article" && (
+          <div className="space-y-5">
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-text">記事のURL</label>
+              <input
+                type="url"
+                value={articleUrl}
+                onChange={(e) => setArticleUrl(e.target.value)}
+                placeholder="https://example.com/article"
+                className="w-full rounded-xl border border-border bg-white px-3 py-2.5 text-sm text-text placeholder:text-text-muted focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20"
+              />
+              {error && <p className="mt-1.5 text-xs text-danger">{error}</p>}
+            </div>
+            <div className="rounded-xl bg-border-light/50 p-3 text-xs text-text-secondary space-y-1">
+              <p>・ 記事のHTMLから本文を自動抽出して学習カード化します</p>
+              <p>・ ブログ・ニュース・note などのURL に対応</p>
+              <p>・ ログインが必要なページや有料記事は取得できない場合があります</p>
+            </div>
+            <div className="flex flex-col gap-3 pt-2 sm:flex-row">
               <Button
-                onClick={() => handleSave(false)}
-                disabled={saving}
-                loading={saving}
-                loadingLabel="保存中..."
+                onClick={() => handleArticleSave(false)}
+                disabled={articleFetching}
+                loading={articleFetching}
+                loadingLabel="取り込み中..."
                 variant="secondary"
                 className="flex-1"
               >
-                保存する
+                {articleFetching ? <><Loader2 className="mr-1.5 h-4 w-4 animate-spin" />取り込み中...</> : "保存する"}
               </Button>
               <Button
-                onClick={() => handleSave(true)}
-                disabled={saving}
-                loading={saving}
-                loadingLabel="保存中..."
+                onClick={() => handleArticleSave(true)}
+                disabled={articleFetching}
+                loading={articleFetching}
+                loadingLabel="取り込み中..."
                 className="flex-1"
               >
                 保存して学ぶ
@@ -268,6 +378,51 @@ export default function NewPostPage() {
           </div>
         )}
 
+        {/* YouTube */}
+        {tab === "youtube" && (
+          <div className="space-y-5">
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-text">YouTubeのURL</label>
+              <input
+                type="url"
+                value={youtubeUrl}
+                onChange={(e) => setYoutubeUrl(e.target.value)}
+                placeholder="https://www.youtube.com/watch?v=..."
+                className="w-full rounded-xl border border-border bg-white px-3 py-2.5 text-sm text-text placeholder:text-text-muted focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20"
+              />
+              {error && <p className="mt-1.5 text-xs text-danger">{error}</p>}
+            </div>
+            <div className="rounded-xl bg-border-light/50 p-3 text-xs text-text-secondary space-y-1">
+              <p>・ 動画の字幕（自動生成・手動字幕）をテキストとして取り込みます</p>
+              <p>・ 無料処理のため、字幕のない動画は取り込めません</p>
+              <p>・ 日本語字幕 → 英語字幕 の順で優先して取得します</p>
+              <p>・ youtu.be / youtube.com/shorts のURLにも対応</p>
+            </div>
+            <div className="flex flex-col gap-3 pt-2 sm:flex-row">
+              <Button
+                onClick={() => handleYoutubeSave(false)}
+                disabled={youtubeFetching}
+                loading={youtubeFetching}
+                loadingLabel="取り込み中..."
+                variant="secondary"
+                className="flex-1"
+              >
+                保存する
+              </Button>
+              <Button
+                onClick={() => handleYoutubeSave(true)}
+                disabled={youtubeFetching}
+                loading={youtubeFetching}
+                loadingLabel="取り込み中..."
+                className="flex-1"
+              >
+                保存して学ぶ
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* 音声メモ */}
         {tab === "voice" && (
           <div className="space-y-5 text-center">
             <p className="text-sm text-text-secondary">
@@ -312,6 +467,7 @@ export default function NewPostPage() {
           </div>
         )}
 
+        {/* 画像解析 */}
         {tab === "image" && (
           <div className="space-y-5">
             <p className="text-sm text-text-secondary">

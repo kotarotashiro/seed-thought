@@ -110,6 +110,14 @@ export default function AskAIPage() {
       : "chat";
   });
 
+  // フォーカスカード — 学習カードページから「AIに聞く」で来た場合に設定される
+  const [focusPostId, setFocusPostId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const postId = new URLSearchParams(window.location.search).get("postId");
+    if (postId) setFocusPostId(postId);
+  }, []);
+
   // ── Chat state ───────────────────────────────────────────────────────────────
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
@@ -183,7 +191,7 @@ export default function AskAIPage() {
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: trimmed, history: messages }),
+        body: JSON.stringify({ message: trimmed, history: messages, postId: focusPostId }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "チャットに失敗しました");
@@ -404,6 +412,17 @@ export default function AskAIPage() {
           <div ref={scrollRef} className="flex-1 space-y-4 overflow-y-auto px-1 py-2">
             {messages.length === 0 ? (
               <div className="flex h-full flex-col items-center justify-center text-center">
+                {focusPostId && (
+                  <div className="mb-4 flex w-full max-w-md items-center gap-2 rounded-xl border border-accent/30 bg-accent-light/40 px-3 py-2 text-left text-xs text-accent">
+                    <MessageSquare className="h-3.5 w-3.5 flex-shrink-0" />
+                    <span>
+                      学習カードの内容が文脈に追加されています。このカードについて何でも聞いてください。
+                    </span>
+                    <Link href={`/posts/${focusPostId}/learning`} className="ml-auto flex-shrink-0 underline underline-offset-2 hover:opacity-70">
+                      カードを見る
+                    </Link>
+                  </div>
+                )}
                 <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-accent-light">
                   <Sparkles className="h-6 w-6 text-accent" />
                 </div>
@@ -411,7 +430,7 @@ export default function AskAIPage() {
                   保存した投稿に質問してみましょう
                 </p>
                 <p className="mt-1 max-w-md text-xs text-text-secondary">
-                  直近30件の保存投稿を参考に、AIが回答します。出典の投稿番号付きで返ってきます。
+                  学習カードの核心・ステップ・応用アイデアを含めて回答します。出典カードへのリンクも返ります。
                 </p>
                 <div className="mt-5 grid w-full max-w-lg gap-2">
                   {SUGGESTIONS.map((s) => (
