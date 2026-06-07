@@ -1,4 +1,4 @@
-import { getProfile } from "@/lib/profile/fixedProfile";
+import { getProfile, type FixedProfile } from "@/lib/profile/fixedProfile";
 import type {
   ChatMessage,
   ClassifyPostInput,
@@ -155,9 +155,14 @@ ${JSON.stringify(trimmedInput, null, 2)}`;
 // max(本体, 補足) ≒ 半分に抑える（A: 並列2分割）。本体が主役、補足は best-effort。
 
 // ① 本体：投稿の中身そのもの＋実践材料（title/summary/capture/steps/応用/tips/useCases）
-export function buildLearningCorePrompt(input: SourcePostForLearning): string {
-  return `${learningModeInstruction(input)}
+export function buildLearningCorePrompt(input: SourcePostForLearning, profile?: FixedProfile): string {
+  const profileSection = profile && (profile.themes.length > 0 || profile.knowledge)
+    ? `\n## ユーザーの関心テーマ（applicationIdeas・applyToYourself の関連性判断に使う）
+テーマ: ${profile.themes.join("、")}${profile.knowledge ? `\nコンテキスト（専門・発信背景）: ${profile.knowledge}` : ""}\n`
+    : "";
 
+  return `${learningModeInstruction(input)}
+${profileSection}
 ${buildLearningInputBlock(input)}
 
 ## あなたの出力（必須・全フィールドを必ず埋める）
@@ -208,9 +213,14 @@ ${KOTARO_LENS_PROFILE}
 }
 
 // ② 補足：初心者ゾーン・図解・解説画像プロンプト・学習メモ・周辺情報
-export function buildLearningSupplementPrompt(input: SourcePostForLearning): string {
-  return `${learningModeInstruction(input)}
+export function buildLearningSupplementPrompt(input: SourcePostForLearning, profile?: FixedProfile): string {
+  const profileSection = profile && (profile.themes.length > 0 || profile.knowledge)
+    ? `\n## ユーザーの関心テーマ（userLearningMemo の関連性判断に使う）
+テーマ: ${profile.themes.join("、")}${profile.knowledge ? `\nコンテキスト（専門・発信背景）: ${profile.knowledge}` : ""}\n`
+    : "";
 
+  return `${learningModeInstruction(input)}
+${profileSection}
 ${buildLearningInputBlock(input)}
 
 ## あなたの出力（必須・全フィールドを必ず埋める）
@@ -376,6 +386,7 @@ function buildLearningMaterialBlock(steps: GenerateOutputInput["steps"]): string
 export async function buildOutputPrompt(input: GenerateOutputInput): Promise<string> {
   // 「本質を絞る」(旧 strict_learning) は発信アウトプットではなく、学習カードのオンデマンド深掘り。
   // 専用ルート (./learning/strict) で生成するため、ここでは扱わない。
+  const profile = await getProfile();
   const stepsContext = buildLearningMaterialBlock(input.steps);
 
   const outputTypeLabel: Record<string, string> = {
@@ -402,11 +413,16 @@ export async function buildOutputPrompt(input: GenerateOutputInput): Promise<str
     ? `@${input.postAuthorUsername}${input.postAuthorName ? `（${input.postAuthorName}）` : ""}`
     : input.postAuthorName ?? "元投稿者";
 
+  const profileConfigSection = (profile.tone || profile.knowledge || profile.outputChannels.length > 0)
+    ? `\n## ユーザー設定プロフィール（settings で設定した動的プロフィール）
+${profile.tone ? `トーン: ${profile.tone}` : ""}${profile.knowledge ? `\nコンテキスト（専門・発信背景）: ${profile.knowledge}` : ""}${profile.outputChannels.length > 0 ? `\n発信チャンネル: ${profile.outputChannels.join("、")}` : ""}\n`
+    : "";
+
   return `あなたはSNSキュレーター・解説者です。
 ユーザーが価値を感じた他者の投稿を、わかりやすく他の人に伝え直すコンテンツを生成します。
 
 ${KOTARO_LENS_PROFILE}
-
+${profileConfigSection}
 ## 重要ルール（持論ねじ込みを避ける）
 - 元投稿の文章をそのまま転載しない
 - **投稿の内容が主役**。プロフィールはトーン・文体の基準として使う。持論を毎回挟まない

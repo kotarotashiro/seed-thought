@@ -436,20 +436,28 @@ export default function SettingsPage() {
           fetch("/api/settings/profile"),
           fetch("/api/notion/settings"),
         ]);
-        const profileData = await profileRes.json();
-        const notionData = await notionRes.json();
+
+        // 各レスポンスを独立して処理（片方が失敗しても他方を壊さない）
+        const [profileData, notionData] = await Promise.all([
+          profileRes.json().catch(() => null),
+          notionRes.json().catch(() => null),
+        ]);
         if (cancelled) return;
 
-        setProfile({
-          name: profileData.name || "",
-          role: profileData.role || "",
-          themes: profileData.themes || [],
-          outputChannels: profileData.outputChannels || [],
-          tone: profileData.tone || "",
-          knowledge: profileData.knowledge || "",
-        });
-        setNotionHasApiKey(Boolean(notionData.hasApiKey));
-        setNotionDatabaseId(notionData.databaseId || "");
+        if (!profileRes.ok) {
+          setError(`プロフィール設定の読み込みに失敗しました${profileData?.error ? `: ${profileData.error}` : ""}`);
+        } else if (profileData) {
+          setProfile({
+            name: profileData.name || "",
+            role: profileData.role || "",
+            themes: profileData.themes || [],
+            outputChannels: profileData.outputChannels || [],
+            tone: profileData.tone || "",
+            knowledge: profileData.knowledge || "",
+          });
+        }
+        setNotionHasApiKey(Boolean(notionData?.hasApiKey));
+        setNotionDatabaseId(notionData?.databaseId || "");
       } catch {
         if (!cancelled) setError("設定の読み込みに失敗しました");
       } finally {
@@ -635,7 +643,7 @@ export default function SettingsPage() {
         />
         {openSections.profile && (
           <div className="mt-4">
-            <div className="mb-4 flex justify-end">
+            <div className="mb-4 flex flex-col items-end gap-2">
               <Button
                 size="sm"
                 onClick={handleSave}
@@ -647,6 +655,18 @@ export default function SettingsPage() {
                 <Save className="w-4 h-4 mr-1" />
                 保存
               </Button>
+              {message && (
+                <p className="text-xs text-success flex items-center gap-1">
+                  <CheckCircle className="w-3 h-3" />
+                  {message}
+                </p>
+              )}
+              {error && (
+                <p className="text-xs text-danger flex items-center gap-1">
+                  <AlertCircle className="w-3 h-3" />
+                  {error}
+                </p>
+              )}
             </div>
             {loading ? (
               <div className="space-y-3 animate-pulse">

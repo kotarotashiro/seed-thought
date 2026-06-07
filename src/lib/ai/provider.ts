@@ -54,6 +54,7 @@ import {
   type AiTaskName,
 } from "./settings";
 import { mockProvider } from "./mockProvider";
+import { getProfile } from "@/lib/profile/fixedProfile";
 import { getGrokClient } from "./providers/grokProvider";
 import { getClaudeClient } from "./providers/claudeProvider";
 import { getOpenAIClient } from "./providers/openaiProvider";
@@ -254,9 +255,11 @@ export function getAiProvider(): AiProvider {
         // 1ショットだと出力JSONが巨大で Kimi k2.6 は300秒を超えて打ち切られる。
         // 「本体」と「補足」を並列実行し、体感時間を max(本体, 補足) に抑える。
         // 本体は必須、補足は best-effort（欠けても本体だけでカードを成立させる）。
+        // settings で設定したプロフィール（テーマ・知識コンテキスト）をプロンプトに渡す。
+        const profile = await getProfile();
         const [coreRaw, supplementRaw] = await Promise.all([
-          ctx.client.chatJson(buildLearningCorePrompt(input)),
-          ctx.client.chatJson(buildLearningSupplementPrompt(input)).catch((err) => {
+          ctx.client.chatJson(buildLearningCorePrompt(input, profile)),
+          ctx.client.chatJson(buildLearningSupplementPrompt(input, profile)).catch((err) => {
             console.warn(
               `[ai/generateLearningCard] 補足の生成に失敗（本体のみで続行） provider=${ctx.provider} model=${ctx.model}:`,
               err instanceof Error ? err.message : err
