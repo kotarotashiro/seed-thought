@@ -183,6 +183,7 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
 
   // SNS output state
   const [selectedOutput, setSelectedOutput] = useState<string | null>(null);
+  const [satoriType, setSatoriType] = useState<"auto" | "A" | "B" | "C" | "D" | "E">("auto");
   const [generatedOutput, setGeneratedOutput] = useState<{ id?: string; title: string; content: string; contentJson?: Record<string, unknown> | null; warning?: string | null } | null>(null);
   const [generatingOutput, setGeneratingOutput] = useState(false);
   const [outputError, setOutputError] = useState<string | null>(null);
@@ -514,7 +515,10 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
       const res = await fetch(`/api/learning-cards/${card.id}/outputs`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ outputType: selectedOutput }),
+        body: JSON.stringify({
+          outputType: selectedOutput,
+          ...(selectedOutput === "x" ? { satoriType } : {}),
+        }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "アウトプットの生成に失敗しました");
@@ -1412,6 +1416,38 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
                 />
               ))}
             </div>
+
+            {selectedOutput === "x" && (
+              <div className="mb-4 rounded-xl border border-border bg-border-light/40 px-4 py-3">
+                <p className="mb-2 text-xs font-medium text-text-secondary">構文の型</p>
+                <div className="flex flex-wrap gap-2">
+                  {(["auto", "A", "B", "C", "D", "E"] as const).map((t) => {
+                    const labels: Record<string, string> = {
+                      auto: "自動選択",
+                      A: "A・万能",
+                      B: "B・逆張り",
+                      C: "C・ニュース",
+                      D: "D・衝撃",
+                      E: "E・ステップ",
+                    };
+                    return (
+                      <button
+                        key={t}
+                        type="button"
+                        onClick={() => setSatoriType(t)}
+                        className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
+                          satoriType === t
+                            ? "bg-accent text-white"
+                            : "bg-background border border-border text-text-secondary hover:border-accent/50 hover:text-text"
+                        }`}
+                      >
+                        {labels[t]}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
             <Button
               onClick={handleGenerateOutput}
               disabled={!selectedOutput || generatingOutput}

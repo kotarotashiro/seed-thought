@@ -12,7 +12,7 @@ import type {
   TranslateTextInput,
 } from "./types";
 import { strictLearningKnowledge, beginnerTeachingRules } from "./knowledge";
-import { outputDesignCore, outputMediumKnowledge, outputSelfReview } from "./outputKnowledge";
+import { outputDesignCore, outputMediumKnowledge, outputSelfReview, satoriTypeInstructions, xSatoriSelfReview } from "./outputKnowledge";
 import { KOTARO_LENS_PROFILE } from "./userLens";
 
 export async function buildClassifyPrompt(input: ClassifyPostInput): Promise<string> {
@@ -615,11 +615,7 @@ Instagramカルーセルの場合、contentJsonに以下を含めてください
 }
 ` : ""}
 
-${input.outputType === "x" ? `X投稿（短く伝える）の構成:
-  ${authorRef}の投稿の核 (1〜2文)
-  ＋ 特に響いた一点 (1文)
-  ＋ 自然な感想 or 自分も試したい点 (1文)
-280文字以内。ハッシュタグは0〜2個。煽り禁止。` : ""}
+${input.outputType === "x" ? `${satoriTypeInstructions[input.satoriType ?? "auto"] ?? satoriTypeInstructions["auto"]}` : ""}
 
 ${input.outputType === "short_video" ? `ショート動画（動画で伝える）の台本:
 content には、視聴者がそのまま撮れる台本を入れる。各パートを「ナレーション」と「テロップ」に分けて書く:
@@ -733,7 +729,16 @@ export function buildOutputRefinePrompt(
     : input.postAuthorName ?? "元投稿者";
 
   const mediumLabel = REFINABLE_OUTPUT_TYPES[input.outputType] ?? input.outputType;
-  const mediumKnowledge = [outputMediumKnowledge[input.outputType] ?? "", outputSelfReview]
+  const isX = input.outputType === "x";
+  const satoriInstruction = isX
+    ? (satoriTypeInstructions[input.satoriType ?? "auto"] ?? satoriTypeInstructions["auto"])
+    : "";
+  const selfReview = isX ? xSatoriSelfReview : outputSelfReview;
+  const mediumKnowledge = [
+    outputMediumKnowledge[input.outputType] ?? "",
+    satoriInstruction,
+    selfReview,
+  ]
     .filter(Boolean)
     .join("\n\n");
   const stepsContext = buildLearningMaterialBlock(input.steps);

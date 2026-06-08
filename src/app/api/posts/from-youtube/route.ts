@@ -163,7 +163,11 @@ function extractVideoTitle(html: string): string | null {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { url, andLearn = false } = body as { url: string; andLearn?: boolean };
+    const { url, andLearn = false, transcriptText: manualTranscript } = body as {
+      url: string;
+      andLearn?: boolean;
+      transcriptText?: string;
+    };
 
     if (!url || typeof url !== "string") {
       return NextResponse.json({ error: "URLを入力してください" }, { status: 400 });
@@ -177,32 +181,48 @@ export async function POST(request: Request) {
       );
     }
 
-    // 動画ページを取得して字幕トラックを探す
-    const tracks = await getCaptionTracks(videoId);
-    if (tracks.length === 0) {
-      return NextResponse.json(
-        { error: "この動画には字幕が見つかりませんでした。字幕付きの動画をお試しください。" },
-        { status: 422 }
-      );
+    let transcriptText: string;
+
+    if (manualTranscript && manualTranscript.trim().length >= 20) {
+      // 手動貼り付けテキストを優先使用
+      transcriptText = manualTranscript.trim();
+    } else {
+      // 自動取得を試みる
+      const tracks = await getCaptionTracks(videoId);
+      if (tracks.length === 0) {
+        return NextResponse.json(
+          {
+            error:
+              "字幕の自動取得に失敗しました。動画ページの「…」→「文字起こしを開く」でテキストをコピーして「字幕テキスト」欄に貼り付けてください。",
+            canPasteManually: true,
+          },
+          { status: 422 }
+        );
+      }
+
+      // 日本語 → 英語 → 手動字幕 → 自動字幕の優先順
+      const preferred =
+        tracks.find((t) => t.languageCode === "ja" && t.kind !== "asr") ??
+        tracks.find((t) => t.languageCode === "en" && t.kind !== "asr") ??
+        tracks.find((t) => t.languageCode === "ja") ??
+        tracks.find((t) => t.languageCode === "en") ??
+        tracks[0];
+
+      const fetched = await fetchCaptionText(preferred.baseUrl);
+      if (!fetched || fetched.length < 20) {
+        return NextResponse.json(
+          {
+            error:
+              "字幕の自動取得に失敗しました。動画ページの「…」→「文字起こしを開く」でテキストをコピーして「字幕テキスト」欄に貼り付けてください。",
+            canPasteManually: true,
+          },
+          { status: 422 }
+        );
+      }
+      transcriptText = fetched;
     }
 
-    // 日本語 → 英語 → 手動字幕 → 自動字幕の優先順
-    const preferred =
-      tracks.find((t) => t.languageCode === "ja" && t.kind !== "asr") ??
-      tracks.find((t) => t.languageCode === "en" && t.kind !== "asr") ??
-      tracks.find((t) => t.languageCode === "ja") ??
-      tracks.find((t) => t.languageCode === "en") ??
-      tracks[0];
-
-    const transcriptText = await fetchCaptionText(preferred.baseUrl);
-    if (!transcriptText || transcriptText.length < 20) {
-      return NextResponse.json(
-        { error: "字幕の内容を取得できませんでした。しばらく経ってから再試行してください。" },
-        { status: 422 }
-      );
-    }
-
-    // 動画タイトル（キャッシュ済みのページHTMLから取得済みでなければ再取得）
+    // 動画タイトルを取得
     let videoTitle: string | null = null;
     try {
       const titleRes = await fetch(`https://www.youtube.com/watch?v=${videoId}`, {

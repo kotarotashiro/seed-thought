@@ -165,6 +165,12 @@ export interface NoteContentJson {
 
 export interface GenerateOutputInput {
   outputType: OutputType;
+  /**
+   * さとり構文の型指定（X媒体のみ有効）。
+   * "auto" または未指定のときは投稿内容からAIが最適な型を選ぶ。
+   * "A" | "B" | "C" | "D" | "E" で型を固定できる。
+   */
+  satoriType?: "auto" | "A" | "B" | "C" | "D" | "E";
   postText: string;
   postAuthorName?: string | null;
   postAuthorUsername?: string | null;

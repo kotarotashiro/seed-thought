@@ -51,8 +51,8 @@ export async function POST(
 ) {
   const { cardId } = await params;
   try {
-    const body = (await request.json()) as { outputType?: string };
-    const { outputType } = body;
+    const body = (await request.json()) as { outputType?: string; satoriType?: string };
+    const { outputType, satoriType } = body;
 
     if (!outputType || !VALID_OUTPUT_TYPES.includes(outputType as OutputType)) {
       return NextResponse.json({ error: "outputType が不正です" }, { status: 400 });
@@ -105,9 +105,17 @@ export async function POST(
     const provider = getAiProvider();
     let warning: string | null = null;
 
+    const VALID_SATORI_TYPES = ["auto", "A", "B", "C", "D", "E"] as const;
+    type SatoriType = (typeof VALID_SATORI_TYPES)[number];
+    const resolvedSatoriType: SatoriType =
+      satoriType && VALID_SATORI_TYPES.includes(satoriType as SatoriType)
+        ? (satoriType as SatoriType)
+        : "auto";
+
     const result = await provider
       .generateOutput({
         outputType: outputType as OutputType,
+        satoriType: resolvedSatoriType,
         postText,
         postAuthorName: post.authorName ?? null,
         postAuthorUsername: post.authorUsername ?? null,

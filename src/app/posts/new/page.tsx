@@ -73,7 +73,9 @@ export default function NewPostPage() {
 
   // YouTube tab
   const [youtubeUrl, setYoutubeUrl] = useState("");
+  const [youtubeTranscript, setYoutubeTranscript] = useState("");
   const [youtubeFetching, setYoutubeFetching] = useState(false);
+  const [showTranscriptPaste, setShowTranscriptPaste] = useState(false);
 
   // テキストタブ: 保存
   const handleSave = async (andLearn: boolean = false) => {
@@ -160,14 +162,18 @@ export default function NewPostPage() {
     setYoutubeFetching(true);
     setError("");
     try {
+      const body: Record<string, unknown> = { url: youtubeUrl.trim(), andLearn };
+      if (youtubeTranscript.trim()) body.transcriptText = youtubeTranscript.trim();
+
       const res = await fetch("/api/posts/from-youtube", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: youtubeUrl.trim(), andLearn }),
+        body: JSON.stringify(body),
       });
       const data = await res.json();
       if (!res.ok) {
         setError(data.error || "YouTube動画の取り込みに失敗しました");
+        if (data.canPasteManually) setShowTranscriptPaste(true);
         return;
       }
       if (andLearn && data.postId) {
@@ -386,16 +392,51 @@ export default function NewPostPage() {
               <input
                 type="url"
                 value={youtubeUrl}
-                onChange={(e) => setYoutubeUrl(e.target.value)}
+                onChange={(e) => { setYoutubeUrl(e.target.value); setError(""); }}
                 placeholder="https://www.youtube.com/watch?v=..."
                 className="w-full rounded-xl border border-border bg-white px-3 py-2.5 text-sm text-text placeholder:text-text-muted focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20"
               />
               {error && <p className="mt-1.5 text-xs text-danger">{error}</p>}
             </div>
+
+            {/* 字幕貼り付け（常に表示 or エラー時に展開） */}
+            <div>
+              <button
+                type="button"
+                onClick={() => setShowTranscriptPaste((v) => !v)}
+                className="flex items-center gap-1.5 text-xs font-medium text-accent hover:underline"
+              >
+                <span>{showTranscriptPaste ? "▲" : "▼"}</span>
+                字幕テキストを手動で貼り付ける（自動取得できない場合）
+              </button>
+              {showTranscriptPaste && (
+                <div className="mt-2 space-y-2">
+                  <div className="rounded-xl bg-amber-50 border border-amber-200 p-3 text-xs text-amber-800 space-y-1">
+                    <p className="font-semibold">字幕テキストの取得方法</p>
+                    <p>① YouTubeで動画を開く</p>
+                    <p>② 動画下の「…」→「文字起こしを開く」をクリック</p>
+                    <p>③ 右上の「…」→「タイムスタンプを切り替え」でタイムスタンプをオフに</p>
+                    <p>④ テキストを全選択（Ctrl+A）してコピー → 下に貼り付け</p>
+                  </div>
+                  <Textarea
+                    label="字幕テキスト"
+                    value={youtubeTranscript}
+                    onChange={(e) => setYoutubeTranscript(e.target.value)}
+                    placeholder="YouTubeの「文字起こし」からコピーしたテキストを貼り付けてください..."
+                    className="min-h-[120px]"
+                  />
+                  {youtubeTranscript.trim() && (
+                    <p className="text-xs text-accent">
+                      ✓ 貼り付けテキストを使用します（{youtubeTranscript.trim().length}文字）
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+
             <div className="rounded-xl bg-border-light/50 p-3 text-xs text-text-secondary space-y-1">
-              <p>・ 動画の字幕（自動生成・手動字幕）をテキストとして取り込みます</p>
-              <p>・ 無料処理のため、字幕のない動画は取り込めません</p>
-              <p>・ 日本語字幕 → 英語字幕 の順で優先して取得します</p>
+              <p>・ URLのみの場合、自動で字幕を取得します（取得できない動画あり）</p>
+              <p>・ 自動取得できない場合は「字幕テキストを手動で貼り付ける」をご利用ください</p>
               <p>・ youtu.be / youtube.com/shorts のURLにも対応</p>
             </div>
             <div className="flex flex-col gap-3 pt-2 sm:flex-row">
