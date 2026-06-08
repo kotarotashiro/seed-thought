@@ -6,24 +6,62 @@ export interface ArticlePreview {
   imageUrl: string | null;
 }
 
-
 function isUrlLike(s: string): boolean {
   return /^https?:\/\/\S+$/.test(s.trim());
 }
 
-function extractContent(data: unknown): string {
-  const d = data as {
-    output_text?: string;
-    output?: Array<{ content?: Array<{ text?: string }> }>;
-  };
-  if (d.output_text) return d.output_text;
-  if (Array.isArray(d.output)) {
-    return d.output
-      .flatMap((block) => block.content ?? [])
-      .map((c) => c.text ?? "")
-      .join("");
+/**
+ * Fetch via Jina Reader (https://r.jina.ai/).
+ * Returns the full article body as markdown — much richer than og:description.
+ * Free, no auth needed. Unreliable for X posts (login wall) and paywalled sites.
+ */
+async function fetchWithJina(url: string): Promise<ArticlePreview> {
+  const jinaUrl = `https://r.jina.ai/${url}`;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 15_000);
+
+  try {
+    const res = await fetch(jinaUrl, {
+      headers: { Accept: "text/plain" },
+      redirect: "follow",
+      signal: controller.signal,
+    });
+    clearTimeout(timer);
+
+    if (!res.ok) throw new Error(`Jina returned ${res.status}`);
+
+    const text = await res.text();
+    if (!text || text.length < 100) throw new Error("Jina returned too little content");
+
+    // Jina output format:
+    //   Title: <title>
+    //   URL Source: <url>
+    //   Published Time: <time>
+    //   Markdown Content:
+    //   # <heading>
+    //   <body ...>
+
+    const titleMatch = text.match(/^Title:\s*(.+)$/m);
+    let title: string | null = titleMatch ? titleMatch[1].trim() : null;
+    // Strip trailing " / X" (Twitter page title suffix)
+    if (title) title = title.replace(/\s*\/\s*X\s*$/, "").trim() || null;
+
+    const mdMatch = text.match(/Markdown Content:\s*([\s\S]+)/);
+    const body = mdMatch ? mdMatch[1].trim() : text.trim();
+
+    // Detect login wall — treat as failure
+    if (/Don't miss what's happening|Log in to X|Sign in to continue|JavaScript is not available/i.test(body.slice(0, 600))) {
+      throw new Error("Jina returned login wall");
+    }
+
+    const description = body.slice(0, 8_000);
+    if (!description) throw new Error("Jina returned empty body");
+
+    return { title, description, imageUrl: null };
+  } catch (err) {
+    clearTimeout(timer);
+    throw err instanceof Error ? err : new Error("Jina fetch failed");
   }
-  return "";
 }
 
 async function fetchWithGrok(url: string): Promise<ArticlePreview> {
@@ -115,25 +153,37 @@ async function fetchWithHtml(url: string): Promise<ArticlePreview> {
 
 /**
  * Fetch article title + description from a URL.
- * Uses Grok with live search if available, falls back to HTML scraping.
+ *
+ * Priority:
+ *  1. Jina Reader  — full article body as markdown (free, no auth, best for AI input)
+ *  2. Grok w/ web_search — AI-generated Japanese summary (handles paywalls, requires xAI config)
+ *  3. HTML og:meta — title + og:description only (always available, last resort)
+ *
  * Returns null fields on failure (never throws).
  */
 export async function fetchArticlePreview(url: string): Promise<ArticlePreview> {
+  // 1. Jina — full body, free
+  try {
+    return await fetchWithJina(url);
+  } catch {
+    // fall through
+  }
+
   const grokConfigured = await hasXaiAuthConfigured();
 
-  try {
-    if (grokConfigured) {
+  // 2. Grok — AI summary, handles paywalls
+  if (grokConfigured) {
+    try {
       return await fetchWithGrok(url);
+    } catch {
+      // fall through
     }
+  }
+
+  // 3. HTML og:meta — last resort
+  try {
     return await fetchWithHtml(url);
   } catch {
-    if (grokConfigured) {
-      try {
-        return await fetchWithHtml(url);
-      } catch {
-        // both failed
-      }
-    }
     return { title: null, description: null, imageUrl: null };
   }
 }
