@@ -189,7 +189,7 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
   const [outputError, setOutputError] = useState<string | null>(null);
 
   // Output history
-  const [outputHistory, setOutputHistory] = useState<Array<{ id: string; outputType: string; title: string; content: string; contentJson: string | null; createdAt: string }>>([]);
+  const [outputHistory, setOutputHistory] = useState<Array<{ id: string; outputType: string; title: string; content: string; contentJson: string | null; satoriTypeUsed?: string | null; createdAt: string }>>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
 
@@ -1516,16 +1516,26 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
                   ) : (
                     outputHistory.map((item) => {
                       const typeLabels: Record<string, string> = { x: "X投稿", instagram: "Instagram", short_video: "ショート動画", note: "note", markdown_log: "Markdown", seminar: "セミナー", strict_learning: "本質を絞る" };
+                      const satoriLabels: Record<string, string> = { A: "A・万能", B: "B・逆張り", C: "C・ニュース", D: "D・衝撃", E: "E・ステップ" };
                       const parsedJson = item.contentJson ? (() => { try { return JSON.parse(item.contentJson); } catch { return null; } })() : null;
                       return (
-                        <OutputPreview
-                          key={item.id}
-                          title={`${typeLabels[item.outputType] ?? item.outputType} • ${new Date(item.createdAt).toLocaleDateString("ja-JP", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}`}
-                          content={item.content}
-                          contentJson={parsedJson}
-                          outputType={item.outputType}
-                          onDelete={() => handleDeleteOutput(item.id)}
-                        />
+                        <div key={item.id} className="space-y-1.5">
+                          {item.outputType === "x" && item.satoriTypeUsed && (
+                            <div className="flex items-center gap-2 px-1">
+                              <span className="text-xs text-text-muted">構文の型:</span>
+                              <span className="rounded-md bg-accent/10 px-2 py-0.5 text-xs font-medium text-accent">
+                                {satoriLabels[item.satoriTypeUsed] ?? `型${item.satoriTypeUsed}`}
+                              </span>
+                            </div>
+                          )}
+                          <OutputPreview
+                            title={`${typeLabels[item.outputType] ?? item.outputType} • ${new Date(item.createdAt).toLocaleDateString("ja-JP", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}`}
+                            content={item.content}
+                            contentJson={parsedJson}
+                            outputType={item.outputType}
+                            onDelete={() => handleDeleteOutput(item.id)}
+                          />
+                        </div>
                       );
                     })
                   )}

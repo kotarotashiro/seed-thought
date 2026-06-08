@@ -150,6 +150,7 @@ export async function POST(
         title: result.title,
         content: result.content,
         contentJson: result.contentJson ? JSON.stringify(result.contentJson) : null,
+        satoriTypeUsed: result.satoriTypeUsed ?? null,
       },
     });
 

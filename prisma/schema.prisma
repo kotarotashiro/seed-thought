@@ -132,6 +132,7 @@ model LearningCardOutput {
   title          String
   content        String
   contentJson    String?  // JSON object
+  satoriTypeUsed String?  // X媒体のさとり構文の型 "A" | "B" | "C" | "D" | "E"
   createdAt      DateTime @default(now())
 
   learningCard LearningCard @relation(fields: [learningCardId], references: [id], onDelete: Cascade)
