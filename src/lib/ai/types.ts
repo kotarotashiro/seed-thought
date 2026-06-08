@@ -189,6 +189,8 @@ export interface GeneratedOutputResult {
   title: string;
   content: string;
   contentJson?: Record<string, unknown>;
+  /** X媒体のさとり構文で実際に使われた型（A〜E）。auto選択時にAIが返す。非X媒体はundefined。 */
+  satoriTypeUsed?: string;
 }
 
 export interface StrictLearningOutput {

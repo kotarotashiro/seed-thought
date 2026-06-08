@@ -300,6 +300,13 @@ export function getAiProvider(): AiProvider {
           });
         }
 
+        // X媒体のさとり構文: 使用した型を result に付与する。
+        // auto の場合はAIが satoriTypeUsed をJSONに含めて返すので、そのまま使う。
+        // 型指定の場合は input.satoriType を直接セットする。
+        if (input.outputType === "x" && input.satoriType && input.satoriType !== "auto") {
+          result.satoriTypeUsed = input.satoriType;
+        }
+
         // 2段生成: 散文・説得が効く媒体（x/instagram/short_video）は下書きを編集者視点で添削させてから書き直す。
         // 改稿は別呼び出しに分けるのが要点（同一生成内の自己添削は効かない）。
         // 改稿パスは temperature を上げて下書きの echo を避ける。
@@ -308,7 +315,12 @@ export function getAiProvider(): AiProvider {
           try {
             const refinePrompt = buildOutputRefinePrompt(input, result);
             const refinedRaw = await ctx.client.chatJson(refinePrompt, { temperature: 0.6 });
-            return parseAiJson(refinedRaw, isGeneratedOutputResult, "アウトプット改稿");
+            const refined = parseAiJson(refinedRaw, isGeneratedOutputResult, "アウトプット改稿");
+            // satoriTypeUsed は改稿パスでは生成しないので1パス目の値を引き継ぐ
+            if (result.satoriTypeUsed && !refined.satoriTypeUsed) {
+              refined.satoriTypeUsed = result.satoriTypeUsed;
+            }
+            return refined;
           } catch (refineErr) {
             console.warn(
               `[ai/generateOutput] ${input.outputType} の改稿に失敗、下書きで続行 provider=${ctx.provider} model=${ctx.model}:`,

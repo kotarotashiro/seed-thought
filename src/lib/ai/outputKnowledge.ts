@@ -69,7 +69,7 @@ export const satoriTypeInstructions: Record<string, string> = {
 - 新ツール・速報・「〜に朗報」: 型C
 - 衝撃的なニュース・臨場感が大事: 型D
 - 手順・ステップ解説・「〜のやり方N選」: 型E
-選んだ型とその理由を冒頭でJSON外に一行で示したうえで、その型の指示に従って本文を書く（選んだ型はJSONには含めない）。`,
+選んだ型に従って本文を書き、出力JSONの中に "satoriTypeUsed": "A"（A〜Eのいずれか）を含めること。`,
 };
 
 /** 媒体別の構成テンプレート */

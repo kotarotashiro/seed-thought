@@ -184,7 +184,7 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
   // SNS output state
   const [selectedOutput, setSelectedOutput] = useState<string | null>(null);
   const [satoriType, setSatoriType] = useState<"auto" | "A" | "B" | "C" | "D" | "E">("auto");
-  const [generatedOutput, setGeneratedOutput] = useState<{ id?: string; title: string; content: string; contentJson?: Record<string, unknown> | null; warning?: string | null } | null>(null);
+  const [generatedOutput, setGeneratedOutput] = useState<{ id?: string; title: string; content: string; contentJson?: Record<string, unknown> | null; warning?: string | null; satoriTypeUsed?: string } | null>(null);
   const [generatingOutput, setGeneratingOutput] = useState(false);
   const [outputError, setOutputError] = useState<string | null>(null);
 
@@ -1467,12 +1467,28 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
           </Card>
 
           {generatedOutput && (
-            <OutputPreview
-              title={generatedOutput.title}
-              content={generatedOutput.content}
-              contentJson={generatedOutput.contentJson ?? null}
-              outputType={selectedOutput || ""}
-            />
+            <>
+              {selectedOutput === "x" && generatedOutput.satoriTypeUsed && (
+                <div className="flex items-center gap-2 px-1">
+                  <span className="text-xs text-text-muted">使用した構文の型:</span>
+                  <span className="rounded-md bg-accent/10 px-2 py-0.5 text-xs font-medium text-accent">
+                    {{
+                      A: "A・万能",
+                      B: "B・逆張り",
+                      C: "C・ニュース",
+                      D: "D・衝撃",
+                      E: "E・ステップ",
+                    }[generatedOutput.satoriTypeUsed] ?? `型${generatedOutput.satoriTypeUsed}`}
+                  </span>
+                </div>
+              )}
+              <OutputPreview
+                title={generatedOutput.title}
+                content={generatedOutput.content}
+                contentJson={generatedOutput.contentJson ?? null}
+                outputType={selectedOutput || ""}
+              />
+            </>
           )}
 
           {/* Output history */}
