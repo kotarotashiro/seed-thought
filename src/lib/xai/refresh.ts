@@ -6,9 +6,19 @@ export type XaiRefreshResult =
   | { ok: true; expiresAt: string | null; rotated: boolean }
   | { ok: false; reason: string };
 
+/** トークン期限切れの何分前からリフレッシュを開始するか */
+const REFRESH_WINDOW_MS = 5 * 60 * 1000;
+/** expiresAt が null の場合、最終更新から何時間後にリフレッシュするか */
+const FALLBACK_REFRESH_INTERVAL_MS = 6 * 60 * 60 * 1000;
+
 /**
  * Proactively refreshes the stored xAI OAuth token to keep the refresh_token
  * chain "warm" — xAI may invalidate refresh_tokens after inactivity.
+ *
+ * Only refreshes when the token is near expiry (or past the fallback interval
+ * if no expiry is known). Skipping unnecessary refreshes prevents xAI from
+ * returning 401 on still-valid tokens, which would otherwise trigger
+ * deleteXaiAuth() and disconnect the user.
  *
  * On 401 / invalid_client / invalid_grant, the stale tokens are deleted from DB
  * so the UI shows the "reconnect" state.
@@ -23,6 +33,19 @@ export async function refreshStoredXaiTokens(): Promise<XaiRefreshResult> {
   const oauth = await findXaiAuth();
   if (!oauth?.refreshToken) {
     return { ok: false, reason: "no refresh token stored" };
+  }
+
+  // リフレッシュが必要かチェック（heartbeat 毎に無条件呼び出しを防ぐ）
+  if (oauth.expiresAt) {
+    const timeLeft = oauth.expiresAt.getTime() - Date.now();
+    if (timeLeft > REFRESH_WINDOW_MS) {
+      return { ok: false, reason: "token not near expiry, skip" };
+    }
+  } else {
+    const timeSinceUpdate = Date.now() - oauth.updatedAt.getTime();
+    if (timeSinceUpdate < FALLBACK_REFRESH_INTERVAL_MS) {
+      return { ok: false, reason: "recently updated, skip" };
+    }
   }
 
   const encryptionKey = getXaiTokenEncryptionKey();
