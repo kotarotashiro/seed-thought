@@ -184,6 +184,8 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
   // SNS output state
   const [selectedOutput, setSelectedOutput] = useState<string | null>(null);
   const [satoriType, setSatoriType] = useState<"auto" | "A" | "B" | "C" | "D" | "E">("auto");
+  // 引用元アカウントを本文に明記するか。デフォルトOFF（@ユーザー名・氏名を出さない匿名引用）。
+  const [citeAuthor, setCiteAuthor] = useState(false);
   const [generatedOutput, setGeneratedOutput] = useState<{ id?: string; title: string; content: string; contentJson?: Record<string, unknown> | null; warning?: string | null; satoriTypeUsed?: string } | null>(null);
   const [generatingOutput, setGeneratingOutput] = useState(false);
   const [outputError, setOutputError] = useState<string | null>(null);
@@ -517,6 +519,7 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           outputType: selectedOutput,
+          citeAuthor,
           ...(selectedOutput === "x" ? { satoriType } : {}),
         }),
       });
@@ -1447,6 +1450,21 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
                   })}
                 </div>
               </div>
+            )}
+            {selectedOutput && (
+              <label className="mb-4 flex cursor-pointer items-start gap-2.5 rounded-xl border border-border bg-border-light/40 px-4 py-3">
+                <input
+                  type="checkbox"
+                  checked={citeAuthor}
+                  onChange={(e) => setCiteAuthor(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 flex-shrink-0 accent-accent"
+                />
+                <span className="text-xs leading-relaxed text-text-secondary">
+                  <span className="font-medium text-text">引用元アカウントを明記する</span>
+                  <br />
+                  オンにすると @ユーザー名・氏名を出典として本文に入れます。オフのときは投稿者を特定せず匿名の引用で生成します。
+                </span>
+              </label>
             )}
             <Button
               onClick={handleGenerateOutput}

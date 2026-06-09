@@ -383,6 +383,22 @@ function buildLearningMaterialBlock(steps: GenerateOutputInput["steps"]): string
     .join("\n\n");
 }
 
+// 引用元アカウントの明記可否を解決する。
+// citeAuthor が未指定/true なら @ユーザー名・氏名を出典として使う（従来どおり）。
+// false なら投稿者を特定させない匿名表現にし、出典ルールも「アカウント名を出さない」に切り替える。
+function resolveAuthorCitation(input: GenerateOutputInput): {
+  citeAuthor: boolean;
+  authorRef: string;
+} {
+  const citeAuthor = input.citeAuthor !== false;
+  const authorRef = citeAuthor
+    ? input.postAuthorUsername
+      ? `@${input.postAuthorUsername}${input.postAuthorName ? `（${input.postAuthorName}）` : ""}`
+      : input.postAuthorName ?? "元投稿者"
+    : "ある投稿者";
+  return { citeAuthor, authorRef };
+}
+
 export async function buildOutputPrompt(input: GenerateOutputInput): Promise<string> {
   // 「本質を絞る」(旧 strict_learning) は発信アウトプットではなく、学習カードのオンデマンド深掘り。
   // 専用ルート (./learning/strict) で生成するため、ここでは扱わない。
@@ -409,9 +425,10 @@ export async function buildOutputPrompt(input: GenerateOutputInput): Promise<str
           .filter(Boolean)
           .join("\n\n");
 
-  const authorRef = input.postAuthorUsername
-    ? `@${input.postAuthorUsername}${input.postAuthorName ? `（${input.postAuthorName}）` : ""}`
-    : input.postAuthorName ?? "元投稿者";
+  const { citeAuthor, authorRef } = resolveAuthorCitation(input);
+  const sourceCiteRule = citeAuthor
+    ? `- 出典（${authorRef}）を自然な形で明示する`
+    : `- 投稿者の@ユーザー名・アカウント名・氏名を本文に一切出さない。特定アカウントを引用元として明記せず、「ある投稿で見かけた考え方」程度の匿名表現にとどめる`;
 
   const profileConfigSection = (profile.tone || profile.knowledge || profile.outputChannels.length > 0)
     ? `\n## ユーザー設定プロフィール（settings で設定した動的プロフィール）
@@ -427,7 +444,7 @@ ${profileConfigSection}
 - 元投稿の文章をそのまま転載しない
 - **投稿の内容が主役**。プロフィールはトーン・文体の基準として使う。持論を毎回挟まない
 - 「${authorRef}の投稿から学んだ・気づいた」という解説者の視点で書く
-- 出典（${authorRef}）を自然な形で明示する
+${sourceCiteRule}
 - 投稿が自然にユーザーの興味の核に接続する場合のみ、自然な形で言及する。
   接続しない投稿なら、投稿の良さをそのまま伝える側に振り切る
 - ユーザー自身の解釈・補足は「特に響いた一点」「自分も試したい」程度の自然な反応に留める
@@ -484,7 +501,7 @@ ${input.outputType === "note" ? `あなたは note 記事の書き手です。${
   "title": "記事タイトル（バズ禁止。投稿の核心を断定形で表す。例:「『頑張っているのに報われない』の正体——対価はプロセスではなくアウトプットに支払われる」）",
   "content": "",
   "contentJson": {
-    "source": "出典を一文で（例: @username（本名）の投稿）",
+    "source": "${citeAuthor ? "出典を一文で（例: @username（本名）の投稿）" : "出典は匿名で一文（例: ある投稿で見かけた考え方）。@ユーザー名・アカウント名・氏名は書かない"}",
     "sections": [
       { "heading": "断定形の小見出し", "body": "本文（markdown可）" }
     ]
@@ -724,9 +741,10 @@ export function buildOutputRefinePrompt(
   input: GenerateOutputInput,
   draft: GeneratedOutputResult
 ): string {
-  const authorRef = input.postAuthorUsername
-    ? `@${input.postAuthorUsername}${input.postAuthorName ? `（${input.postAuthorName}）` : ""}`
-    : input.postAuthorName ?? "元投稿者";
+  const { citeAuthor, authorRef } = resolveAuthorCitation(input);
+  const sourceCiteRule = citeAuthor
+    ? `- 出典（${authorRef}）は自然な形で残す`
+    : `- 投稿者の@ユーザー名・アカウント名・氏名は本文に一切出さない。特定アカウントを引用元として明記せず、匿名の引用にとどめる`;
 
   const mediumLabel = REFINABLE_OUTPUT_TYPES[input.outputType] ?? input.outputType;
   const isX = input.outputType === "x";
@@ -789,7 +807,7 @@ ${draft.content}${draftJson ? `\n\n構造データ(contentJson):\n${draftJson}` 
 
 ## 厳守
 - 元素材にない事実・数字・固有名・体験を捏造しない（盛らない）
-- 出典（${authorRef}）は自然な形で残す
+${sourceCiteRule}
 - 「いかがでしたか」「ぜひ」「素晴らしい」「印象的でした」等の浅い表現・締めの定型句は使わない
 - 下書きが構造データ(contentJson)を持つ媒体（カルーセル・動画台本など）は、同じ構造で改稿版の contentJson を必ず返す
 

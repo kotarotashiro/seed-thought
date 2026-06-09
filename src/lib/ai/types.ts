@@ -171,6 +171,12 @@ export interface GenerateOutputInput {
    * "A" | "B" | "C" | "D" | "E" で型を固定できる。
    */
   satoriType?: "auto" | "A" | "B" | "C" | "D" | "E";
+  /**
+   * 引用元アカウントの明記可否。
+   * 未指定/true のときは従来どおり @ユーザー名・氏名を出典として本文に明示する。
+   * false のときはアカウント名・@ユーザー名・氏名を本文に一切出さず、匿名の引用として生成する。
+   */
+  citeAuthor?: boolean;
   postText: string;
   postAuthorName?: string | null;
   postAuthorUsername?: string | null;

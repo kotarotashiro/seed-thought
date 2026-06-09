@@ -51,8 +51,12 @@ export async function POST(
 ) {
   const { cardId } = await params;
   try {
-    const body = (await request.json()) as { outputType?: string; satoriType?: string };
-    const { outputType, satoriType } = body;
+    const body = (await request.json()) as {
+      outputType?: string;
+      satoriType?: string;
+      citeAuthor?: boolean;
+    };
+    const { outputType, satoriType, citeAuthor } = body;
 
     if (!outputType || !VALID_OUTPUT_TYPES.includes(outputType as OutputType)) {
       return NextResponse.json({ error: "outputType が不正です" }, { status: 400 });
@@ -116,6 +120,7 @@ export async function POST(
       .generateOutput({
         outputType: outputType as OutputType,
         satoriType: resolvedSatoriType,
+        citeAuthor: citeAuthor === true,
         postText,
         postAuthorName: post.authorName ?? null,
         postAuthorUsername: post.authorUsername ?? null,
