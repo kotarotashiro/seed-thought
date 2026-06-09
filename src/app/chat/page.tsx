@@ -102,20 +102,34 @@ function saveSearchHistory(query: string, current: string[]): string[] {
 export default function AskAIPage() {
   const confirm = useConfirm();
 
-  // Mode — read ?mode=search from URL on first render
+  // Mode — read ?mode= from URL on first render
   const [mode, setMode] = useState<Mode>(() => {
     if (typeof window === "undefined") return "chat";
-    return new URLSearchParams(window.location.search).get("mode") === "search"
-      ? "search"
-      : "chat";
+    const m = new URLSearchParams(window.location.search).get("mode");
+    if (m === "search" || m === "research" || m === "account") return m;
+    return "chat";
   });
 
   // フォーカスカード — 学習カードページから「AIに聞く」で来た場合に設定される
   const [focusPostId, setFocusPostId] = useState<string | null>(null);
 
   useEffect(() => {
-    const postId = new URLSearchParams(window.location.search).get("postId");
+    const params = new URLSearchParams(window.location.search);
+    const postId = params.get("postId");
     if (postId) setFocusPostId(postId);
+
+    // ?q= でクエリをプリフィル（保存傾向のトピックリンクなどから来た場合）
+    const q = params.get("q");
+    if (q) {
+      const m = params.get("mode");
+      if (m === "research") {
+        setResearchQuery(q);
+        void loadResearchHistory();
+      } else if (m === "search") {
+        setQuery(q);
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // ── Chat state ───────────────────────────────────────────────────────────────
@@ -257,6 +271,11 @@ export default function AskAIPage() {
     setSearchHistory(next);
   };
 
+  const clearAllSearchHistory = () => {
+    localStorage.removeItem(SEARCH_HISTORY_KEY);
+    setSearchHistory([]);
+  };
+
   // ── Research handlers ─────────────────────────────────────────────────────────
 
   const loadResearchHistory = async () => {
@@ -271,6 +290,15 @@ export default function AskAIPage() {
       // ignore
     }
     setResearchHistoryLoaded(true);
+  };
+
+  const removeResearchHistory = async (id: string) => {
+    try {
+      await fetch(`/api/research/${id}`, { method: "DELETE" });
+    } catch {
+      // ignore
+    }
+    setResearchHistory((prev) => prev.filter((h) => h.id !== id));
   };
 
   const handleResearch = async (q?: string, modeOverride?: ResearchMode) => {
@@ -540,10 +568,18 @@ export default function AskAIPage() {
 
           {searchHistory.length > 0 && !searched && (
             <div className="space-y-2">
-              <p className="flex items-center gap-1 text-xs font-medium text-text-muted">
-                <Clock className="h-3.5 w-3.5" />
-                検索履歴
-              </p>
+              <div className="flex items-center justify-between">
+                <p className="flex items-center gap-1 text-xs font-medium text-text-muted">
+                  <Clock className="h-3.5 w-3.5" />
+                  検索履歴
+                </p>
+                <button
+                  onClick={clearAllSearchHistory}
+                  className="text-xs text-text-muted hover:text-danger"
+                >
+                  すべて削除
+                </button>
+              </div>
               <div className="flex flex-wrap gap-2">
                 {searchHistory.map((q) => (
                   <div
@@ -730,14 +766,22 @@ export default function AskAIPage() {
                 </p>
                 <div className="flex flex-wrap gap-2">
                   {items.map((h) => (
-                    <button
-                      key={h.id}
-                      onClick={() => void handleResearch(h.query, h.mode === "deep" ? "deep" : "quick")}
-                      className="flex max-w-[280px] items-center gap-1.5 rounded-full border border-border bg-white px-3 py-1 text-xs text-text-secondary hover:border-accent/40 hover:text-text"
-                    >
-                      {h.mode === "deep" && <span className="text-[10px] font-semibold text-accent">深</span>}
-                      <span className="truncate">{h.query}</span>
-                    </button>
+                    <div key={h.id} className="flex max-w-[280px] items-center rounded-full border border-border bg-white text-xs text-text-secondary hover:border-accent/40 hover:text-text">
+                      <button
+                        onClick={() => void handleResearch(h.query, h.mode === "deep" ? "deep" : "quick")}
+                        className="flex min-w-0 items-center gap-1.5 py-1 pl-3 pr-1"
+                      >
+                        {h.mode === "deep" && <span className="text-[10px] font-semibold text-accent">深</span>}
+                        <span className="truncate">{h.query}</span>
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); void removeResearchHistory(h.id); }}
+                        className="flex-shrink-0 p-1 pr-2 text-text-muted hover:text-danger"
+                        aria-label="削除"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
                   ))}
                 </div>
               </div>
@@ -835,14 +879,22 @@ export default function AskAIPage() {
                 </p>
                 <div className="flex flex-wrap gap-2">
                   {items.map((h) => (
-                    <button
-                      key={h.id}
-                      onClick={() => void handleAccountAnalyze(h.query, "")}
-                      className="flex max-w-[280px] items-center gap-1.5 rounded-full border border-border bg-white px-3 py-1 text-xs text-text-secondary hover:border-accent/40 hover:text-text"
-                    >
-                      <AtSign className="h-3 w-3 text-text-muted" />
-                      <span className="truncate">{h.query}</span>
-                    </button>
+                    <div key={h.id} className="flex max-w-[280px] items-center rounded-full border border-border bg-white text-xs text-text-secondary hover:border-accent/40 hover:text-text">
+                      <button
+                        onClick={() => void handleAccountAnalyze(h.query, "")}
+                        className="flex min-w-0 items-center gap-1.5 py-1 pl-3 pr-1"
+                      >
+                        <AtSign className="h-3 w-3 flex-shrink-0 text-text-muted" />
+                        <span className="truncate">{h.query}</span>
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); void removeResearchHistory(h.id); }}
+                        className="flex-shrink-0 p-1 pr-2 text-text-muted hover:text-danger"
+                        aria-label="削除"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
                   ))}
                 </div>
               </div>

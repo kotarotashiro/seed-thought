@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { useAlert, useConfirm } from "@/components/ui/DialogProvider";
+import { CollectionSuggestions } from "@/components/collections/CollectionSuggestions";
 
 interface CollectionListItem {
   id: string;
@@ -374,6 +375,8 @@ export default function CollectionsPage() {
           </div>
         </Card>
       )}
+
+      {!showForm && <CollectionSuggestions />}
 
       {loading ? (
         <p className="py-12 text-center text-sm text-text-muted">読み込み中…</p>

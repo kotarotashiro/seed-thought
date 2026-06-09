@@ -218,13 +218,20 @@ export default function InsightsPage() {
               <ArrowRight className="w-5 h-5 text-accent" />
               <h3 className="text-sm font-semibold text-text">次に学ぶとよいトピック</h3>
             </div>
+            <p className="mb-3 text-xs text-text-muted">クリックするとそのトピックのリサーチが開きます</p>
             <ol className="space-y-2">
               {data.insight.recommendedNextTopics.map((topic, index) => (
-                <li key={topic} className="flex items-start gap-3 rounded-xl border border-border px-4 py-3">
-                  <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-accent-subtle text-xs font-bold text-accent">
-                    {index + 1}
-                  </span>
-                  <span className="text-sm text-text">{topic}</span>
+                <li key={topic}>
+                  <a
+                    href={`/chat?mode=research&q=${encodeURIComponent(topic)}`}
+                    className="flex items-start gap-3 rounded-xl border border-border px-4 py-3 transition-colors hover:border-accent/40 hover:bg-accent-light/20"
+                  >
+                    <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-accent-subtle text-xs font-bold text-accent">
+                      {index + 1}
+                    </span>
+                    <span className="min-w-0 flex-1 text-sm text-text">{topic}</span>
+                    <ArrowRight className="h-4 w-4 flex-shrink-0 text-accent opacity-0 transition-opacity group-hover:opacity-100" />
+                  </a>
                 </li>
               ))}
             </ol>

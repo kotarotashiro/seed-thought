@@ -291,9 +291,10 @@ export default function XSettingsPage() {
         </div>
       )}
 
-      {/* Connection Status */}
+      {/* X Account Connection */}
       <Card>
-        <h3 className="text-base font-bold text-text mb-4">接続状態</h3>
+        <h3 className="text-base font-bold text-text mb-1">Xアカウント連携</h3>
+        <p className="text-xs text-text-muted mb-4">いいね・ブックマークの取り込みに使います</p>
         {xStatus?.connected && xStatus.account ? (
           <div className="space-y-4">
             <div className="flex items-center gap-3">

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, use } from "react";
+import { useState, useEffect, use, useRef } from "react";
 import { useSafeBack } from "@/hooks/useSafeBack";
 import Link from "next/link";
 import { Card } from "@/components/ui/Card";
@@ -137,6 +137,28 @@ export default function ConfirmPage({ params }: { params: Promise<{ postId: stri
       cancelled = true;
     };
   }, [postId]);
+
+  // 投稿ロード後に1回だけ自動取得（ツリー・リンク）
+  const autoFetchedRef = useRef(false);
+  useEffect(() => {
+    if (!post || autoFetchedRef.current) return;
+    autoFetchedRef.current = true;
+
+    const isLikeOrBookmark =
+      post.source === "user_like" || post.source === "user_bookmark";
+    const canThread = isLikeOrBookmark && !!post.sourcePostId;
+    const alreadyHasThread = (post.threadPosts?.length ?? 0) > 0;
+    const alreadyHasLinks = relatedLinks.length > 0;
+    const hasUrl = /https?:\/\//i.test(post.text ?? "");
+
+    if (canThread && !alreadyHasThread) {
+      void handleFetchThread();
+    }
+    if (!alreadyHasLinks && hasUrl) {
+      void handleEnrichLinks();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [post?.id]);
 
   // 生成モデル選択用に、利用可能な provider とデフォルトを取得
   useEffect(() => {
@@ -942,7 +964,7 @@ export default function ConfirmPage({ params }: { params: Promise<{ postId: stri
             <select
               value={genProvider}
               onChange={(e) => handleProviderChange(e.target.value)}
-              className="flex-1 rounded-lg border border-border bg-white px-3 py-2 text-sm text-text outline-none focus:border-accent"
+              className="min-w-0 flex-1 rounded-lg border border-border bg-white px-3 py-2 text-sm text-text outline-none focus:border-accent"
             >
               <option value="">
                 デフォルト{defaultProviderLabel ? `（${defaultProviderLabel}${defaultModel ? " / " + defaultModel : ""}）` : ""}
@@ -954,12 +976,12 @@ export default function ConfirmPage({ params }: { params: Promise<{ postId: stri
               ))}
             </select>
             {genProvider && (
-              <div className="flex flex-1 items-center gap-2">
+              <div className="flex min-w-0 flex-1 items-center gap-2">
                 {(modelLists[genProvider]?.length ?? 0) > 0 ? (
                   <select
                     value={genModel}
                     onChange={(e) => setGenModel(e.target.value)}
-                    className="flex-1 rounded-lg border border-border bg-white px-3 py-2 text-sm text-text outline-none focus:border-accent"
+                    className="min-w-0 flex-1 rounded-lg border border-border bg-white px-3 py-2 text-sm text-text outline-none focus:border-accent"
                   >
                     {modelLists[genProvider].map((m) => (
                       <option key={m.id} value={m.id}>{m.name}</option>
@@ -971,7 +993,7 @@ export default function ConfirmPage({ params }: { params: Promise<{ postId: stri
                     value={genModel}
                     onChange={(e) => setGenModel(e.target.value)}
                     placeholder="モデル名..."
-                    className="flex-1 rounded-lg border border-border bg-white px-3 py-2 text-sm text-text outline-none focus:border-accent"
+                    className="min-w-0 flex-1 rounded-lg border border-border bg-white px-3 py-2 text-sm text-text outline-none focus:border-accent"
                   />
                 )}
                 {modelLoading && <Loader2 className="h-4 w-4 flex-shrink-0 animate-spin text-text-muted" />}

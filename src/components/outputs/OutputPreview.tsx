@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/Button";
 import { Copy, Check, ChevronDown, ChevronUp, ExternalLink, Send, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { useConfirm } from "@/components/ui/DialogProvider";
+import { stripMarkdownForX } from "@/lib/text/markdown";
 
 interface OutputPreviewProps {
   title: string;
@@ -72,7 +73,7 @@ export function OutputPreview({ title, content, contentJson, outputType, onDelet
   ) : null;
 
   const handleCopy = async () => {
-    await navigator.clipboard.writeText(content);
+    await navigator.clipboard.writeText(displayContent);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -90,7 +91,7 @@ export function OutputPreview({ title, content, contentJson, outputType, onDelet
       const res = await fetch("/api/x/post", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content }),
+        body: JSON.stringify({ content: displayContent }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "投稿に失敗しました");
@@ -101,6 +102,9 @@ export function OutputPreview({ title, content, contentJson, outputType, onDelet
       setPosting(false);
     }
   };
+
+  // X出力のみマークダウン記号を除去（note等は元の content をそのまま使う）
+  const displayContent = outputType === "x" ? stripMarkdownForX(content) : content;
 
   const showXPostButton = outputType === "x";
 
@@ -530,7 +534,7 @@ export function OutputPreview({ title, content, contentJson, outputType, onDelet
 
       <div className="bg-border-light rounded-xl p-4">
         <pre className="text-sm text-text whitespace-pre-wrap font-sans leading-relaxed">
-          {content}
+          {displayContent}
         </pre>
       </div>
 

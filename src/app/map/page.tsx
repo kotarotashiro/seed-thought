@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { Loader2, Maximize2, Minus, Network, Plus, X as XIcon } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Layers, Loader2, Maximize2, Minus, Network, Plus, X as XIcon } from "lucide-react";
 import type { KnowledgeMapData, KnowledgeMapNode, KnowledgeMapEdge } from "@/app/api/knowledge-map/route";
 
 // ── カテゴリ別の色 ─────────────────────────────────────────────────────────────
@@ -178,6 +179,7 @@ const clampScale = (s: number) => Math.max(MIN_SCALE, Math.min(MAX_SCALE, s));
 
 // ── メインコンポーネント ──────────────────────────────────────────────────────
 export default function KnowledgeMapPage() {
+  const router = useRouter();
   const [data, setData] = useState<KnowledgeMapData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -685,10 +687,29 @@ export default function KnowledgeMapPage() {
 
               <Link
                 href={`/posts/${selectedNode.postId}/learning`}
-                className="mb-4 block rounded-xl border border-accent/30 bg-accent-light/40 px-3 py-2 text-center text-xs font-semibold text-accent transition-colors hover:bg-accent-light/70"
+                className="mb-2 block rounded-xl border border-accent/30 bg-accent-light/40 px-3 py-2 text-center text-xs font-semibold text-accent transition-colors hover:bg-accent-light/70"
               >
                 学習カードを開く →
               </Link>
+
+              {/* 関連カードをまとめてコレクション化 */}
+              {selectedEdges.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const adjacentIds = selectedEdges.map((e) =>
+                      e.source === selectedNode.id ? e.target : e.source
+                    );
+                    const ids = [selectedNode.id, ...adjacentIds].slice(0, 30);
+                    const params = ids.map((id) => `cardId=${id}`).join("&");
+                    router.push(`/collections?${params}`);
+                  }}
+                  className="mb-4 flex w-full items-center justify-center gap-1.5 rounded-xl border border-border px-3 py-2 text-xs font-medium text-text-secondary transition-colors hover:border-accent/30 hover:bg-accent-light/20 hover:text-accent"
+                >
+                  <Layers className="h-3.5 w-3.5" />
+                  関連カードをコレクション化
+                </button>
+              )}
 
               {selectedEdges.length > 0 && (
                 <>
