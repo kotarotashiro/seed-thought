@@ -247,7 +247,7 @@ ${buildLearningInputBlock(input)}
   "userLearningMemo": "あとで見返すための学習メモ",
   "backgroundContext": {
     "postType": "判定タイプ（例: 既存概念の解説/著者の経験/ハウツー/統計/エッセイ/製品紹介/感想）",
-    "origin": "原典・出典詳細（年・著者・公式URL等）。該当しない場合は null",
+    "origin": "原典・出典を1つの文字列で記述（例: 「ダニエル・カーネマン『ファスト＆スロー』2011年 https://...」）。オブジェクト不可。該当しない場合は null",
     "historicalContext": "時代背景・なぜこの主張が生まれたか。該当しない場合は null",
     "relatedFrameworks": [
       { "name": "類似フレームワーク名", "description": "説明", "relation": "どう似ているか・違うか" }

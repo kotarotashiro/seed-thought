@@ -106,6 +106,23 @@ function parseLearningOutput(card?: LearningCardView | null): LearningOutput | n
   }
 }
 
+/** AIが構造化オブジェクトを返した場合でも安全に文字列として表示する */
+function safeStr(value: unknown): string {
+  if (typeof value === "string") return value;
+  if (value === null || value === undefined) return "";
+  if (typeof value === "object") {
+    const obj = value as Record<string, unknown>;
+    const parts: string[] = [];
+    if (obj.name) parts.push(String(obj.name));
+    if (obj.author) parts.push(String(obj.author));
+    if (obj.year) parts.push(String(obj.year));
+    if (obj.url) parts.push(String(obj.url));
+    if (parts.length > 0) return parts.join(" / ");
+    return JSON.stringify(value);
+  }
+  return String(value);
+}
+
 function SectionHeader({ icon: Icon, title }: { icon: typeof BookOpen; title: string }) {
   return (
     <div className="mb-4 flex items-center gap-2">
@@ -1004,13 +1021,13 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
                   {bg.origin && (
                     <div className="rounded-xl border border-border px-4 py-3">
                       <p className="mb-1 text-xs font-medium text-text-muted">原典・出典</p>
-                      <p className="whitespace-pre-wrap text-sm leading-relaxed text-text">{bg.origin}</p>
+                      <p className="whitespace-pre-wrap text-sm leading-relaxed text-text">{safeStr(bg.origin)}</p>
                     </div>
                   )}
                   {bg.historicalContext && (
                     <div className="rounded-xl border border-border px-4 py-3">
                       <p className="mb-1 text-xs font-medium text-text-muted">時代背景・文脈</p>
-                      <p className="whitespace-pre-wrap text-sm leading-relaxed text-text">{bg.historicalContext}</p>
+                      <p className="whitespace-pre-wrap text-sm leading-relaxed text-text">{safeStr(bg.historicalContext)}</p>
                     </div>
                   )}
                   {bg.relatedFrameworks && bg.relatedFrameworks.length > 0 && (
