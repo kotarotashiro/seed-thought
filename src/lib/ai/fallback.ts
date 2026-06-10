@@ -57,9 +57,6 @@ function inferCategory(text: string): string {
 
 function buildSummary(text: string): string {
   const compact = compactText(text);
-  if (compact.includes("ツルハシ")) {
-    return "市場では、道具を売る側、使う側、その支援側の順に利益機会が生まれるという構造を説明している投稿です。";
-  }
   if (/Codex|Claude Code|ChatGPT|Gemini|Cursor/i.test(compact)) {
     return "AI開発ツールやエージェント活用の新機能・使い方を紹介し、実務でどう活かせるかのヒントを示している投稿です。";
   }
@@ -119,25 +116,6 @@ function inferLearningTopic(text: string): {
       examples: [
         "保存一覧をカードUIにする場合、表示項目、ボタン、ソート条件を先に決める",
         "AI要約を直す場合、良い要約と悪い要約の例を与える",
-      ],
-    };
-  }
-
-  if (/ツルハシ/.test(compact)) {
-    return {
-      topic: "市場で利益が生まれる順番を見る考え方",
-      basics:
-        "この投稿の中心は、流行そのものよりも、その流行を支える道具・支援・応用の市場を見るという視点です。誰が最初に利益を得るか、次に誰が成果を出すかを分けて考えます。",
-      mechanism:
-        "新しい市場では、まず道具を売る側が利益を得やすく、その後、道具を使って成果を出す側、さらにその人たちを支援する側へ機会が広がります。ただし、使う側が成果を出せない市場は長続きしません。",
-      practicalSteps: [
-        "市場の参加者を「売る側」「使う側」「支援する側」に分ける",
-        "自分がどの立場で価値を出せるか考える",
-        "読者にとって再現できる形に言い換える",
-      ],
-      examples: [
-        "AI市場なら、ツール提供者、AIを使う事業者、導入支援者に分けて見る",
-        "SNS運用なら、教材販売者、実践者、添削や運用支援者に分けて見る",
       ],
     };
   }

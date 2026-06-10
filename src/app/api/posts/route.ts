@@ -22,7 +22,12 @@ function corsJson(body: unknown, init?: ResponseInit) {
 
 function isExtensionAuthorized(request: Request): boolean {
   const expected = process.env.EXTENSION_TOKEN;
-  if (!expected) return true; // unset = open (personal-use default)
+  if (!expected) {
+    // REQUIRE_EXTENSION_TOKEN=1 を設定すると、EXTENSION_TOKEN未設定時に全リクエストを拒否する。
+    // Cloudflare Tunnelなど外部公開環境ではこのフラグを有効にしてEXTENSION_TOKENも設定すること。
+    if (process.env.REQUIRE_EXTENSION_TOKEN === "1") return false;
+    return true; // 未設定=オープン（個人ローカル利用デフォルト）
+  }
   const header = request.headers.get("x-extension-token") || "";
   return header === expected;
 }

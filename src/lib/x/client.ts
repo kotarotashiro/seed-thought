@@ -87,7 +87,8 @@ const EXPANSIONS = "author_id,attachments.media_keys";
 async function fetchFromX(
   endpoint: string,
   accessToken: string,
-  params: Record<string, string> = {}
+  params: Record<string, string> = {},
+  attempt = 0
 ): Promise<XApiResponse> {
   const url = new URL(`${BASE_URL}${endpoint}`);
   Object.entries(params).forEach(([key, value]) => {
@@ -101,6 +102,11 @@ async function fetchFromX(
   });
 
   if (!response.ok) {
+    // 503/502 は一時的なエラーなので最大2回リトライ
+    if ((response.status === 503 || response.status === 502) && attempt < 2) {
+      await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
+      return fetchFromX(endpoint, accessToken, params, attempt + 1);
+    }
     const errorText = await response.text();
     throw new Error(`X API error: ${response.status} - ${errorText}`);
   }
