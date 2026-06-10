@@ -147,11 +147,13 @@ export default function ConfirmPage({ params }: { params: Promise<{ postId: stri
     const isLikeOrBookmark =
       post.source === "user_like" || post.source === "user_bookmark";
     const canThread = isLikeOrBookmark && !!post.sourcePostId;
-    const alreadyHasThread = (post.threadPosts?.length ?? 0) > 0;
+    // threadFetchedAt が入っていれば取得済み（子投稿0件の単独ポストも含む）。
+    // 未取得のときだけ自動取得し、開くたびのX API再読み取り課金を防ぐ。
+    const alreadyChecked = !!post.threadFetchedAt || (post.threadPosts?.length ?? 0) > 0;
     const alreadyHasLinks = relatedLinks.length > 0;
     const hasUrl = /https?:\/\//i.test(post.text ?? "");
 
-    if (canThread && !alreadyHasThread) {
+    if (canThread && !alreadyChecked) {
       void handleFetchThread();
     }
     if (!alreadyHasLinks && hasUrl) {
@@ -211,13 +213,17 @@ export default function ConfirmPage({ params }: { params: Promise<{ postId: stri
     ? `/posts/${postId}/learning?provider=${encodeURIComponent(genProvider)}${genModel ? `&model=${encodeURIComponent(genModel)}` : ""}`
     : `/posts/${postId}/learning`;
 
-  const handleFetchThread = async () => {
+  const handleFetchThread = async (force = false) => {
     setFetchingThread(true);
     setThreadMessage(null);
     setThreadError(null);
 
     try {
-      const res = await fetch(`/api/posts/${postId}/thread`, { method: "POST" });
+      const res = await fetch(`/api/posts/${postId}/thread`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ force }),
+      });
       const data = await res.json();
       if (!res.ok || data.error) {
         setThreadError(data.error || "ツリーの取得に失敗しました");
@@ -655,7 +661,7 @@ export default function ConfirmPage({ params }: { params: Promise<{ postId: stri
               <Button
                 variant="secondary"
                 size="sm"
-                onClick={handleFetchThread}
+                onClick={() => handleFetchThread(true)}
                 disabled={fetchingThread || deletingThread || addingManualThread}
                 loading={fetchingThread}
                 loadingLabel="取得中..."

@@ -28,6 +28,7 @@ model Post {
   savedAt         DateTime @default(now())
   rawJson         String?
   enrichmentStatus String  @default("done") // "pending" | "processing" | "done" | "failed"
+  threadFetchedAt  DateTime? // X APIでツリー取得を試みた最終時刻（null=未取得）。子投稿0件でも記録し、再取得（=X API課金）を防ぐ。
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 

@@ -9,6 +9,8 @@ interface ThreadFetchResult {
   fetchedCount: number;
   insertedCount: number;
   skippedCount: number;
+  /** true when served from DB without calling the X API (no read consumed). */
+  cached?: boolean;
 }
 
 interface ManualThreadInput {
@@ -157,7 +159,10 @@ export async function addManualThreadPost(
   return { insertedCount: 1, source: "manual_text" };
 }
 
-export async function fetchAndSaveThread(postId: string): Promise<ThreadFetchResult> {
+export async function fetchAndSaveThread(
+  postId: string,
+  options: { force?: boolean } = {}
+): Promise<ThreadFetchResult> {
   const post = await prisma.post.findUnique({
     where: { id: postId },
     include: { threadPosts: true },
@@ -167,6 +172,18 @@ export async function fetchAndSaveThread(postId: string): Promise<ThreadFetchRes
   const isFromX = post.source === "user_like" || post.source === "user_bookmark";
   if (!isFromX || !post.sourcePostId || !post.authorUsername) {
     throw new Error("X由来の投稿だけツリーを取得できます");
+  }
+
+  // キャッシュ: 一度ツリー取得を試みた投稿は、子投稿が0件でも threadFetchedAt が
+  // 入る。再取得は X API の Read 課金が走るため、明示的な force 指定がない限りは
+  // 保存済みをそのまま返す（最新の連投を取り直したいときは「再取得」ボタン=force）。
+  if (!options.force && post.threadFetchedAt) {
+    return {
+      fetchedCount: post.threadPosts.length,
+      insertedCount: 0,
+      skippedCount: post.threadPosts.length,
+      cached: true,
+    };
   }
 
   const xAccount = await prisma.xAccount.findFirst();
@@ -247,6 +264,12 @@ export async function fetchAndSaveThread(postId: string): Promise<ThreadFetchRes
       insertedCount++;
     }
   }
+
+  // 取得済みフラグを立てる（子投稿0件＝単独ポストでも記録し、次回以降の自動再取得を止める）。
+  await prisma.post.update({
+    where: { id: postId },
+    data: { threadFetchedAt: new Date() },
+  });
 
   return {
     fetchedCount: childTweets.length,

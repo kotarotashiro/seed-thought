@@ -5,7 +5,7 @@ import { syncXPosts } from "@/lib/x/sync";
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { syncType = "both", limit = 25, postedFrom, postedTo } = body;
+    const { syncType = "likes", limit = 25, postedFrom, postedTo } = body;
 
     const validTypes = ["likes", "bookmarks", "both"];
     if (!validTypes.includes(syncType)) {

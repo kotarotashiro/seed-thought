@@ -10,7 +10,9 @@ export async function POST(
   const { postId } = await params;
 
   try {
-    const result = await fetchAndSaveThread(postId);
+    const body = await request.json().catch(() => ({}));
+    const force = body?.force === true;
+    const result = await fetchAndSaveThread(postId, { force });
     return NextResponse.json(result);
   } catch (error) {
     console.error("Failed to fetch thread:", error);
