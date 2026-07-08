@@ -50,6 +50,8 @@ model LearningCard {
   imagePrompt  String
   outputJson   String
   userMemo     String?
+  // 元の投稿を含めた学習内容全体をMarkdownに整形したもの。エクスポート時に生成・上書き保存する（資産としてDBに残す）。
+  exportText   String?
   status       String   @default("draft") // "draft" | "saved"
   learningMode      String   @default("content")  // "content" | "format"
   strictLearningJson String?

@@ -18,6 +18,7 @@ import { OpenInXButton } from "@/components/ui/OpenInXButton";
 import type { LearningOutput, StrictLearningOutput } from "@/lib/ai/types";
 import { parseArticleContent } from "@/lib/posts/articleParser";
 import { buildCardCopyText } from "@/lib/export/cardCopyText";
+import { buildPostTextWithThread } from "@/lib/posts/threadText";
 import {
   AlertCircle,
   ArrowLeft,
@@ -29,6 +30,7 @@ import {
   ClipboardList,
   Clock,
   Copy,
+  Download,
   ExternalLink,
   Film,
   GitBranch,
@@ -218,6 +220,7 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
   const [articleExpanded, setArticleExpanded] = useState(false);
   const [postExpanded, setPostExpanded] = useState(false);
   const [copiedAll, setCopiedAll] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   // Collapsible section states (secondary content starts closed)
   const [strictOpen, setStrictOpen] = useState(false);
@@ -274,17 +277,48 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
   // 1つのMarkdownにまとめてコピーする。他AIでの記事生成に貼り付ける用途。
   const handleCopyAll = async () => {
     if (!output) return;
-    const text = buildCardCopyText(output, strictLearning, {
-      title: output.title || card?.title,
-      sourceUrl: post?.sourceUrl,
-      author: post?.authorUsername ? `@${post.authorUsername}` : post?.authorName,
-    });
+    const text = buildCardCopyText(
+      output,
+      strictLearning,
+      {
+        title: output.title || card?.title,
+        sourceUrl: post?.sourceUrl,
+        author: post?.authorUsername ? `@${post.authorUsername}` : post?.authorName,
+      },
+      post ? buildPostTextWithThread({ ...post, threadPosts: post.threadPosts ?? undefined }) : null
+    );
     try {
       await navigator.clipboard.writeText(text);
       setCopiedAll(true);
       setTimeout(() => setCopiedAll(false), 2000);
     } catch {
       await alert({ title: "コピーに失敗しました", message: "クリップボードへのアクセスが拒否されました。" });
+    }
+  };
+
+  // 元の投稿を含めた学習内容全体をMarkdownに整形してDBに保存し、ファイルとしてダウンロードする。
+  const handleExport = async () => {
+    if (!card) return;
+    setExporting(true);
+    try {
+      const res = await fetch(`/api/learning-cards/${card.id}/export`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "エクスポートに失敗しました");
+      const blob = new Blob([data.exportText], { type: "text/markdown;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = data.filename || "learning-card.md";
+      a.click();
+      URL.revokeObjectURL(url);
+      setMessage("学習内容をエクスポートしました");
+    } catch (err) {
+      await alert({
+        title: "エクスポートに失敗しました",
+        message: err instanceof Error ? err.message : "しばらくしてから再度お試しください。",
+      });
+    } finally {
+      setExporting(false);
     }
   };
 
@@ -640,6 +674,16 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
                 ) : (
                   <><Copy className="mr-1.5 h-3.5 w-3.5" />記事用にコピー</>
                 )}
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={handleExport}
+                loading={exporting}
+                loadingLabel="書き出し中..."
+              >
+                <Download className="mr-1.5 h-3.5 w-3.5" />
+                エクスポート
               </Button>
               <Button size="sm" onClick={handleSave} loading={saving} loadingLabel="保存中...">
                 <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />
