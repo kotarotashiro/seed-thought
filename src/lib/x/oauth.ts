@@ -4,7 +4,8 @@ import crypto from "crypto";
 const AUTH_URL = "https://twitter.com/i/oauth2/authorize";
 const TOKEN_URL = "https://api.twitter.com/2/oauth2/token";
 
-const DEFAULT_SCOPES = ["tweet.read", "tweet.write", "users.read", "offline.access"];
+const REQUIRED_SCOPES = ["tweet.read", "users.read", "offline.access", "like.read", "bookmark.read"];
+const DEFAULT_SCOPES = [...REQUIRED_SCOPES, "tweet.write"];
 
 function getClientId(): string {
   const clientId = process.env.X_CLIENT_ID;
@@ -20,7 +21,7 @@ function getRedirectUri(): string {
   return process.env.X_REDIRECT_URI || "http://localhost:3003/api/x/callback";
 }
 
-function getScopes(): string[] {
+export function getScopes(): string[] {
   const configured = process.env.X_SCOPES;
   if (!configured) return DEFAULT_SCOPES;
 
@@ -29,7 +30,9 @@ function getScopes(): string[] {
     .map((scope) => scope.trim())
     .filter(Boolean);
 
-  return scopes.length > 0 ? scopes : DEFAULT_SCOPES;
+  const merged = new Set(scopes.length > 0 ? scopes : DEFAULT_SCOPES);
+  REQUIRED_SCOPES.forEach((scope) => merged.add(scope));
+  return [...merged];
 }
 
 function generateCodeVerifier(): string {

@@ -21,6 +21,32 @@ interface SyncDateRange {
   to?: Date | null;
 }
 
+interface SyncOptions {
+  auto?: boolean;
+  enrichWithAi?: boolean;
+}
+
+function parseScopes(scopesJson: string | null): string[] {
+  if (!scopesJson) return [];
+  try {
+    const scopes = JSON.parse(scopesJson);
+    return Array.isArray(scopes) ? scopes.map(String) : [];
+  } catch {
+    return [];
+  }
+}
+
+function getMissingScopes(
+  syncType: "likes" | "bookmarks" | "both",
+  scopesJson: string | null
+): string[] {
+  const scopes = parseScopes(scopesJson);
+  const required = new Set<string>();
+  if (syncType === "likes" || syncType === "both") required.add("like.read");
+  if (syncType === "bookmarks" || syncType === "both") required.add("bookmark.read");
+  return [...required].filter((scope) => !scopes.includes(scope));
+}
+
 function filterTweetsByPostedAt(
   tweets: XTweetWithAuthor[],
   dateRange?: SyncDateRange
@@ -43,17 +69,21 @@ async function saveTweets(
 ): Promise<{ insertedCount: number; skippedDuplicateCount: number }> {
   let insertedCount = 0;
   let skippedDuplicateCount = 0;
+  const sourcePostIds = tweets.map((tweet) => tweet.id).filter(Boolean);
+  const existingRows = sourcePostIds.length > 0
+    ? await prisma.post.findMany({
+        where: {
+          savedType,
+          sourcePostId: { in: sourcePostIds },
+        },
+        select: { sourcePostId: true },
+      })
+    : [];
+  const existingSourcePostIds = new Set(existingRows.map((row) => row.sourcePostId).filter(Boolean));
 
   for (const tweet of tweets) {
     // Check for duplicates
-    const existing = await prisma.post.findFirst({
-      where: {
-        sourcePostId: tweet.id,
-        savedType,
-      },
-    });
-
-    if (existing) {
+    if (existingSourcePostIds.has(tweet.id)) {
       skippedDuplicateCount++;
       continue;
     }
@@ -131,7 +161,8 @@ async function saveTweets(
 export async function syncXPosts(
   syncType: "likes" | "bookmarks" | "both",
   limit: number = 25,
-  dateRange?: SyncDateRange
+  dateRange?: SyncDateRange,
+  options: SyncOptions = {}
 ): Promise<{ syncRunId: string; results: SyncResult }> {
   // Get the connected X account
   const xAccount = await prisma.xAccount.findFirst();
@@ -139,8 +170,16 @@ export async function syncXPosts(
     throw new Error("Xアカウントが接続されていません。設定画面からXアカウントを接続してください。");
   }
 
+  const missingScopes = getMissingScopes(syncType, xAccount.scopesJson);
+  if (missingScopes.length > 0) {
+    throw new Error(
+      `X連携の読み取り権限が不足しています（不足: ${missingScopes.join(", ")}）。` +
+      "一度Xアカウントの接続を解除し、再接続してから同期してください。"
+    );
+  }
+
   const accessToken = await getFreshAccessToken(xAccount);
-  const enrichWithAi = limit <= 25;
+  const enrichWithAi = options.enrichWithAi ?? (!options.auto && limit <= 25);
 
   // Create sync run record
   const syncRun = await prisma.xSyncRun.create({

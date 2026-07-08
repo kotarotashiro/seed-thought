@@ -26,6 +26,21 @@ describe("parseAiJson", () => {
     expect(parseAiJson(fenced, isNumObj, "test")).toEqual({ n: 2 });
   });
 
+  it("parses fenced JSON with surrounding prose", () => {
+    const response = '以下です。\n```json\n{"n":3}\n```\n必要なら調整してください。';
+    expect(parseAiJson(response, isNumObj, "test")).toEqual({ n: 3 });
+  });
+
+  it("parses an embedded JSON object from prose", () => {
+    const response = '承知しました。{"n":4} 以上です。';
+    expect(parseAiJson(response, isNumObj, "test")).toEqual({ n: 4 });
+  });
+
+  it("ignores bracket-like prose before an embedded JSON object", () => {
+    const response = '候補 [未確定] を確認しました。\n{"n":5}';
+    expect(parseAiJson(response, isNumObj, "test")).toEqual({ n: 5 });
+  });
+
   it("throws AiJsonError on empty input", () => {
     expect(() => parseAiJson("", isString, "lbl")).toThrow(AiJsonError);
     expect(() => parseAiJson("   ", isString, "lbl")).toThrow(AiJsonError);

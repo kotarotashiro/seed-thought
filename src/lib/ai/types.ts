@@ -68,6 +68,69 @@ export interface BeginnerZone {
   glossary: { term: string; explanation: string }[];
 }
 
+/**
+ * 解読器（SeedThought 2）の出力。
+ * 「なぜすごいのか」「何が変わったか(before/after)」を投稿から解読し、
+ * 発信の背景文脈と再利用可能な型を取り出す。
+ * 全主張は evidenceQuotes（投稿からの抜き出し句）に根拠を紐付ける（引用ファースト）。
+ * 品質基準: docs/seedthought2-decoder-gold-sample.md
+ */
+export interface DecodeOutput {
+  /** 引用ファースト: 解読の根拠となる投稿からの抜き出し句（3〜8個） */
+  evidenceQuotes: string[];
+  /** この投稿の正体を一言で（要約ではなく「何を実現したものか」） */
+  oneLiner: string;
+  /** なぜすごいのか。各ポイントに根拠句を紐付ける */
+  whySignificant: { point: string; evidence: string }[];
+  /** 変化の文脈。発信時に初級者へ伝わる導入の核材料になる */
+  beforeAfter: {
+    /** 今まで: どうするしかなかったか */
+    before: string;
+    /** これが出た: 何が登場・変化したか */
+    trigger: string;
+    /** こう変わる: 誰に何ができるようになるか */
+    after: string;
+  };
+  /** 仕組みの解読（旧・学習カードの理解パートの統合先）。要素→実務上の役割 */
+  mechanism: {
+    items: { element: string; role: string }[];
+    /** 原典・系譜（どこから来た手法/考え方か）。不明なら null */
+    lineage: string | null;
+  } | null;
+  /** 再利用可能な型。型が抽出できない投稿（感想・ニュース等）は null */
+  extractedPattern: {
+    name: string;
+    structure: string;
+    variableSlots: string[];
+    /** どこまで転用できるか（元の領域の外を必ず考える） */
+    transferScope: string;
+    usageNote: string | null;
+  } | null;
+  /**
+   * 同ジャンルの隣接する定番の型（派生の地図）。
+   * 唯一、投稿の外の一般知識を使ってよいフィールド。実在する定番のみ・でっちあげ禁止。
+   * 各型にすぐ試せるプロンプト案を付け、この投稿から横に派生できるようにする。
+   */
+  adjacentPatterns?: {
+    name: string;
+    description: string;
+    /**
+     * その型をそのまま試せる実行形。形式はジャンルに合わせる
+     * （プロンプト/穴埋めテンプレ/問いリスト/最小手順）。実行形にできない型は null
+     */
+    actionable: string | null;
+  }[] | null;
+  /** 掛け合わせエンジン用のフック（短いタグ3〜6個） */
+  synthesisTags: string[];
+  /** 発信ネタの種（2パス生成への入力） */
+  outputSeed: {
+    /** 切り口。before/after を導入に使う形で */
+    angle: string;
+    /** 冒頭フック案。無ければ null */
+    hook: string | null;
+  };
+}
+
 export interface LearningOutput {
   sourcePostId: string;
   title: string;
@@ -87,6 +150,12 @@ export interface LearningOutput {
   applicationIdeas: {
     title: string;
     description: string;
+    /**
+     * そのまま使える実行形。形式は投稿のジャンルに合わせる：
+     * プロンプト系→貼れるプロンプト / 文章術→穴埋めテンプレ / 思考法→自分に当てる問いリスト /
+     * 手順系→最小手順。実行形にできない投稿（思想・ニュース等）は null（無理に作らない）
+     */
+    actionable?: string | null;
   }[];
   tips: string[];
   useCases: string[];
@@ -103,6 +172,8 @@ export interface LearningOutput {
   imageExplanationPrompt: string;
   userLearningMemo: string;
   backgroundContext?: BackgroundContext | null;
+  /** 解読器の出力（SeedThought 2）。生成失敗時や旧カードは null/undefined */
+  decode?: DecodeOutput | null;
   status: "draft" | "saved";
 
   // --- legacy（旧カード互換。新規生成では使わない） ---
@@ -156,6 +227,31 @@ export type OutputType =
 export interface NoteSection {
   heading: string;
   body: string;
+}
+
+/**
+ * セミナー2分割生成の「①設計」出力。
+ * 巨大スキーマの1ショット生成はモデルが省略する（スライド2枚・章詳細1件等）ため、
+ * 設計と中身に分割する。フィールドの詳細構造はプロンプト側が規定し、ここでは
+ * 機械チェックに必要な部分だけ型を持つ。
+ */
+export interface SeminarDesign {
+  coreInterpretation?: Record<string, unknown>;
+  titleOptions?: unknown[];
+  seminar: { name: string; [key: string]: unknown };
+  schedule: { time?: string; part?: string; content?: string; purpose?: string }[];
+  promotion?: Record<string, unknown>;
+  salesFunnel?: Record<string, unknown>;
+  finalStatement?: string;
+}
+
+/** セミナー2分割生成の「②中身」出力。 */
+export interface SeminarContent {
+  chapterDetails: { part?: string; script?: string; [key: string]: unknown }[];
+  demonstration?: Record<string, unknown>;
+  workshop?: Record<string, unknown>;
+  templates?: Record<string, unknown>;
+  slides: { slideNumber?: number; title?: string; content?: string; visualIdea?: string }[];
 }
 
 export interface NoteContentJson {

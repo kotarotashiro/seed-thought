@@ -2,6 +2,7 @@
 
 # dependencies
 /node_modules
+/.pnpm-store
 /.pnp
 .pnp.*
 .yarn/*
@@ -42,6 +43,7 @@ backups/
 # local runtime logs
 dev-server.log
 *.local.log
+.xai-auth.local.json
 .claude/
 
 # vercel

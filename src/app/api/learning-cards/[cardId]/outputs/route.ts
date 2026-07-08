@@ -5,6 +5,7 @@ import { getUserFacingError } from "@/lib/api/errors";
 import { createFallbackOutput } from "@/lib/ai/fallback";
 import type { PostClassificationResult } from "@/lib/ai/types";
 import { buildPostTextWithThread } from "@/lib/posts/threadText";
+import { buildOutputMaterialSteps } from "@/lib/ai/outputMaterial";
 
 // アウトプット生成は1回のLLM呼び出し。Vercel Hobby(Fluid Compute)上限の300秒まで
 // 引き上げ、Kimi等の遅いモデルでも打ち切られないようにする。
@@ -125,14 +126,7 @@ export async function POST(
         postAuthorName: post.authorName ?? null,
         postAuthorUsername: post.authorUsername ?? null,
         classification,
-        steps: [
-          {
-            title: "学習内容",
-            question: "",
-            aiContent: card.outputJson,
-            userNote: card.userMemo ?? null,
-          },
-        ],
+        steps: buildOutputMaterialSteps(card.outputJson, card.userMemo ?? null),
         userFinalNote: card.userMemo ?? null,
         finalSummary: card.summary,
       })

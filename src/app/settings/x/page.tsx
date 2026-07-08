@@ -120,6 +120,19 @@ export default function XSettingsPage() {
   const accountScopes = parseAccountScopes(xStatus?.account);
   const missingSyncScopes = getMissingSyncScopes(syncType, accountScopes);
 
+  const triggerHeartbeatRefresh = () => {
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("seed-thought:heartbeat:refresh"));
+      try {
+        const channel = new BroadcastChannel("seed-thought:heartbeat");
+        channel.postMessage("refresh");
+        channel.close();
+      } catch {
+        // Ignore
+      }
+    }
+  };
+
   const loadStatus = async (showLoading = false) => {
     if (showLoading) setLoading(true);
     try {
@@ -129,6 +142,7 @@ export default function XSettingsPage() {
       ]);
       setXStatus(await xRes.json());
       setGrokStatus(await grokRes.json());
+      triggerHeartbeatRefresh();
     } catch (err) {
       console.error("Failed to fetch connection status:", err);
     } finally {
@@ -148,6 +162,7 @@ export default function XSettingsPage() {
         if (cancelled) return;
         setXStatus(await xRes.json());
         setGrokStatus(await grokRes.json());
+        triggerHeartbeatRefresh();
       } catch (err) {
         console.error("Failed to fetch connection status:", err);
       } finally {

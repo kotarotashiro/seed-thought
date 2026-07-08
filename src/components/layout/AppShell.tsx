@@ -8,7 +8,8 @@ import { DialogProvider } from "@/components/ui/DialogProvider";
 import { ConnectionBanner, type GrokStatus } from "./ConnectionBanner";
 
 /** 起動時に1回だけ heartbeat を叩き、次の focus 契機まで最低この ms を空ける */
-const FOCUS_THROTTLE_MS = 3 * 60 * 1000; // 3分
+const FOCUS_THROTTLE_MS = 60 * 60 * 1000; // 60分
+const HEARTBEAT_CACHE_KEY = "seed-thought:heartbeat";
 
 interface HeartbeatResponse {
   grok: GrokStatus;
@@ -18,6 +19,8 @@ interface HeartbeatResponse {
 export function AppShell({ children }: { children: React.ReactNode }) {
   const [collapsed, setCollapsed] = useState(false);
   const [grokStatus, setGrokStatus] = useState<GrokStatus | null>(null);
+  const grokStatusRef = useRef<GrokStatus | null>(null);
+  grokStatusRef.current = grokStatus;
   const lastFetchRef = useRef<number>(0);
 
   const fetchHeartbeat = async () => {
@@ -33,17 +36,47 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   };
 
   useEffect(() => {
-    // マウント時に1回実行
     void fetchHeartbeat();
 
-    // ウィンドウフォーカス時にスロットル付きで再取得
+    // 他のタブやポップアップからの変更通知を受け取るための BroadcastChannel
+    let channel: BroadcastChannel | null = null;
+    try {
+      channel = new BroadcastChannel("seed-thought:heartbeat");
+      channel.onmessage = (event) => {
+        if (event.data === "refresh") {
+          void fetchHeartbeat();
+        }
+      };
+    } catch {
+      // 環境によってサポートされていない場合は無視
+    }
+
+    // 同一タブ内のコンポーネントからの変更通知用カスタムイベント
+    const handleRefresh = () => {
+      void fetchHeartbeat();
+    };
+    window.addEventListener("seed-thought:heartbeat:refresh", handleRefresh);
+
+    // ウィンドウフォーカス時にスロットル付きで再取得（接続エラー時、またはX設定ページでは強制再取得）
     const onFocus = () => {
-      if (Date.now() - lastFetchRef.current >= FOCUS_THROTTLE_MS) {
+      const isSettingsPage = window.location.pathname === "/settings/x";
+      const hasConnectionError = !grokStatusRef.current || !grokStatusRef.current.connected;
+      if (
+        isSettingsPage ||
+        hasConnectionError ||
+        Date.now() - lastFetchRef.current >= FOCUS_THROTTLE_MS
+      ) {
         void fetchHeartbeat();
       }
     };
     window.addEventListener("focus", onFocus);
-    return () => window.removeEventListener("focus", onFocus);
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      window.removeEventListener("seed-thought:heartbeat:refresh", handleRefresh);
+      if (channel) {
+        channel.close();
+      }
+    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

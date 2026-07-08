@@ -1,9 +1,12 @@
 import type {
+  DecodeOutput,
   GeneratedOutputResult,
   LearningOutput,
   NoteSection,
   PostClassificationResult,
   SemanticSearchResult,
+  SeminarContent,
+  SeminarDesign,
   StrictLearningOutput,
   TrendInsight,
 } from "./types";
@@ -217,6 +220,80 @@ function isValidBeginnerZone(value: unknown): boolean {
   return stumblingOk && glossaryOk;
 }
 
+/**
+ * 解読器出力の検証。
+ * 核フィールド（oneLiner / whySignificant / beforeAfter）は厳格に、
+ * 周辺フィールド（mechanism / extractedPattern 等）は寛容に検証する。
+ * 弱いモデルが周辺を落としても、核が立っていれば解読として成立させる。
+ */
+export function isDecodeOutput(value: unknown): value is DecodeOutput {
+  if (!isRecord(value)) return false;
+
+  // 核: 一言でいうと・なぜすごいのか（根拠句つき・1件以上）・before/after
+  if (typeof value.oneLiner !== "string" || value.oneLiner.trim().length === 0) return false;
+  if (
+    !Array.isArray(value.whySignificant) ||
+    value.whySignificant.length === 0 ||
+    !value.whySignificant.every(
+      (w) => isRecord(w) && typeof w.point === "string" && typeof w.evidence === "string"
+    )
+  ) {
+    return false;
+  }
+  const ba = value.beforeAfter;
+  if (
+    !isRecord(ba) ||
+    typeof ba.before !== "string" ||
+    typeof ba.trigger !== "string" ||
+    typeof ba.after !== "string"
+  ) {
+    return false;
+  }
+
+  // 周辺: 形が合わないときだけ弾く（欠落は provider 側でデフォルト補完）
+  if (value.evidenceQuotes !== undefined && !isStringArray(value.evidenceQuotes)) return false;
+  if (value.synthesisTags !== undefined && !isStringArray(value.synthesisTags)) return false;
+  if (value.mechanism !== undefined && value.mechanism !== null) {
+    const m = value.mechanism;
+    if (
+      !isRecord(m) ||
+      !Array.isArray(m.items) ||
+      !m.items.every(
+        (it) => isRecord(it) && typeof it.element === "string" && typeof it.role === "string"
+      )
+    ) {
+      return false;
+    }
+  }
+  if (value.extractedPattern !== undefined && value.extractedPattern !== null) {
+    const p = value.extractedPattern;
+    if (
+      !isRecord(p) ||
+      typeof p.name !== "string" ||
+      typeof p.structure !== "string" ||
+      !isStringArray(p.variableSlots) ||
+      typeof p.transferScope !== "string"
+    ) {
+      return false;
+    }
+  }
+  if (value.outputSeed !== undefined && value.outputSeed !== null) {
+    const s = value.outputSeed;
+    if (!isRecord(s) || typeof s.angle !== "string") return false;
+  }
+  if (value.adjacentPatterns !== undefined && value.adjacentPatterns !== null) {
+    if (
+      !Array.isArray(value.adjacentPatterns) ||
+      !value.adjacentPatterns.every(
+        (a) => isRecord(a) && typeof a.name === "string" && typeof a.description === "string"
+      )
+    ) {
+      return false;
+    }
+  }
+  return true;
+}
+
 export function isStrictLearningOutput(value: unknown): value is StrictLearningOutput {
   if (!isRecord(value)) return false;
   if (!isRecord(value.claimBreakdown)) return false;
@@ -252,6 +329,28 @@ export function isStrictLearningOutput(value: unknown): value is StrictLearningO
     typeof ex.goal === "string" &&
     isStringArray(ex.steps) &&
     typeof ex.deliverable === "string"
+  );
+}
+
+/** セミナー①設計の検証。schedule と seminar.name が立っていれば成立（他は寛容）。 */
+export function isSeminarDesign(value: unknown): value is SeminarDesign {
+  if (!isRecord(value)) return false;
+  if (!isRecord(value.seminar) || typeof value.seminar.name !== "string") return false;
+  return (
+    Array.isArray(value.schedule) &&
+    value.schedule.length > 0 &&
+    value.schedule.every((s) => isRecord(s))
+  );
+}
+
+/** セミナー②中身の検証。slides と chapterDetails が配列で存在すれば成立（枚数は機械チェック側で見る）。 */
+export function isSeminarContent(value: unknown): value is SeminarContent {
+  if (!isRecord(value)) return false;
+  return (
+    Array.isArray(value.slides) &&
+    value.slides.every((s) => isRecord(s)) &&
+    Array.isArray(value.chapterDetails) &&
+    value.chapterDetails.every((c) => isRecord(c))
   );
 }
 

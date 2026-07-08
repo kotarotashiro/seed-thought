@@ -8,12 +8,14 @@ import type {
   PostContext,
   PostSummaryForSearch,
   PostSummaryForTrend,
+  SeminarContent,
+  SeminarDesign,
   SourcePostForLearning,
   TranslateTextInput,
 } from "./types";
 import { strictLearningKnowledge, beginnerTeachingRules } from "./knowledge";
 import { outputDesignCore, outputMediumKnowledge, outputSelfReview, satoriTypeInstructions, xSatoriSelfReview } from "./outputKnowledge";
-import { KOTARO_LENS_PROFILE } from "./userLens";
+import { READER_LENS_PROFILE, WRITER_VOICE_RULES } from "./userLens";
 
 export async function buildClassifyPrompt(input: ClassifyPostInput): Promise<string> {
   const profile = await getProfile();
@@ -99,12 +101,13 @@ function learningModeInstruction(input: SourcePostForLearning): string {
   const mode = input.learningMode ?? "content";
   return mode === "content"
     ? `あなたは「勉強のできる解説者」です。
-ユーザーが保存したX投稿について、ユーザーが一段深く理解できるように整理します。
+ユーザーは、最先端の知識・技術を初級者向けにかみ砕いて発信・講座化する解説者です。
+保存したX投稿を、ユーザーが「人に教えられる」水準で理解できるように整理します。この学習カードは、のちの発信・セミナー・記事の仕込みになります。
 
 役割は投稿の要約整理ではありません。役割は以下の3つです：
 1. 投稿の内容を正確に・敬意をもって理解する（持論で歪めない）
 2. 投稿の周辺情報（原典・時代背景・類似フレームワーク等）を補足し、投稿を理解するための地図を作る
-3. ユーザーが自分の言葉で考えるための材料を揃える
+3. ユーザーが自分の言葉で初級者に説明するための材料を揃える
 
 - 投稿のテーマ領域に踏み込んで、内容として学ぶ
 - 投稿者の主張・根拠・推奨アクションを尊重する
@@ -189,11 +192,21 @@ ${buildLearningInputBlock(input)}
     { "title": "手順名", "description": "説明", "actions": ["具体アクション1", "具体アクション2"] }
   ],
   "applicationIdeas": [
-    { "title": "応用アイデア", "description": "説明" }
+    { "title": "応用アイデア", "description": "説明", "actionable": "そのまま使える実行形。形式は下の作法に従う。該当しなければ null" }
   ],
   "tips": ["うまく使うコツ1", "コツ2"],
   "useCases": ["向いている用途1", "用途2"]
 }
+
+## applicationIdeas（応用アイデア）の作法
+- アイデアを「説明」で終わらせない。各アイデアに、ユーザーがコピーして今日そのまま使える「実行形」を actionable に書く
+- **実行形の形式は投稿のジャンルに合わせる**（ここが腕の見せ所。ジャンル違いの形式を機械的に当てはめない）：
+  - プロンプト・テンプレ系 → そのまま貼れる具体プロンプト（元の構造を保ち、変える箇所だけ差し替える）
+  - 文章術・構文系 → 穴埋めテンプレや書き換え例（[ ]で差し替え箇所を示す）
+  - 思考法・フレームワーク系 → 自分の状況に当てるための問いリスト（3〜5問）やチェックリスト
+  - 手順・ワークフロー系 → 最小の手順レシピ（今日できる粒度で3〜5ステップ）
+  - ツール紹介・速報系 → 最初の15分でできる試し方
+- 実行形にできない投稿（思想・エッセイ・感想・ニュースの感想等）は actionable を null にする。無理に作らない
 
 ## ① capture（投稿の中身）の作法 ＝ このカードの主役
 投稿の中身そのものを取り出すセクション。何も知らない人がこの通りやれば同じ結果になる粒度で、中身を忠実に転写する。
@@ -202,12 +215,10 @@ ${buildLearningInputBlock(input)}
 - 抽象化・批評・自分の言葉への変換はしない（それは別セクションの仕事）
 - 投稿のノイズ（煽り・自分語り・宣伝・URL・CTA）は削り、価値のある中身だけ残す
 
-${KOTARO_LENS_PROFILE}
-
 ## 最終確認
 - すべての必須フィールドを省略しない
-- 投稿の内容に忠実に、Kotaroの持論をねじ込まない
-- 投稿が興味の核に自然に接続するときだけ、自然に指摘する（無理に接続しない）
+- 投稿の内容に忠実に。ユーザーの持論・思想を勝手に足さない
+- 投稿がユーザーの関心テーマに自然に接続するときだけ、自然に指摘する（無理に接続しない）
 - 日本語として正しい表記にする。誤変換・中国語/英単語の生混入を避ける（×完美主義→○完璧主義、×鶏呑み→○鵜呑み、英単語の生混入禁止）
 - JSONのみ返してください。説明文・前置きは不要です`;
 }
@@ -281,9 +292,131 @@ ${beginnerTeachingRules}
 
 ## 最終確認
 - diagramStructure を必ず埋める
-- 投稿の内容に忠実に、Kotaroの持論をねじ込まない
+- 投稿の内容に忠実に。ユーザーの持論・思想を勝手に足さない
 - 日本語として正しい表記にする。誤変換・中国語/英単語の生混入を避ける（×完美主義→○完璧主義、×鶏呑み→○鵜呑み、英単語の生混入禁止）
 - JSONのみ返してください。説明文・前置きは不要です`;
+}
+
+// ③ 解読器（SeedThought 2）：なぜすごいのか・before/after・仕組み・型を解読する。
+// 弱いモデルでも品質が出るよう、引用ファースト＋金標準few-shot＋失敗モードの名指し禁止で足場を組む。
+// 品質基準と設計レバーの全文: docs/seedthought2-decoder-gold-sample.md
+export function buildDecodePrompt(input: SourcePostForLearning, profile?: FixedProfile): string {
+  const profileSection = profile && (profile.themes.length > 0 || profile.knowledge)
+    ? `\n## ユーザーの関心テーマ（outputSeed の切り口判断に使う。無理に接続しない）
+テーマ: ${profile.themes.join("、")}${profile.knowledge ? `\nコンテキスト（専門・発信背景）: ${profile.knowledge}` : ""}\n`
+    : "";
+
+  return `あなたは保存された投稿の「意義」を解読するアナリストです。
+役割は要約ではありません。「この投稿はなぜすごいのか」「これで何が変わったのか」を解読し、
+初級者向けの発信に使える背景文脈と、再利用可能な型を取り出すことです。
+
+## 作業手順（必ずこの順で）
+1. まず投稿から、解読の根拠になる句を3〜8個そのまま抜き出す（evidenceQuotes）
+2. 以降のすべての主張を、抜き出した句に紐付けて書く。根拠句に紐付かない主張は書かない
+   （唯一の例外は adjacentPatterns。後述の作法に従い一般知識を使ってよい）
+${profileSection}
+${buildLearningInputBlock(input)}
+
+## 出力形式（必ず以下のJSONのみ）
+{
+  "evidenceQuotes": ["投稿からの抜き出し句1", "句2", "句3"],
+  "oneLiner": "この投稿の正体を一言で（〜した型/手法/知見、の形。内容の要約ではなく「何を実現したものか」）",
+  "whySignificant": [
+    { "point": "なぜすごいのかの1点", "evidence": "根拠になる抜き出し句（evidenceQuotesのいずれか）" }
+  ],
+  "beforeAfter": {
+    "before": "今まで: どうするしかなかったか（誰が・何に困っていたか）",
+    "trigger": "これが出た: 何が登場・変化したか",
+    "after": "こう変わる: 誰に何ができるようになるか"
+  },
+  "mechanism": {
+    "items": [
+      { "element": "投稿内の要素・句・手順", "role": "実務上なんのための指定/工程か" }
+    ],
+    "lineage": "原典・系譜（どこから来た手法か、誰の何を参考にしたか）。不明なら null"
+  } または null,
+  "extractedPattern": {
+    "name": "型の名前（例: 浮遊デコンストラクト広告型）",
+    "structure": "型の構造を要素の連なりで（例: [被写体] + ジャンル宣言 + 背景 + ライティング + 構図トリック）",
+    "variableSlots": ["差し替え可能なスロット1", "スロット2"],
+    "transferScope": "元の領域の外でどこまで転用できるか",
+    "usageNote": "使うときの注意。無ければ null"
+  } または null（感想・ニュース等、型が抽出できない投稿は null）,
+  "adjacentPatterns": [
+    {
+      "name": "同ジャンルの別の定番の型の名前",
+      "description": "どんな型か・どんな場面で効くか（1〜2文）",
+      "actionable": "その型をすぐ試せる実行形。形式はジャンルに合わせる（プロンプト/穴埋めテンプレ/問いリスト/最小手順）。実行形にできない型は null"
+    }
+  ] または null,
+  "synthesisTags": ["掛け合わせ用の短いタグ3〜6個"],
+  "outputSeed": {
+    "angle": "発信の切り口（beforeAfter を導入に使う形で1〜2文）",
+    "hook": "冒頭フック案。無ければ null"
+  }
+}
+
+## 見本（この水準を出す。語句の流用ではなく、粒度と目線を真似ること）
+入力例: 「海外で話題の『料理がバラバラに浮かぶ』プロンプトを、チラシやサイトのメインビジュアルにそのまま使える形に改良した」という投稿＋穴埋め式プロンプト（[subject], premium food advertising, white seamless background, high key studio lighting, floating stacked composition, [ingredient_bits] scattered around, clean minimal layout）
+出力例の要点:
+- oneLiner: 「実写広告の定番『浮遊デコンストラクト』構図を、飲食店バナー用の穴埋め式プロンプトに実務変換した型」
+- whySignificant: 「この構図はAI発祥ではなく実写広告の確立ジャンルの移植。本来はスタジオ撮影＋スタイリスト＋合成の外注領域」（根拠句:「海外で話題の『料理がバラバラに浮かぶ』プロンプト」）／「鑑賞用→実務用への変換をしている。white seamless background と clean minimal layout は絵作りではなく後工程（文字入れ・切り抜き）のための指定」（根拠句:「チラシやサイトのメインビジュアルにそのまま使える形に改良」）
+- beforeAfter: before「この品質の浮遊系ビジュアルは外注領域で、小規模店はプロ発注かストックフォトで妥協するしかなかった」→ trigger「話題の構図が穴埋めプロンプト化された」→ after「個人経営の飲食店が看板メニューで広告グレードのビジュアルを内製できる」
+- mechanism.items: 「white seamless background → 白ホリ背景。切り抜き・文字載せ・チラシ流用のための指定」「clean minimal layout → 余白の予約。コピーやロゴを入れるスペースを空けておく」のように、各要素が実務上なんのためかに答える
+- extractedPattern: name「浮遊デコンストラクト広告型」/ structure「[被写体] + ジャンル宣言 + 背景（後工程用）+ ライティング + 構図トリック + 小物散らし + レイアウト配慮」/ transferScope「構成要素に分解できるプロダクト全般。ジャンル宣言を差し替えれば化粧品・飲料にも」
+- adjacentPatterns: 「スプラッシュ（液体飛沫）型: 飲料・ソース系で定番。液体の躍動で鮮度を演出」「ノーリング（整列俯瞰）型: 構成要素を等間隔に並べて俯瞰。誠実さ・網羅感の演出に効く」のように、同じ広告写真ジャンルの別の定番構図を、すぐ試せる実行形つきで2〜4個
+
+## adjacentPatterns（隣接する定番の型）の作法 — 唯一の例外フィールド
+このフィールドだけは、投稿の外のあなたの一般知識を使ってよい。
+- この投稿の型が属するジャンル（例: 広告写真の構図、コピーライティングの型、プロンプト設計の技法、
+  思考フレームワーク、仕事術）で、他に確立された定番の型を2〜4個挙げる。
+  ユーザーがこの投稿から横に派生するための地図になる
+- 実在する定番のみ。名前をでっちあげない。不確かなものは入れない（0個なら null でよい）
+- 各型に actionable（そのまま試せる実行形）を付ける。**形式はジャンルに合わせる**：
+  画像プロンプトの型ならプロンプト案、コピーの型なら穴埋めテンプレ、
+  思考法なら自分に当てる問いリスト、仕事術なら最小手順。
+  実行形にできないジャンルなら actionable は null（無理に作らない）
+- 型が属するジャンルが不明瞭な投稿（感想・ニュース等）は null
+
+## 禁止則（破ったら失格）
+- 数字・統計・価格・実績の創作禁止（「数十万円かかる」のような検証不能な数字を作らない）
+- 根拠句（evidence）に紐付かない「すごい」禁止。褒め言葉だけのポイントは書かない
+- 一般論の水増し禁止（「AIの進化は目覚ましい」のような、どの投稿にも書ける文は書かない）
+- mechanism.items の role を画風・雰囲気の形容で終えない。「実務上なんのためか」に答える
+- 型が抽出できない投稿に無理に extractedPattern を作らない（null でよい）
+
+## 最終確認
+- whySignificant の各 evidence は evidenceQuotes に含まれる句と一致しているか
+- beforeAfter.before は「誰が困っていたか」まで書けているか
+- 日本語として正しい表記にする。誤変換・中国語/英単語の生混入を避ける
+- JSONのみ返してください。説明文・前置きは不要です`;
+}
+
+// 解読の検品パス（2パス目）。チェックリストで自己検証させ、問題があれば修正版を返させる。
+// 検品は best-effort：失敗しても初回の解読を採用する（provider 側でガード）。
+export function buildDecodeReviewPrompt(decodeJson: string, input: SourcePostForLearning): string {
+  const postText = truncateForPrompt(input.text, MAX_POST_TEXT_CHARS) ?? input.text;
+  return `あなたは解読結果の検品担当です。以下の「解読JSON」を元投稿と突き合わせてチェックし、
+問題がなければ {"ok": true} だけを返し、問題があれば修正した解読JSON全体を返してください。
+
+## 元投稿
+${postText}
+${input.translatedText ? `\n## 日本語訳\n${truncateForPrompt(input.translatedText, MAX_POST_TEXT_CHARS)}\n` : ""}
+## 解読JSON（検品対象）
+${decodeJson}
+
+## チェックリスト
+1. whySignificant の各 evidence は、元投稿に実在する句か（捏造引用は修正）
+2. beforeAfter は元投稿の事実に基づくか（投稿にない変化を語っていたら修正）
+3. 数字・統計・価格・実績の創作が混ざっていないか（あれば削除）
+4. mechanism.items の role が「実務上なんのためか」に答えているか（画風の形容で終わっていたら書き直す）
+5. 一般論の水増し（どの投稿にも書ける文）が混ざっていないか（あれば削除）
+6. adjacentPatterns は投稿外の一般知識でよいが、実在が疑わしい型名・不正確な説明は削除する
+
+## 出力
+- 全チェック通過 → {"ok": true} のみ
+- 修正あり → 修正済みの解読JSON全体（元と同じ構造）のみ
+JSONのみ返してください。`;
 }
 
 export async function buildStrictLearningPrompt(input: {
@@ -306,8 +439,9 @@ ${input.articleTitle ? `タイトル: ${input.articleTitle}\n` : ""}${input.arti
 
   return `あなたはSeedThoughtの専属学習コーチです。
 保存済み投稿を、さとり式「厳密学習」のテンプレートに沿って1ショットで構造化してください。
+この厳密学習は、ユーザー（最先端の知識・技術を初級者向けにかみ砕いて発信・講座化する解説者）が、人に教えられる水準まで理解を深めるための工程です。
 
-${KOTARO_LENS_PROFILE}
+${WRITER_VOICE_RULES}
 
 ## 元投稿
 ${input.postText}
@@ -328,11 +462,11 @@ ${strictLearningKnowledge}
 - 正例・反例・境界事例は、投稿の領域に即した具体例にすること
 - 暗黙の前提（assumption）と限界（limit）は、投稿が触れていない部分を補う形で
 - 反例・境界事例は「ありがち」ではなく「鋭い」ものを。投稿の主張がどこで崩れるかを示す
-- 「自分に使うなら（applyToYourself）」はユーザーの興味の核と自然に接続する場合のみ具体化。
+- 「自分に使うなら（applyToYourself）」はユーザーのテーマ・発信活動と自然に接続する場合のみ具体化。
   接続しない投稿なら「この投稿は ${profile.themes.join("・")} から離れた領域だが、◯◯の観点で参照価値がある」と素直に書く
 - 15分ワークは、机上のメモではなく、実際に15分で成果物が一つ残る手順にすること
 - 抽象論で終わらず、必要条件・典型特徴・本質を明確に分けること
-- 持論（INFJ／意志vs仕組み等）を毎回ねじ込まない。投稿が自然にその領域に触れる場合のみ参照
+- ユーザーの持論・思想を毎回ねじ込まない。投稿が自然にその領域に触れる場合のみ参照
 
 ## 出力形式（必ず以下のJSONのみ。説明文は不要）
 {
@@ -427,7 +561,7 @@ export async function buildOutputPrompt(input: GenerateOutputInput): Promise<str
 
   const { citeAuthor, authorRef } = resolveAuthorCitation(input);
   const sourceCiteRule = citeAuthor
-    ? `- 出典（${authorRef}）を自然な形で明示する`
+    ? `- 出典（${authorRef}）は文の中に自然に織り込む（例:「${authorRef}の投稿で知った」「${authorRef}が公開している」）。文末に@ユーザー名だけを裸でぶら下げない`
     : `- 投稿者の@ユーザー名・アカウント名・氏名を本文に一切出さない。特定アカウントを引用元として明記せず、「ある投稿で見かけた考え方」程度の匿名表現にとどめる`;
 
   const profileConfigSection = (profile.tone || profile.knowledge || profile.outputChannels.length > 0)
@@ -435,17 +569,18 @@ export async function buildOutputPrompt(input: GenerateOutputInput): Promise<str
 ${profile.tone ? `トーン: ${profile.tone}` : ""}${profile.knowledge ? `\nコンテキスト（専門・発信背景）: ${profile.knowledge}` : ""}${profile.outputChannels.length > 0 ? `\n発信チャンネル: ${profile.outputChannels.join("、")}` : ""}\n`
     : "";
 
-  return `あなたはSNSキュレーター・解説者です。
-ユーザーが価値を感じた他者の投稿を、わかりやすく他の人に伝え直すコンテンツを生成します。
+  return `あなたは、最先端の知識・技術を初級者向けにかみ砕いて伝えるSNS解説者です。
+ユーザーが価値を感じた他者の投稿を、下の読者プロフィールの読者が理解でき、「面白そう」「使ってみたい」と思えるコンテンツに伝え直します。
 
-${KOTARO_LENS_PROFILE}
+${READER_LENS_PROFILE}
+${WRITER_VOICE_RULES}
 ${profileConfigSection}
 ## 重要ルール（持論ねじ込みを避ける）
 - 元投稿の文章をそのまま転載しない
 - **投稿の内容が主役**。プロフィールはトーン・文体の基準として使う。持論を毎回挟まない
 - 「${authorRef}の投稿から学んだ・気づいた」という解説者の視点で書く
 ${sourceCiteRule}
-- 投稿が自然にユーザーの興味の核に接続する場合のみ、自然な形で言及する。
+- 投稿が自然にユーザーの発信テーマ（設定プロフィール）に接続する場合のみ、自然な形で言及する。
   接続しない投稿なら、投稿の良さをそのまま伝える側に振り切る
 - ユーザー自身の解釈・補足は「特に響いた一点」「自分も試したい」程度の自然な反応に留める
 - 「印象的でした」「すごい」「ぜひ」「いかがでしたか」のような浅い表現は使わない
@@ -464,7 +599,7 @@ ${input.finalSummary || "なし"}
 ${mediumKnowledge ? `\n${mediumKnowledge}\n` : ""}
 ## 出力形式: ${outputTypeLabel[input.outputType] || input.outputType}
 
-${input.outputType === "note" ? `あなたは note 記事の書き手です。${authorRef} の投稿から得た学びを、一本の思考ラインとして一人称で語り直します。中立的な「解説・レビュー」ではなく、「自分が考えたこと」として読める記事にしてください。読者は「この人の話だ」と感じて読み進めます。
+${input.outputType === "note" ? `あなたは note 記事の書き手です。${authorRef} の投稿から得た学びを、初級者（上の読者プロフィール参照）に向けて、一本の筋が通った解説記事として語り直します。教科書的な網羅や中立的なレビューではなく、「この人の説明はわかりやすい」「自分にもできそう」と感じて読み進められる記事にしてください。読み終えた読者に「面白そう」「使ってみたい」が残ることがゴールです。
 
 ## 最優先の絶対ルール（破ったら失格）
 ここは「声は一人称でよいが、事実は捏造しない」の線引きが核心です。
@@ -474,15 +609,16 @@ ${input.outputType === "note" ? `あなたは note 記事の書き手です。${
 - 【許可】一人称の語り口・思考の声・共感の枠組みは使ってよい（○「この問いに何度もぶつかってきた」「かつての自分もそうだった」「今なら言語化できる」）。これは読者を引き込む装置であり、嘘の事実ではない。
 - 一般論を例で示すときは「たとえば〜なら」「仮に〜だとすると」と仮定を明示し、実際に起きた事実だと誤読させない。数字は付けない。
 - 字数を埋めるための創作は厳禁。素材を使い切れば自然に厚くなる。長さより正直さを優先する。
+- ただし「短く済ませる」ことは正直さではない。論点を1〜2文で流して次に進むのは素材の取りこぼし。各セクションはだいたい300字以上になるまで、素材にある典型場面・つまずきの先回り・言い換えを展開してから次に進む。
 
 ## 素材の4層仕分け（書く前に必ず分類する）
 渡された学習カードの素材を、次の4層に仕分けてから使う。
 - **論点層**（投稿の中身＝番号付きの主張群）→ 記事の骨格。**1つも落とさず全て使う**。
-- **補助層**（初心者のつまずき・用語解説・正例/反例）→ 独立セクションにしない。**本文に溶かす**。
-  - つまずきポイントは「読者が反発・誤解しそうな箇所」なので、本文中で**想定反論として先回りして処理**する（例: 強い主張の直後に「これは〜を否定しているわけではない」と留保を置く）。
+- **補助層**（初心者のつまずき・用語解説・正例/反例）→ 独立セクションにしない。**本文に溶かす**。読者が初級者なので、この層は記事の生命線。
+  - つまずきポイントには2種類ある。「誤解・反発しそうな箇所」は**想定反論として先回りして処理**し（強い主張の直後に「これは〜を否定しているわけではない」と留保を置く）、「意味が取れない箇所」は出たその場でやさしく言い換える。
   - 用語の定義は用語集にせず、本文中で自然に言い添える（例:「対価とは金銭だけでなく〜」）。
 - **拡張層**（背景・時代文脈・類似フレームワーク・他分野転用・参考文献）→ **原則使わない**。
-  外部フレームワークの引用は記事を「解説・レビュー」のトーンにし、一人称の体験密度を薄めるため。権威づけより筋の通った思考を優先する。
+  初級者向けの記事では、外部フレームワークの列挙は情報量を増やして読者を置き去りにする。使うのは「なぜ今この話が重要か」を一言で支える場合だけ（最大1つ）。権威づけより、読者がついて来られる筋を優先する。
 - **実践層**（15分ワーク・応用アイデア・コツ）→ **1つだけ**選び、締めに「読者が手を動かせるパーツ」として置く。応用アイデアは入れても1つだけ本文に溶かす。
 
 ## 構造＝一本の思考ライン（解説書にしない）
@@ -492,7 +628,7 @@ ${input.outputType === "note" ? `あなたは note 記事の書き手です。${
 3. **定義の拡張**（読者が誤解しがちな語の射程を広げて誤解を壊す）
 4. **条件の追加**（主張に必要な条件を足して立体化する）
 5. **想定反論の処理**（読者が抱きそうな反論を取り上げ、構造で答える）
-6. **実践への変換**（考え方を、読者が今日できる具体的な行動・記録法に落とす）
+6. **実践への変換**（考え方を、読者が今日できる具体的な行動に落とす。ツールをまだ触ったことがない読者でも踏み出せる粒度の「最初の一歩」にする）
 7. **構造のまとめ＋ワーク**（論点を数個の条件に圧縮して締め、実践層のワークを1つ置く）
 - 見出しは「出会い」「まとめ」のような汎用ラベルではなく、その節の主張を表す**断定形**にする（例:「プロセスに対価は発生しない」）。movements は厳密に7個でなくてよい（素材に応じて統合・分割可）。
 
@@ -509,6 +645,7 @@ ${input.outputType === "note" ? `あなたは note 記事の書き手です。${
 }
 
 ## 文体ルール
+- 専門用語・カタカナ語・略語は初出でやさしい言い換えを一言添える（初級者が詰まらないこと）
 - 一人称の実感を入口に使い、読者が「自分の話だ」と感じる冒頭にする
 - 強い主張の直後には補足・留保を置く（読者が反発しそうな箇所をケアする）
 - 太字（**）は1セクション1箇所に絞る。多用するとスキャン読みされ本文が読まれない
@@ -527,7 +664,7 @@ ${input.outputType === "note" ? `あなたは note 記事の書き手です。${
 - 抽象的な条件は、身近な**比喩**で1つ示して腹落ちさせる（学習カードの補助層に比喩があれば必ず使う）。
 - 補助層（つまずき・正例反例・比喩）を捨てない。**想定反論として本文に織り込む**
   （○「これは趣味を否定しているわけではない。報われたいと望むときだけ基準が変わる、という話だ」）。
-- 段落を「〜の判断による」「〜の対象となり得る」のような中身のない一般化の一文で締めない。
+- 段落を「〜の判断による」「〜の対象となり得る」「〜に由来する」「〜に基づく」「〜が前提となる」のような中身のない一般化・抽象原理の一文で締めない。締めは読者の行動・具体像・留保にする。
 - 一人称の声を、少なくとも冒頭フックで必ず使う（○「この問いに、私も何度もぶつかってきた」）。
   ※ただし検証可能な経歴・肩書・数字の捏造は禁止（声は一人称でよいが、事実は作らない）。
 
@@ -690,19 +827,29 @@ export const MIN_NOTE_SECTION_CHARS = 300;
  * 1回だけ（provider でガード済み）。
  */
 export function buildNoteExpandPrompt(
-  authorRef: string,
+  input: GenerateOutputInput,
   sections: NoteSection[],
   currentLen: number
 ): string {
+  const { authorRef } = resolveAuthorCitation(input);
   const thinSections = sections
     .map((s, i) => ({ i, heading: s.heading, len: s.body.replace(/[\r\n]/g, "").length }))
     .filter((s) => s.len < MIN_NOTE_SECTION_CHARS);
 
   const sectionsJson = JSON.stringify(sections, null, 2);
+  const stepsContext = buildLearningMaterialBlock(input.steps);
+  const postText = truncateForPrompt(input.postText, MAX_POST_TEXT_CHARS) ?? input.postText;
 
   return `あなたはnote記事の編集者です。
-以下のnote記事は内容がやや薄いため、特に薄いセクションを「正直な解説」として深掘りしてください。
-ただし字数を満たすことが目的ではありません。深掘りできる実在素材がなければ、無理に伸ばさず短いまま返して構いません。
+以下のnote記事は内容が薄い（現在${currentLen}字）ため、薄いセクションを「正直な解説」として深掘りしてください。
+ただし字数を満たすことが目的ではありません。下の実在素材から拾える中身がなければ、無理に伸ばさず短いまま返して構いません。
+
+## 深掘りに使ってよい実在素材（この範囲内でだけ伸ばす）
+### 元投稿（${authorRef}、転載禁止）
+${postText}
+
+### 学習カードの分析（論点・初心者のつまずき・用語・具体例・背景）
+${stepsContext}
 
 ## 薄いセクション（body が${MIN_NOTE_SECTION_CHARS}字未満）
 ${thinSections.length > 0 ? thinSections.map((s) => `- セクション${s.i + 1}「${s.heading}」: 現在${s.len}字`).join("\n") : "（全セクション基準クリア済み）"}
@@ -711,10 +858,11 @@ ${thinSections.length > 0 ? thinSections.map((s) => `- セクション${s.i + 1}
 ${sectionsJson}
 
 ## 深掘りのルール（絶対）
-- 深掘りは「投稿の論の筋・原理・背景・関連概念との違い・適用範囲」など**実在する素材**だけで行う
-- 実在しない数字・統計・割合・固有名・事例・体験を一切創作しない（字数稼ぎの捏造は失格）
+- 薄いセクションの論点を、上の素材にある「誰が・どんな場面で」の典型場面、初心者のつまずきの先回り、用語のやさしい言い換えで肉付けする
+- 深掘りは上の実在素材だけで行う。実在しない数字・統計・割合・固有名・事例・体験を一切創作しない（字数稼ぎの捏造は失格）
 - 「${authorRef}の投稿が〜している」というメタなぞりは禁止。中身そのものを書く
 - 一般論の例示は「たとえば〜なら」と仮定を明示し、数字は付けない
+- 段落の締めに「〜に由来する」「〜に基づく」「〜が前提となる」のような抽象原理の一文を置かない。締めは読者の行動・具体像・留保にする
 - 文末の定型句（いかがでしたか等）は禁止
 
 以下のJSON形式のみ返してください：
@@ -743,7 +891,7 @@ export function buildOutputRefinePrompt(
 ): string {
   const { citeAuthor, authorRef } = resolveAuthorCitation(input);
   const sourceCiteRule = citeAuthor
-    ? `- 出典（${authorRef}）は自然な形で残す`
+    ? `- 出典（${authorRef}）は文の中に自然に織り込んで残す（文末に@ユーザー名だけを裸でぶら下げない）`
     : `- 投稿者の@ユーザー名・アカウント名・氏名は本文に一切出さない。特定アカウントを引用元として明記せず、匿名の引用にとどめる`;
 
   const mediumLabel = REFINABLE_OUTPUT_TYPES[input.outputType] ?? input.outputType;
@@ -769,7 +917,8 @@ export function buildOutputRefinePrompt(
 以下は同じ素材から書かれた「下書き」です。${mediumLabel}として、編集者の視点で厳しく添削し、別物の完成度まで書き直してください。
 「だいたい良い」で止めず、有料でも読まれる水準を狙ってください。
 
-${KOTARO_LENS_PROFILE}
+${READER_LENS_PROFILE}
+${WRITER_VOICE_RULES}
 
 ## この媒体の狙いと構成
 ${mediumKnowledge}
@@ -801,6 +950,7 @@ ${draft.content}${draftJson ? `\n\n構造データ(contentJson):\n${draftJson}` 
    - 具体・手触り・固有の視点が足りているか
    - 借り物の言葉・AIっぽい言い回し・浅い表現が混ざっていないか
    - この媒体の読まれ方・文字数・構成に合っているか
+   - 初級者（AI未経験〜チャット経験のみ）が専門用語で詰まらないか。読後に「面白そう」「使ってみたい」が残るか
    - 学習カードの分析（①投稿の中身・②背景や本質・③初心者のつまずき）を活かしきれているか。下書きが表面の要約やメタななぞりで止まっていないか
 2. 挙げた弱点を全て潰すように書き直す。なぞりを具体に、抽象を手触りに置き換え、冗長は削る。
 3. この媒体の構成・文字数の制約を必ず守る。
@@ -819,6 +969,250 @@ ${sourceCiteRule}
   "contentJson": { /* 媒体の構造データ。下書きと同じ形を維持。無ければ {} */ }
 }
 JSONのみ返してください。`;
+}
+
+/**
+ * X投稿の機械チェック修正パス。プロンプト指示だけでは140〜280字やsatoriTypeUsedの記録が
+ * 守られないことがあるため、決定論的にチェックした違反点だけを渡して直させる（1回だけ、best-effort）。
+ */
+export function buildXFixPrompt(
+  input: GenerateOutputInput,
+  draft: GeneratedOutputResult,
+  violations: string[]
+): string {
+  const { citeAuthor, authorRef } = resolveAuthorCitation(input);
+  const sourceCiteRule = citeAuthor
+    ? `- 出典（${authorRef}）は文の中に自然に織り込んで残す`
+    : `- 投稿者の@ユーザー名・アカウント名・氏名は本文に一切出さない`;
+  const satoriInstruction =
+    satoriTypeInstructions[input.satoriType ?? "auto"] ?? satoriTypeInstructions["auto"];
+
+  return `あなたはX投稿の編集者です。以下のX投稿は機械チェックで基準違反が見つかりました。違反だけを直してください。
+
+## 違反項目（すべて直すこと）
+${violations.map((v) => `- ${v}`).join("\n")}
+
+## この媒体の型
+${satoriInstruction}
+
+## 元投稿（${authorRef}、転載禁止）
+${input.postText}
+
+## 修正対象の下書き
+タイトル: ${draft.title}
+本文:
+${draft.content}
+
+## 修正ルール
+- 違反項目だけを直す。良い部分は残し、書き直しは最小限にとどめる
+- 140〜280文字の範囲に必ず収める（本文の実文字数を自分で数えて確認すること）
+- satoriTypeUsed には実際に使った型（A〜E）を必ず入れる
+- 元投稿にない事実・数字・固有名を捏造しない
+${sourceCiteRule}
+- マークダウン記法（見出し記号・太字・コードスパン）は使わない
+
+以下のJSON形式のみ返してください：
+{
+  "title": "タイトル（変更不要ならそのまま）",
+  "content": "修正後の本文",
+  "contentJson": {},
+  "satoriTypeUsed": "A" | "B" | "C" | "D" | "E"
+}
+JSONのみ返してください。`;
+}
+
+// ─────────────────────────────────────────────────────────────
+// セミナー2分割生成。巨大スキーマの1ショットはモデルが省略する
+// （実測: grok-4.3 でスライド2枚・章詳細1件・テンプレが説明文）ため、
+// 学習カード本体と同じ処方箋で「①設計」「②中身」に分ける。②は①を入力に受ける。
+// ─────────────────────────────────────────────────────────────
+
+const seminarRoleInstruction = `あなたは、保存済みコンテンツから「実践型セミナー」を設計する専門家です。
+投稿内容をそのまま紹介するのではなく、その背後にあるノウハウの本質を抽出し、
+参加者が実際に使えるスキル・テンプレート・手順として持ち帰れる90分講座にしてください。
+「この投稿について学ぶセミナー」ではなく「このノウハウを使えるようにするセミナー」にすること。`;
+
+function buildSeminarMaterialBlock(input: GenerateOutputInput): string {
+  const { authorRef } = resolveAuthorCitation(input);
+  const postText = truncateForPrompt(input.postText, MAX_POST_TEXT_CHARS) ?? input.postText;
+  return `## 元投稿（${authorRef}、転載禁止）
+${postText}
+
+## 学習カードの分析（セミナーの素材。①投稿の中身／②なぜすごいか・変化の文脈／③初心者のつまずき／④応用を活かす）
+${buildLearningMaterialBlock(input.steps)}
+
+## ユーザーの最終メモ
+${input.userFinalNote || "なし"}
+
+## 最終サマリー
+${input.finalSummary || "なし"}`;
+}
+
+export async function buildSeminarDesignPrompt(input: GenerateOutputInput): Promise<string> {
+  const profile = await getProfile();
+  const profileSection = profile.knowledge || profile.tone
+    ? `\n## 講師（ユーザー）のプロフィール\n${profile.tone ? `トーン: ${profile.tone}` : ""}${profile.knowledge ? `\nコンテキスト: ${profile.knowledge}` : ""}\n`
+    : "";
+
+  return `${seminarRoleInstruction}
+
+これは2工程のうちの「①設計」です。セミナーの骨格（解釈・タイトル・スケジュール・告知・販売導線）だけを作ります。
+各章の台本・スライド・テンプレートは別工程で作るため、ここでは出力しないこと。
+
+${READER_LENS_PROFILE}
+${profileSection}
+${buildSeminarMaterialBlock(input)}
+
+## 設計の思考プロセス（必ずこの順で考える）
+1. 投稿の表面的な内容を整理する
+2. 本質的なノウハウを抽出する（学習カードの「なぜすごいか・変化の文脈」を必ず使う）
+3. どんな人のどんな課題を解決するかを考える
+4. セミナーとして成立するテーマに広げる
+5. 参加者が最後に何をできるようになるべきかを決める
+6. 講義・実演・ワークを含む90分のスケジュールに落とす
+
+## 出力形式（必ず以下のJSONのみ）
+{
+  "coreInterpretation": {
+    "surface": "投稿が直接言っていること",
+    "essence": "本当に重要なポイント（本質）",
+    "applicability": "どんな業務・制作・発信に応用できるか",
+    "participantPain": "このセミナーが解決する参加者の悩み"
+  },
+  "titleOptions": [
+    { "title": "タイトル案", "subtitle": "サブタイトル", "targetAudience": "誰に刺さるか", "oneLiner": "一言で言うと何を学ぶ講座か" }
+  ],
+  "seminar": {
+    "name": "決定したセミナー名",
+    "subtitle": "サブタイトル",
+    "targetAudience": "対象者",
+    "outcomes": ["受講後にできること1", "できること2", "できること3"],
+    "value": "このセミナーの価値",
+    "whyNow": "なぜ今この内容を学ぶべきか"
+  },
+  "schedule": [
+    { "time": "0:00〜0:10", "part": "パート名", "content": "内容", "purpose": "目的" }
+  ],
+  "promotion": {
+    "xPost": "X投稿用告知文（そのまま投稿できる文面）",
+    "instagram": "Instagram投稿用告知文",
+    "line": "LINE配信用告知文（そのまま配信できる文面）",
+    "noteIntro": "note記事冒頭文",
+    "lpCopy": "LPファーストビューコピー"
+  },
+  "salesFunnel": {
+    "nextProduct": "セミナー内で案内する次の商品",
+    "consultationBridge": "個別相談へのつなげ方",
+    "templateSales": "有料テンプレート販売案",
+    "continuationCourse": "継続講座にする場合の発展案"
+  },
+  "finalStatement": "このセミナーは、〇〇を学ぶ講座ではなく、〇〇できるようになる講座です"
+}
+
+## 必須条件
+- トップレベルに coreInterpretation / titleOptions / seminar / schedule / promotion / salesFunnel / finalStatement の
+  **7キーすべて**を持つJSONを返す。内側のオブジェクト（coreInterpretationの中身だけ等）を単体で返したら失格
+- titleOptions は切り口の違う3案を出す
+- schedule は導入〜まとめまで5〜7パート。講義だけでなく実演とワークを必ず含める
+- promotion は「〜のご案内」のような説明文でなく、そのまま使える文面にする
+- 実在しない実績・数字を告知文に入れない
+JSONのみ返してください。説明文は不要です。`;
+}
+
+export function buildSeminarContentPrompt(input: GenerateOutputInput, design: SeminarDesign): string {
+  const scheduleList = design.schedule
+    .map((s, i) => `${i + 1}. [${s.time ?? ""}] ${s.part ?? `パート${i + 1}`}: ${s.content ?? ""}`)
+    .join("\n");
+
+  return `${seminarRoleInstruction}
+
+これは2工程のうちの「②中身」です。確定済みの設計に沿って、講師が当日そのまま使える中身（章ごとの台本・実演・ワーク・テンプレート・スライド）を作ります。
+
+${READER_LENS_PROFILE}
+${WRITER_VOICE_RULES}
+${buildSeminarMaterialBlock(input)}
+
+## 確定済みの設計（この設計に厳密に従うこと）
+セミナー名: ${design.seminar.name}
+対象者: ${typeof design.seminar.targetAudience === "string" ? design.seminar.targetAudience : ""}
+スケジュール:
+${scheduleList}
+
+## 出力形式（必ず以下のJSONのみ）
+{
+  "chapterDetails": [
+    {
+      "part": "スケジュールのパート名と一致させる",
+      "teachingPoint": "この章で伝えること",
+      "script": "話す内容。話し言葉で、当日そのまま読める粒度（各章200字以上）",
+      "slideContent": "この章で見せるスライドの内容",
+      "demonstration": "実演する場合の具体例（なければ null）",
+      "question": "参加者に考えてもらう問い"
+    }
+  ],
+  "demonstration": {
+    "theme": "実演テーマ",
+    "badExample": "実演前の悪い例（具体的な文面・状況）",
+    "goodExample": "改善後の良い例（具体的な文面・状況）",
+    "prompt": "実演で実際に使う指示・問いかけ（そのまま使える形）",
+    "expectedOutput": "期待される出力",
+    "showPoints": ["参加者に見せるポイント"]
+  },
+  "workshop": {
+    "name": "ワーク名",
+    "purpose": "ワークの目的",
+    "steps": ["手順1", "手順2", "手順3"],
+    "fillItems": ["記入項目1", "記入項目2"],
+    "completionImage": "完成イメージ",
+    "facilitatorTips": ["講師が補足すべきポイント"]
+  },
+  "templates": {
+    "basic": "基本テンプレート（実物）",
+    "advanced": "応用テンプレート（実物）",
+    "fixFailed": "うまくいかなかったときの修正テンプレート（実物）",
+    "snsPost": "参加者がワーク結果をSNSに投稿するためのテンプレート（実物）",
+    "seminarMaterial": "配布資料の文面（実物）",
+    "blogNote": "ブログ・note用テンプレート（実物）"
+  },
+  "slides": [
+    { "slideNumber": 1, "title": "スライドタイトル", "content": "スライドに載せる文言", "visualIdea": "ビジュアル案" }
+  ]
+}
+
+## 必須条件（機械チェックされる。破ると差し戻し）
+- chapterDetails はスケジュールの**全パート分**（${design.schedule.length}件）を書く。導入とまとめも省略しない
+- slides は**15〜25枚**。章ごとに2〜4枚を割り、表紙・アジェンダ・まとめ・告知も含める
+- templates は「〜のテンプレート」という**説明文を書いたら失格**。コピーしてそのまま使える実物の文面・
+  記入シート（項目名: ＿＿ の形式）・穴埋め文を書く
+- 学習カードの素材（投稿の中身・なぜすごいか・初心者のつまずき・応用アイデア）を script とスライドに展開する。
+  素材にない実績・数字・事例を創作しない
+JSONのみ返してください。説明文は不要です。`;
+}
+
+/** セミナー②中身の機械チェック違反を1回だけ直させる。違反点だけを渡して最小修正させる。 */
+export function buildSeminarContentFixPrompt(
+  design: SeminarDesign,
+  content: SeminarContent,
+  violations: string[]
+): string {
+  return `あなたはセミナー資料の編集者です。以下のセミナー中身JSONは機械チェックで基準違反が見つかりました。
+違反項目を直し、**修正後のJSON全体**（元と同じ構造）を返してください。
+
+## 違反項目（すべて直すこと）
+${violations.map((v) => `- ${v}`).join("\n")}
+
+## 確定済みスケジュール（chapterDetails はこの全パート分必要）
+${design.schedule.map((s, i) => `${i + 1}. ${s.part ?? `パート${i + 1}`}: ${s.content ?? ""}`).join("\n")}
+
+## 修正対象のJSON
+${JSON.stringify(content, null, 1)}
+
+## 修正ルール
+- 違反項目だけを直す。基準を満たしている部分は変えない
+- slides は15〜25枚（章ごとに2〜4枚＋表紙・アジェンダ・まとめ）
+- templates は説明文でなく、コピーしてそのまま使える実物の文面にする
+- 実在しない実績・数字・事例を創作しない
+JSONのみ返してください。説明文は不要です。`;
 }
 
 export function buildSemanticSearchPrompt(query: string, posts: PostSummaryForSearch[]): string {

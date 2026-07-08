@@ -99,7 +99,7 @@ const DEFAULT_MODELS: Record<AiProviderName, string> = {
   grok: "grok-3",
   claude: "claude-sonnet-4-6",
   openai: "gpt-4o",
-  gemini: "gemini-2.5-flash",
+  gemini: "gemini-3.5-flash",
   kimi: "kimi-k2.6",
   mock: "mock",
 };

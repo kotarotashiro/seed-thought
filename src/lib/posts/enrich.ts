@@ -65,7 +65,7 @@ async function enrichOne(postId: string): Promise<void> {
 }
 
 // Process a batch of pending/failed posts. Called from cron or after().
-export async function enrichPendingPosts(limit = 10): Promise<void> {
+export async function enrichPendingPosts(limit = 10): Promise<{ processedCount: number }> {
   const posts = await prisma.post.findMany({
     where: { enrichmentStatus: { in: ["pending", "failed"] } },
     select: { id: true, urlCardJson: true, text: true, enrichmentStatus: true },
@@ -77,6 +77,7 @@ export async function enrichPendingPosts(limit = 10): Promise<void> {
   for (const post of toProcess) {
     await enrichOne(post.id);
   }
+  return { processedCount: toProcess.length };
 }
 
 // Mark a newly-created post for enrichment if it has a fetchable URL.

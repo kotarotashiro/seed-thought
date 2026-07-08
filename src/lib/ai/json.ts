@@ -57,5 +57,70 @@ function extractJson(raw: string): string {
   const trimmed = raw.trim();
   const fenced = trimmed.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
   if (fenced?.[1]) return fenced[1].trim();
+  const embeddedFence = trimmed.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+  if (embeddedFence?.[1]) return embeddedFence[1].trim();
+  const embeddedJson = findEmbeddedJson(trimmed);
+  if (embeddedJson) return embeddedJson;
   return trimmed;
+}
+
+function findEmbeddedJson(text: string): string | null {
+  for (let i = 0; i < text.length; i += 1) {
+    const ch = text[i];
+    if (ch !== "{" && ch !== "[") continue;
+
+    const candidate = readBalancedJson(text, i);
+    if (!candidate) continue;
+
+    try {
+      JSON.parse(candidate);
+      return candidate;
+    } catch {
+      // Keep scanning. The first bracket-like block can be prose, not JSON.
+    }
+  }
+  return null;
+}
+
+function readBalancedJson(text: string, start: number): string | null {
+  const closeFor = (open: string) => (open === "{" ? "}" : "]");
+  const stack = [closeFor(text[start])];
+  let inString = false;
+  let escaped = false;
+
+  for (let i = start + 1; i < text.length; i += 1) {
+    const ch = text[i];
+
+    if (inString) {
+      if (escaped) {
+        escaped = false;
+      } else if (ch === "\\") {
+        escaped = true;
+      } else if (ch === "\"") {
+        inString = false;
+      }
+      continue;
+    }
+
+    if (ch === "\"") {
+      inString = true;
+      continue;
+    }
+
+    if (ch === "{" || ch === "[") {
+      stack.push(closeFor(ch));
+      continue;
+    }
+
+    const expected = stack[stack.length - 1];
+    if (ch === expected) {
+      stack.pop();
+      if (stack.length === 0) return text.slice(start, i + 1).trim();
+      continue;
+    }
+
+    if (ch === "}" || ch === "]") return null;
+  }
+
+  return null;
 }

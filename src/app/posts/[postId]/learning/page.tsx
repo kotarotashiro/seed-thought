@@ -52,7 +52,7 @@ const PROGRESS_STEPS = [
   "中身の忠実な抽出",
   "実践手順の生成",
   "初心者向けの補足",
-  "背景・周辺情報の収集",
+  "意義の解読（なぜすごいのか・before/after）",
 ] as const;
 
 const ARTICLE_PREVIEW_CHARS = 240;
@@ -900,6 +900,42 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
             </div>
           </Card>
 
+          {/* 解読（SeedThought 2）: なぜすごいのか・before/after */}
+          {output.decode && (
+            <Card>
+              <SectionHeader icon={Lightbulb} title="なぜすごいのか（解読）" />
+              {output.decode.oneLiner && (
+                <p className="mb-4 text-base font-semibold text-text">{output.decode.oneLiner}</p>
+              )}
+              <div className="space-y-2.5">
+                {output.decode.whySignificant.map((w, i) => (
+                  <div key={`why-${i}`} className="rounded-xl border border-border px-4 py-3">
+                    <p className="text-sm leading-relaxed text-text">{w.point}</p>
+                    {w.evidence && (
+                      <p className="mt-1 text-xs leading-relaxed text-text-muted">根拠: 「{w.evidence}」</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+              {(output.decode.beforeAfter.before || output.decode.beforeAfter.after) && (
+                <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                  <div className="rounded-xl bg-border-light px-4 py-3">
+                    <p className="mb-1 text-xs font-medium text-text-muted">今まで</p>
+                    <p className="text-sm leading-relaxed text-text">{output.decode.beforeAfter.before}</p>
+                  </div>
+                  <div className="rounded-xl bg-border-light px-4 py-3">
+                    <p className="mb-1 text-xs font-medium text-text-muted">これが出た</p>
+                    <p className="text-sm leading-relaxed text-text">{output.decode.beforeAfter.trigger}</p>
+                  </div>
+                  <div className="rounded-xl bg-accent-subtle px-4 py-3">
+                    <p className="mb-1 text-xs font-medium text-accent">こう変わる</p>
+                    <p className="text-sm leading-relaxed text-text">{output.decode.beforeAfter.after}</p>
+                  </div>
+                </div>
+              )}
+            </Card>
+          )}
+
           {/* ── Layer 2: じっくり理解する ── */}
           <LayerDivider label="② じっくり理解する" />
 
@@ -956,6 +992,97 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
                   ))}
                 </div>
               )}
+            </Card>
+          )}
+
+          {/* 解読: 仕組みの解読（要素→実務上の役割＋原典・系譜） */}
+          {output.decode?.mechanism && output.decode.mechanism.items.length > 0 && (
+            <Card>
+              <SectionHeader icon={GitBranch} title="仕組みの解読" />
+              <div className="space-y-2.5">
+                {output.decode.mechanism.items.map((m, i) => (
+                  <div key={`mech-${i}`} className="rounded-xl border border-border px-4 py-3">
+                    <p className="break-words font-mono text-xs text-text-muted">{m.element}</p>
+                    <p className="mt-1 text-sm leading-relaxed text-text">{m.role}</p>
+                  </div>
+                ))}
+              </div>
+              {output.decode.mechanism.lineage && (
+                <div className="mt-4 rounded-xl bg-border-light px-4 py-3">
+                  <p className="mb-1 text-xs font-medium text-text-muted">原典・系譜</p>
+                  <p className="text-sm leading-relaxed text-text">{output.decode.mechanism.lineage}</p>
+                </div>
+              )}
+            </Card>
+          )}
+
+          {/* 解読: 再利用可能な型（資産庫のたね） */}
+          {output.decode?.extractedPattern && (
+            <Card>
+              <SectionHeader icon={Library} title="型として抽出" />
+              <p className="mb-3 text-base font-semibold text-text">{output.decode.extractedPattern.name}</p>
+              <div className="space-y-3">
+                <div className="rounded-xl border border-border px-4 py-3">
+                  <p className="mb-1 text-xs font-medium text-text-muted">構造</p>
+                  <p className="text-sm leading-relaxed text-text">{output.decode.extractedPattern.structure}</p>
+                </div>
+                {output.decode.extractedPattern.variableSlots.length > 0 && (
+                  <div className="rounded-xl border border-border px-4 py-3">
+                    <p className="mb-1 text-xs font-medium text-text-muted">差し替えスロット</p>
+                    <p className="text-sm leading-relaxed text-text">
+                      {output.decode.extractedPattern.variableSlots.join(" / ")}
+                    </p>
+                  </div>
+                )}
+                <div className="rounded-xl border border-border px-4 py-3">
+                  <p className="mb-1 text-xs font-medium text-text-muted">転用範囲</p>
+                  <p className="text-sm leading-relaxed text-text">{output.decode.extractedPattern.transferScope}</p>
+                </div>
+                {output.decode.extractedPattern.usageNote && (
+                  <div className="rounded-xl border border-border px-4 py-3">
+                    <p className="mb-1 text-xs font-medium text-text-muted">使い方メモ</p>
+                    <p className="text-sm leading-relaxed text-text">{output.decode.extractedPattern.usageNote}</p>
+                  </div>
+                )}
+              </div>
+            </Card>
+          )}
+
+          {/* 解読: 隣接する定番の型（派生の地図） */}
+          {output.decode?.adjacentPatterns && output.decode.adjacentPatterns.length > 0 && (
+            <Card>
+              <SectionHeader icon={GitBranch} title="派生できる隣接の型" />
+              <p className="mb-3 text-xs text-text-muted">
+                この投稿の型と同じジャンルにある、他の定番の型（AIの一般知識より。試して検証を）
+              </p>
+              <div className="space-y-2.5">
+                {output.decode.adjacentPatterns.map((a, i) => (
+                  <div key={`adj-${i}`} className="rounded-xl border border-border px-4 py-3">
+                    <p className="text-sm font-semibold text-text">{a.name}</p>
+                    <p className="mt-0.5 text-sm leading-relaxed text-text-secondary">{a.description}</p>
+                    {a.actionable && (
+                      <div className="mt-2 rounded-lg border border-border bg-white px-3 py-2">
+                        <p className="whitespace-pre-wrap break-words font-mono text-xs leading-relaxed text-text">{a.actionable}</p>
+                        <button
+                          type="button"
+                          className="mt-1.5 inline-flex items-center text-xs font-medium text-accent hover:underline"
+                          onClick={async () => {
+                            try {
+                              await navigator.clipboard.writeText(a.actionable || "");
+                              setMessage("実行形をコピーしました");
+                            } catch {
+                              // ignore
+                            }
+                          }}
+                        >
+                          <Copy className="mr-1 h-3 w-3" />
+                          そのまま使える形をコピー
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
             </Card>
           )}
 
@@ -1297,6 +1424,26 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
                     <div key={`${idea.title}-${index}`} className="rounded-xl bg-border-light px-4 py-3">
                       <p className="mb-1 text-sm font-semibold text-text">{idea.title}</p>
                       <p className="text-sm leading-relaxed text-text-secondary">{idea.description}</p>
+                      {idea.actionable && (
+                        <div className="mt-2 rounded-lg border border-border bg-white px-3 py-2">
+                          <p className="whitespace-pre-wrap break-words font-mono text-xs leading-relaxed text-text">{idea.actionable}</p>
+                          <button
+                            type="button"
+                            className="mt-1.5 inline-flex items-center text-xs font-medium text-accent hover:underline"
+                            onClick={async () => {
+                              try {
+                                await navigator.clipboard.writeText(idea.actionable || "");
+                                setMessage("実行形をコピーしました");
+                              } catch {
+                                // ignore
+                              }
+                            }}
+                          >
+                            <Copy className="mr-1 h-3 w-3" />
+                            そのまま使える形をコピー
+                          </button>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -1422,6 +1569,15 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
             <p className="mb-4 text-sm text-text-secondary">
               学んだことを、わかりやすく他の人に伝えるコンテンツに変換します。
             </p>
+            {output.decode?.outputSeed?.angle && (
+              <div className="mb-4 rounded-xl bg-accent-subtle px-4 py-3">
+                <p className="mb-1 text-xs font-medium text-accent">発信ネタの種（解読より）</p>
+                <p className="text-sm leading-relaxed text-text">{output.decode.outputSeed.angle}</p>
+                {output.decode.outputSeed.hook && (
+                  <p className="mt-1 text-xs leading-relaxed text-text-muted">冒頭フック案: {output.decode.outputSeed.hook}</p>
+                )}
+              </div>
+            )}
             <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
               {OUTPUT_TYPES.map((type) => (
                 <OutputTypeCard

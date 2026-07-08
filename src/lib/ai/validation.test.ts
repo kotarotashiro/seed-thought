@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+  isDecodeOutput,
   isPostClassificationResult,
   isGeneratedOutputResult,
   isSemanticSearchResult,
@@ -242,5 +243,100 @@ describe("isStrictLearningOutput", () => {
         transferToOtherFields: [{ field: "分野" }], // application missing
       })
     ).toBe(false);
+  });
+});
+
+const validDecode = {
+  evidenceQuotes: ["チラシやサイトのメインビジュアルにそのまま使える形に改良"],
+  oneLiner: "実写広告の定番構図を穴埋め式プロンプトに実務変換した型",
+  whySignificant: [
+    {
+      point: "鑑賞用ではなく実務用への変換をしている",
+      evidence: "チラシやサイトのメインビジュアルにそのまま使える形に改良",
+    },
+  ],
+  beforeAfter: {
+    before: "小規模店はプロ発注かストックフォトで妥協するしかなかった",
+    trigger: "話題の構図が穴埋めプロンプト化された",
+    after: "個人経営の飲食店が広告グレードのビジュアルを内製できる",
+  },
+  mechanism: {
+    items: [{ element: "white seamless background", role: "切り抜き・文字載せのための白ホリ指定" }],
+    lineage: "@azed_ai の海外作例が原典",
+  },
+  extractedPattern: {
+    name: "浮遊デコンストラクト広告型",
+    structure: "[被写体] + ジャンル宣言 + 背景 + ライティング + 構図トリック",
+    variableSlots: ["subject", "ingredient_bits"],
+    transferScope: "構成要素に分解できるプロダクト全般",
+    usageNote: null,
+  },
+  synthesisTags: ["プロンプト設計", "商用ビジュアル"],
+  outputSeed: { angle: "before/after を導入に使う切り口", hook: null },
+};
+
+describe("isDecodeOutput", () => {
+  it("accepts a full valid decode", () => {
+    expect(isDecodeOutput(validDecode)).toBe(true);
+  });
+
+  it("accepts when peripheral fields are missing (core only)", () => {
+    expect(
+      isDecodeOutput({
+        oneLiner: validDecode.oneLiner,
+        whySignificant: validDecode.whySignificant,
+        beforeAfter: validDecode.beforeAfter,
+      })
+    ).toBe(true);
+  });
+
+  it("accepts null mechanism / extractedPattern", () => {
+    expect(isDecodeOutput({ ...validDecode, mechanism: null, extractedPattern: null })).toBe(true);
+  });
+
+  it("rejects empty oneLiner", () => {
+    expect(isDecodeOutput({ ...validDecode, oneLiner: "  " })).toBe(false);
+  });
+
+  it("rejects empty whySignificant array", () => {
+    expect(isDecodeOutput({ ...validDecode, whySignificant: [] })).toBe(false);
+  });
+
+  it("rejects whySignificant entries without evidence", () => {
+    expect(
+      isDecodeOutput({ ...validDecode, whySignificant: [{ point: "根拠なしのすごい" }] })
+    ).toBe(false);
+  });
+
+  it("rejects incomplete beforeAfter", () => {
+    expect(
+      isDecodeOutput({ ...validDecode, beforeAfter: { before: "今まで", after: "こう変わる" } })
+    ).toBe(false);
+  });
+
+  it("rejects malformed mechanism items", () => {
+    expect(
+      isDecodeOutput({
+        ...validDecode,
+        mechanism: { items: [{ element: "x" }], lineage: null }, // role missing
+      })
+    ).toBe(false);
+  });
+
+  it("rejects malformed extractedPattern", () => {
+    expect(
+      isDecodeOutput({
+        ...validDecode,
+        extractedPattern: { name: "型", structure: "構造" }, // variableSlots / transferScope missing
+      })
+    ).toBe(false);
+  });
+
+  it("rejects the review-pass ok response ({\"ok\": true})", () => {
+    expect(isDecodeOutput({ ok: true })).toBe(false);
+  });
+
+  it("rejects null", () => {
+    expect(isDecodeOutput(null)).toBe(false);
   });
 });

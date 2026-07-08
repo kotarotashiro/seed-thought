@@ -1,7 +1,7 @@
 import http from "http";
 import { NextResponse } from "next/server";
 import { getUserFacingError } from "@/lib/api/errors";
-import { saveXaiOAuthSession, saveXaiTokens } from "@/lib/xai/authStore";
+import { saveXaiTokens } from "@/lib/xai/authStore";
 import {
   buildXaiAuthorizeUrl,
   createXaiPkceSession,
@@ -114,7 +114,6 @@ export async function GET(request: Request) {
     const session = createXaiPkceSession();
     const settingsUrl = new URL("/settings/x", request.url).toString();
 
-    await saveXaiOAuthSession(session);
     await startLoopbackServer({ ...session, settingsUrl });
     const authorizeUrl = await buildXaiAuthorizeUrl(session);
     return NextResponse.redirect(authorizeUrl);

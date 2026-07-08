@@ -3,6 +3,7 @@ import type {
   AiProvider,
   ChatMessage,
   ClassifyPostInput,
+  DecodeOutput,
   GenerateOutputInput,
   GeneratedOutputResult,
   LearningOutput,
@@ -12,6 +13,8 @@ import type {
   PostSummaryForSearch,
   PostSummaryForTrend,
   SemanticSearchResult,
+  SeminarContent,
+  SeminarDesign,
   SourcePostForLearning,
   StrictLearningOutput,
   TranslateTextInput,
@@ -20,11 +23,17 @@ import type {
 import {
   buildChatPrompt,
   buildClassifyPrompt,
+  buildDecodePrompt,
+  buildDecodeReviewPrompt,
   buildLearningCorePrompt,
   buildLearningSupplementPrompt,
   buildNoteExpandPrompt,
   buildOutputPrompt,
   buildOutputRefinePrompt,
+  buildSeminarContentFixPrompt,
+  buildSeminarContentPrompt,
+  buildSeminarDesignPrompt,
+  buildXFixPrompt,
   MIN_NOTE_CONTENT_CHARS,
   REFINABLE_OUTPUT_TYPES,
   buildSemanticSearchPrompt,
@@ -34,12 +43,15 @@ import {
 } from "./prompts";
 import { parseAiJson, tryParseAiJson } from "./json";
 import {
+  isDecodeOutput,
   isGeneratedOutputResult,
   isLearningCoreOutput,
   isLearningSupplementOutput,
   isNoteSectionArray,
   isPostClassificationResult,
   isSemanticSearchResult,
+  isSeminarContent,
+  isSeminarDesign,
   isStrictLearningOutput,
   isTrendInsight,
   isTranslatedTextResult,
@@ -54,7 +66,7 @@ import {
   type AiTaskName,
 } from "./settings";
 import { mockProvider } from "./mockProvider";
-import { getProfile } from "@/lib/profile/fixedProfile";
+import { getProfile, type FixedProfile } from "@/lib/profile/fixedProfile";
 import { getGrokClient } from "./providers/grokProvider";
 import { getClaudeClient } from "./providers/claudeProvider";
 import { getOpenAIClient } from "./providers/openaiProvider";
@@ -136,13 +148,14 @@ async function getClient(
   };
 }
 
-// 並列生成した「本体」と「補足」を1つの LearningOutput にまとめる。
-// 補足が欠けた（タイムアウト/形式不正で null）場合は安全なデフォルトで埋め、
+// 並列生成した「本体」「補足」「解読」を1つの LearningOutput にまとめる。
+// 補足・解読が欠けた（タイムアウト/形式不正で null）場合は安全なデフォルトで埋め、
 // 本体だけでもカードが成立するようにする。
 function mergeLearningOutput(
   input: SourcePostForLearning,
   core: LearningCoreOutput,
-  supplement: LearningSupplementOutput | null
+  supplement: LearningSupplementOutput | null,
+  decode: DecodeOutput | null
 ): LearningOutput {
   return {
     ...core,
@@ -152,14 +165,166 @@ function mergeLearningOutput(
     imageExplanationPrompt: supplement?.imageExplanationPrompt ?? "",
     userLearningMemo: supplement?.userLearningMemo ?? core.summary ?? "",
     backgroundContext: supplement?.backgroundContext ?? null,
+    decode,
     status: "draft",
   };
+}
+
+// 検証ガードは周辺フィールドの欠落を許容するため、欠落分をデフォルトで埋めて型を満たす。
+function normalizeDecode(d: DecodeOutput): DecodeOutput {
+  return {
+    evidenceQuotes: d.evidenceQuotes ?? [],
+    oneLiner: d.oneLiner,
+    whySignificant: d.whySignificant,
+    beforeAfter: d.beforeAfter,
+    mechanism: d.mechanism ?? null,
+    extractedPattern: d.extractedPattern ?? null,
+    adjacentPatterns: d.adjacentPatterns ?? null,
+    synthesisTags: d.synthesisTags ?? [],
+    outputSeed: d.outputSeed ?? { angle: "", hook: null },
+  };
+}
+
+// 解読器（SeedThought 2）: 解読の生成→検品の直列チェーン。
+// Promise.all の並列枠内で走らせるため、体感時間は max(本体, 補足, 解読+検品)。
+// 検品は best-effort：{"ok": true} や形式不正が返ったら初回の解読を採用する。
+async function generateDecodeWithReview(
+  client: LLMClient,
+  input: SourcePostForLearning,
+  profile: FixedProfile
+): Promise<DecodeOutput | null> {
+  const raw = await client.chatJson(buildDecodePrompt(input, profile));
+  const decode = tryParseAiJson(raw, isDecodeOutput, "解読");
+  if (!decode) return null;
+
+  try {
+    const reviewRaw = await client.chatJson(
+      buildDecodeReviewPrompt(JSON.stringify(decode, null, 2), input)
+    );
+    // 修正版（DecodeOutput全体）が返ったときだけ差し替える。{"ok": true} 等は初回を採用。
+    const reviewed = tryParseAiJson(reviewRaw, isDecodeOutput, "解読(検品)");
+    if (reviewed) return normalizeDecode(reviewed);
+  } catch (reviewErr) {
+    console.warn(
+      "[ai/generateLearningCard] 解読の検品に失敗、初回の解読を採用:",
+      reviewErr instanceof Error ? reviewErr.message : reviewErr
+    );
+  }
+  return normalizeDecode(decode);
+}
+
+// chatJson→検証つきパースを、形式不正時に1回だけ再試行するヘルパー。
+// gemini-3.1-pro-preview は全体スキーマでなく内側のオブジェクトだけを返すことが確率的にあり
+// （実測: 学習カード本体・セミナー設計で発生）、再試行で解消することが多い。
+async function chatJsonValidated<T>(
+  client: LLMClient,
+  prompt: string,
+  guard: (v: unknown) => v is T,
+  label: string,
+  retries = 1
+): Promise<T> {
+  let lastErr: unknown;
+  for (let attempt = 0; attempt <= retries; attempt += 1) {
+    try {
+      const raw = await client.chatJson(prompt);
+      return parseAiJson(raw, guard, label);
+    } catch (err) {
+      lastErr = err;
+      if (attempt < retries) {
+        console.warn(`[ai] ${label} の応答が形式不正、再試行します（${attempt + 1}/${retries}回目）`);
+      }
+    }
+  }
+  throw lastErr;
 }
 
 // LLM 呼び出し失敗時に provider/model/task を含めた診断ログを出す
 function logAiError(task: AiTaskName, provider: string, model: string, err: unknown): void {
   const message = err instanceof Error ? err.message : String(err);
   console.error(`[ai/${task}] provider=${provider} model=${model} call failed: ${message}`);
+}
+
+// X投稿の機械チェック。プロンプト指示だけでは140〜280字やsatoriTypeUsedの記録が
+// 破られることがあるため、決定論的に検証する（xSatoriSelfReview のルール6・型記録に対応）。
+function validateXOutput(result: GeneratedOutputResult): string[] {
+  const violations: string[] = [];
+  const len = result.content.trim().length;
+  if (len < 140) violations.push(`本文が${len}字で140字未満（薄い。ベネフィットか具体例を書き足す）`);
+  if (len > 280) violations.push(`本文が${len}字で280字を超えている（削って収める）`);
+  if (!result.satoriTypeUsed) violations.push("satoriTypeUsed（使用した型 A〜E）が記録されていない");
+  return violations;
+}
+
+// セミナー②中身の機械チェック。プロンプト指示だけでは省略される
+// （実測: スライド2枚・章詳細1件・テンプレが説明文）ため決定論的に検証する。
+function validateSeminarContent(content: SeminarContent, design: SeminarDesign): string[] {
+  const violations: string[] = [];
+  if (content.slides.length < 15) {
+    violations.push(`スライドが${content.slides.length}枚しかない（15〜25枚必要。章ごとに2〜4枚＋表紙・アジェンダ・まとめ）`);
+  }
+  if (content.chapterDetails.length < design.schedule.length) {
+    violations.push(
+      `章詳細が${content.chapterDetails.length}件（スケジュール${design.schedule.length}パート全てに必要）`
+    );
+  }
+  const templates = content.templates ?? {};
+  for (const key of ["basic", "snsPost"]) {
+    const v = templates[key];
+    if (typeof v === "string" && v.length > 0 && v.length < 40) {
+      violations.push(`templates.${key} が${v.length}字と短く実物になっていない（コピーしてそのまま使える文面が必要）`);
+    }
+  }
+  return violations;
+}
+
+// セミナーの2分割生成: ①設計（骨格）→ ②中身（台本・スライド・テンプレ実物）→ 機械チェック＋1回修正。
+// 巨大スキーマの1ショットはモデルが省略するため分割する。②は①に厳密に従わせる。
+// 所要時間は2〜3呼び出しの直列（grok実測 約30秒/回）で maxDuration=300 に収まる。
+async function generateSeminarOutput(
+  client: LLMClient,
+  input: GenerateOutputInput,
+  ctx: { provider: string; model: string }
+): Promise<GeneratedOutputResult> {
+  const design = await chatJsonValidated(
+    client,
+    await buildSeminarDesignPrompt(input),
+    isSeminarDesign,
+    "セミナー設計"
+  );
+
+  let content = await chatJsonValidated(
+    client,
+    buildSeminarContentPrompt(input, design),
+    isSeminarContent,
+    "セミナー中身"
+  );
+
+  const violations = validateSeminarContent(content, design);
+  if (violations.length > 0) {
+    try {
+      const fixedRaw = await client.chatJson(buildSeminarContentFixPrompt(design, content, violations));
+      const fixed = parseAiJson(fixedRaw, isSeminarContent, "セミナー中身修正");
+      // 改悪防止: 修正後に違反が減ったときだけ差し替える
+      if (validateSeminarContent(fixed, design).length < violations.length) {
+        content = fixed;
+      } else {
+        console.warn(
+          `[ai/generateOutput] セミナー修正パス後も基準未達、初回を採用 provider=${ctx.provider} model=${ctx.model}: ${violations.join(", ")}`
+        );
+      }
+    } catch (fixErr) {
+      console.warn(
+        `[ai/generateOutput] セミナー修正パスに失敗、初回の中身で続行 provider=${ctx.provider} model=${ctx.model}:`,
+        fixErr instanceof Error ? fixErr.message : fixErr
+      );
+    }
+  }
+
+  return {
+    title: design.seminar.name,
+    content: typeof design.finalStatement === "string" ? design.finalStatement : "",
+    contentJson: { ...design, ...content } as Record<string, unknown>,
+  };
 }
 
 // note セクション配列を連結して content 文字列を組み立てる。
@@ -253,12 +418,18 @@ export function getAiProvider(): AiProvider {
       if (ctx.isMock) return mockProvider.generateLearningCard(input);
       try {
         // 1ショットだと出力JSONが巨大で Kimi k2.6 は300秒を超えて打ち切られる。
-        // 「本体」と「補足」を並列実行し、体感時間を max(本体, 補足) に抑える。
-        // 本体は必須、補足は best-effort（欠けても本体だけでカードを成立させる）。
+        // 「本体」「補足」「解読」を並列実行し、体感時間を max(本体, 補足, 解読+検品) に抑える。
+        // 本体は必須、補足・解読は best-effort（欠けても本体だけでカードを成立させる）。
         // settings で設定したプロフィール（テーマ・知識コンテキスト）をプロンプトに渡す。
         const profile = await getProfile();
-        const [coreRaw, supplementRaw] = await Promise.all([
-          ctx.client.chatJson(buildLearningCorePrompt(input, profile)),
+        const [core, supplementRaw, decode] = await Promise.all([
+          // 本体は必須。形式不正（内側オブジェクトだけ返す等）は1回だけ再試行する。
+          chatJsonValidated(
+            ctx.client,
+            buildLearningCorePrompt(input, profile),
+            isLearningCoreOutput,
+            "学習カード(本体)"
+          ),
           ctx.client.chatJson(buildLearningSupplementPrompt(input, profile)).catch((err) => {
             console.warn(
               `[ai/generateLearningCard] 補足の生成に失敗（本体のみで続行） provider=${ctx.provider} model=${ctx.model}:`,
@@ -266,12 +437,18 @@ export function getAiProvider(): AiProvider {
             );
             return "";
           }),
+          generateDecodeWithReview(ctx.client, input, profile).catch((err) => {
+            console.warn(
+              `[ai/generateLearningCard] 解読の生成に失敗（解読なしで続行） provider=${ctx.provider} model=${ctx.model}:`,
+              err instanceof Error ? err.message : err
+            );
+            return null;
+          }),
         ]);
-        const core = parseAiJson(coreRaw, isLearningCoreOutput, "学習カード(本体)");
         const supplement = supplementRaw
           ? tryParseAiJson(supplementRaw, isLearningSupplementOutput, "学習カード(補足)")
           : null;
-        return mergeLearningOutput(input, core, supplement);
+        return mergeLearningOutput(input, core, supplement, decode);
       } catch (err) {
         logAiError("generateLearningCard", ctx.provider, ctx.model, err);
         throw err;
@@ -282,6 +459,12 @@ export function getAiProvider(): AiProvider {
       const ctx = await getClient("generateOutput");
       if (ctx.isMock) return mockProvider.generateOutput(input);
       try {
+        // セミナーは2分割生成（設計→中身→機械チェック）の専用パス。
+        // buildOutputPrompt のセミナー1ショット指示は通らない。
+        if (input.outputType === "seminar") {
+          return await generateSeminarOutput(ctx.client, input, ctx);
+        }
+
         const prompt = await buildOutputPrompt(input);
         const raw = await ctx.client.chatJson(prompt);
         const result = parseAiJson(raw, isGeneratedOutputResult, "アウトプット生成");
@@ -293,7 +476,7 @@ export function getAiProvider(): AiProvider {
             ? `@${input.postAuthorUsername}${input.postAuthorName ? `（${input.postAuthorName}）` : ""}`
             : input.postAuthorName ?? "元投稿者";
           return buildNoteResult(result, authorRef, ctx, input, async (sections, currentLen) => {
-            const expandPrompt = buildNoteExpandPrompt(authorRef, sections, currentLen);
+            const expandPrompt = buildNoteExpandPrompt(input, sections, currentLen);
             const expandedRaw = await ctx.client.chatJson(expandPrompt);
             const expandedParsed = JSON.parse(expandedRaw) as { sections?: unknown };
             return isNoteSectionArray(expandedParsed.sections) ? expandedParsed.sections : null;
@@ -311,6 +494,7 @@ export function getAiProvider(): AiProvider {
         // 改稿は別呼び出しに分けるのが要点（同一生成内の自己添削は効かない）。
         // 改稿パスは temperature を上げて下書きの echo を避ける。
         // 改稿に失敗しても下書きで続行する（品質は落ちるが出力は返す）。
+        let finalResult = result;
         if (input.outputType in REFINABLE_OUTPUT_TYPES) {
           try {
             const refinePrompt = buildOutputRefinePrompt(input, result);
@@ -320,16 +504,48 @@ export function getAiProvider(): AiProvider {
             if (result.satoriTypeUsed && !refined.satoriTypeUsed) {
               refined.satoriTypeUsed = result.satoriTypeUsed;
             }
-            return refined;
+            finalResult = refined;
           } catch (refineErr) {
             console.warn(
               `[ai/generateOutput] ${input.outputType} の改稿に失敗、下書きで続行 provider=${ctx.provider} model=${ctx.model}:`,
               refineErr instanceof Error ? refineErr.message : refineErr
             );
-            return result;
+            finalResult = result;
           }
         }
-        return result;
+
+        // X投稿の機械チェック＋修正パス。プロンプト指示だけでは字数・型記録が破られることがあるため、
+        // 違反を検出したときだけ1回修正させる（改悪防止: 修正後も違反が減らなければ直前の結果を採用）。
+        if (input.outputType === "x") {
+          const violations = validateXOutput(finalResult);
+          if (violations.length > 0) {
+            try {
+              const fixPrompt = buildXFixPrompt(input, finalResult, violations);
+              const fixedRaw = await ctx.client.chatJson(fixPrompt, { temperature: 0.4 });
+              const fixed = parseAiJson(fixedRaw, isGeneratedOutputResult, "X投稿修正");
+              if (!fixed.satoriTypeUsed) {
+                fixed.satoriTypeUsed =
+                  finalResult.satoriTypeUsed ??
+                  (input.satoriType && input.satoriType !== "auto" ? input.satoriType : undefined);
+              }
+              const remaining = validateXOutput(fixed);
+              if (remaining.length < violations.length) {
+                finalResult = fixed;
+              } else {
+                console.warn(
+                  `[ai/generateOutput] X修正パス後も基準未達、直前の結果を採用 provider=${ctx.provider} model=${ctx.model}: ${remaining.join(", ")}`
+                );
+              }
+            } catch (fixErr) {
+              console.warn(
+                `[ai/generateOutput] X修正パスに失敗、直前の結果で続行 provider=${ctx.provider} model=${ctx.model}:`,
+                fixErr instanceof Error ? fixErr.message : fixErr
+              );
+            }
+          }
+        }
+
+        return finalResult;
       } catch (err) {
         logAiError("generateOutput", ctx.provider, ctx.model, err);
         throw err;

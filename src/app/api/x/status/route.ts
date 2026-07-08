@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
+import { getScopes } from "@/lib/x/oauth";
 
 // GET /api/x/status - Get X account connection status and sync history
 export async function GET() {
@@ -42,7 +43,7 @@ export async function GET() {
       config: {
         clientIdConfigured: Boolean(process.env.X_CLIENT_ID),
         redirectUri: process.env.X_REDIRECT_URI || "http://localhost:3003/api/x/callback",
-        scopes: process.env.X_SCOPES || "tweet.read users.read offline.access",
+        scopes: getScopes().join(" "),
         tokenEncryptionConfigured: Boolean(process.env.TOKEN_ENCRYPTION_KEY),
       },
     });

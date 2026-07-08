@@ -31,8 +31,14 @@ export function getUserFacingError(error: unknown, fallback: string): string {
   if (error.message.includes("X API error: 403")) {
     return "X APIの権限またはプラン制限により取得できませんでした。X Developer Portalの権限、X_SCOPES、APIプランを確認してから再接続してください。";
   }
+  if (error.message.includes("X API error: 401")) {
+    return "X連携の認証または権限が無効です。一度Xアカウントの接続を解除し、再接続してから同期してください。";
+  }
   if (error.message.includes("X API error: 429")) {
     return "X APIのレート制限に達しました。少し時間を置いてから再実行してください。";
+  }
+  if (error.message.toLowerCase().includes("compute time quota")) {
+    return "実行時間の利用上限に達しています。Vercel Functions、Neon compute、またはAIプロバイダ側のquotaがまだ解除されていない可能性があります。Vercel Logsで直前の provider=... / DATABASE / function timeout を確認してください。";
   }
   if (
     error.message.includes("RESOURCE_EXHAUSTED") ||
