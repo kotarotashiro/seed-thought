@@ -17,8 +17,6 @@ interface SegmentedControlProps<T extends string> {
   size?: "sm" | "md";
   /** 各タブを等幅に伸ばす（フォーム内トグルなど） */
   fullWidth?: boolean;
-  /** 狭い画面ではラベルを隠してアイコンだけにする */
-  collapseLabelsOnMobile?: boolean;
   className?: string;
 }
 
@@ -34,13 +32,12 @@ export function SegmentedControl<T extends string>({
   onChange,
   size = "md",
   fullWidth = false,
-  collapseLabelsOnMobile = false,
   className,
 }: SegmentedControlProps<T>) {
   return (
     <div
       className={clsx(
-        "flex rounded-xl border border-border bg-border-light p-0.5",
+        "flex max-w-full overflow-x-auto rounded-xl border border-border bg-border-light p-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
         fullWidth ? "w-full" : "w-fit",
         className
       )}
@@ -51,9 +48,10 @@ export function SegmentedControl<T extends string>({
           <button
             key={item.value}
             type="button"
+            aria-label={item.label}
             onClick={() => onChange(item.value)}
             className={clsx(
-              "flex items-center justify-center gap-1.5 rounded-lg font-medium transition-colors",
+              "flex shrink-0 items-center justify-center gap-1.5 rounded-lg font-medium transition-colors",
               fullWidth && "flex-1",
               size === "sm" ? "px-3 py-1.5 text-xs" : "px-4 py-2 text-sm",
               active
@@ -62,7 +60,7 @@ export function SegmentedControl<T extends string>({
             )}
           >
             {item.icon}
-            <span className={collapseLabelsOnMobile ? "hidden sm:inline" : undefined}>
+            <span>
               {item.label}
             </span>
           </button>

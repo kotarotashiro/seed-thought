@@ -418,7 +418,6 @@ export default function AskAIPage() {
           {/* Mode tabs */}
           <SegmentedControl
             size="sm"
-            collapseLabelsOnMobile
             value={mode}
             onChange={(next) => {
               setMode(next);
@@ -525,6 +524,7 @@ export default function AskAIPage() {
             />
             <Button
               type="submit"
+              aria-label="送信"
               disabled={!input.trim() || sending}
               loading={sending}
               loadingLabel="送信中"
@@ -594,6 +594,7 @@ export default function AskAIPage() {
                     </button>
                     <button
                       onClick={() => removeSearchHistory(q)}
+                      aria-label="削除"
                       className="text-text-muted opacity-0 transition-opacity hover:text-danger group-hover:opacity-100"
                     >
                       <X className="h-3 w-3" />

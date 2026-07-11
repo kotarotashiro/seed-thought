@@ -285,7 +285,7 @@ export default function NewPostPage() {
 
       <SegmentedControl
         fullWidth
-        collapseLabelsOnMobile
+
         value={tab}
         onChange={setTab}
         items={TABS}

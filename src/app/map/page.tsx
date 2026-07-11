@@ -537,19 +537,27 @@ export default function KnowledgeMapPage() {
                   // ラベルはズームに依らず一定の画面サイズで描く（1/view.k で補正）。
                   const inv = 1 / view.k;
 
+                  const handleNodeClick = (e: React.MouseEvent) => {
+                    e.stopPropagation();
+                    if (draggedRef.current) return;
+                    setSelectedNode(isSelected ? null : node);
+                  };
+
                   return (
                     <g
                       key={node.id}
                       transform={`translate(${pos.x},${pos.y})`}
                       style={{ cursor: "pointer" }}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (draggedRef.current) return;
-                        setSelectedNode(isSelected ? null : node);
-                      }}
+                      onClick={handleNodeClick}
                       onPointerEnter={() => setHoveredNode(node.id)}
                       onPointerLeave={() => setHoveredNode((h) => (h === node.id ? null : h))}
                     >
+                      <circle
+                        r={22 * inv}
+                        fill="transparent"
+                        pointerEvents="all"
+                      />
+
                       <circle
                         r={r}
                         fill={color.fill}
@@ -567,7 +575,8 @@ export default function KnowledgeMapPage() {
                           stroke="#ffffff"
                           strokeWidth={3.5 * inv}
                           strokeLinejoin="round"
-                          style={{ paintOrder: "stroke", pointerEvents: "none", userSelect: "none" }}
+                          onClick={handleNodeClick}
+                          style={{ paintOrder: "stroke", pointerEvents: "auto", userSelect: "none" }}
                         >
                           {truncate(node.title)}
                         </text>
@@ -585,7 +594,7 @@ export default function KnowledgeMapPage() {
               type="button"
               aria-label="拡大"
               onClick={() => zoomByButton(1.3)}
-              className="flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-white/95 text-text-secondary shadow-sm hover:bg-border-light hover:text-text"
+              className="flex h-11 w-11 items-center justify-center rounded-lg border border-border bg-white/95 text-text-secondary shadow-sm hover:bg-border-light hover:text-text"
             >
               <Plus className="h-4 w-4" />
             </button>
@@ -593,7 +602,7 @@ export default function KnowledgeMapPage() {
               type="button"
               aria-label="縮小"
               onClick={() => zoomByButton(1 / 1.3)}
-              className="flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-white/95 text-text-secondary shadow-sm hover:bg-border-light hover:text-text"
+              className="flex h-11 w-11 items-center justify-center rounded-lg border border-border bg-white/95 text-text-secondary shadow-sm hover:bg-border-light hover:text-text"
             >
               <Minus className="h-4 w-4" />
             </button>
@@ -604,7 +613,7 @@ export default function KnowledgeMapPage() {
                 interactedRef.current = false;
                 fitView();
               }}
-              className="flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-white/95 text-text-secondary shadow-sm hover:bg-border-light hover:text-text"
+              className="flex h-11 w-11 items-center justify-center rounded-lg border border-border bg-white/95 text-text-secondary shadow-sm hover:bg-border-light hover:text-text"
             >
               <Maximize2 className="h-4 w-4" />
             </button>

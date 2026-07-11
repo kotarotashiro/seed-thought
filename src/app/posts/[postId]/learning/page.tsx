@@ -184,6 +184,7 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const autoGenerateTriedRef = useRef(false);
+  const generateAbortControllerRef = useRef<AbortController | null>(null);
 
   // 生成モデルの上書き（投稿詳細ページで選び、クエリパラメータで渡される。空 = 設定のデフォルト）
   const [genProvider, setGenProvider] = useState("");
@@ -371,7 +372,11 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
 
   const handleGenerate = async (mode?: "content" | "format") => {
     const activeMode = mode ?? learningMode;
+    const previousMode = learningMode;
     if (mode !== undefined) setLearningMode(mode);
+
+    const abortController = new AbortController();
+    generateAbortControllerRef.current = abortController;
     setGenerating(true);
     setError(null);
     setMessage(null);
@@ -381,6 +386,7 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
       const res = await fetch(`/api/posts/${postId}/learning`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        signal: abortController.signal,
         body: JSON.stringify({
           learningMode: activeMode,
           ...(genProvider ? { provider: genProvider, model: genModel || undefined } : {}),
@@ -417,11 +423,24 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
       setMessage("学習カードを作成しました");
       // 「本質を絞る」(深掘り)はオンデマンド。ユーザーがボタンを押したときだけ生成する。
     } catch (generateError) {
+      if (generateError instanceof Error && generateError.name === "AbortError") {
+        if (mode !== undefined) setLearningMode(previousMode);
+        setError(null);
+        setMessage("生成を中止しました");
+        return;
+      }
       console.error("Failed to generate learning card:", generateError);
       setError(generateError instanceof Error ? generateError.message : "学習カードの生成に失敗しました");
     } finally {
+      if (generateAbortControllerRef.current === abortController) {
+        generateAbortControllerRef.current = null;
+      }
       setGenerating(false);
     }
+  };
+
+  const cancelGenerate = () => {
+    generateAbortControllerRef.current?.abort();
   };
 
   const generateStrict = async () => {
@@ -481,7 +500,7 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
   }, [loading, post, card, generating]);
 
   const handleSave = async () => {
-    if (!card) return;
+    if (!card || saving) return;
     setSaving(true);
     setError(null);
     setMessage(null);
@@ -685,9 +704,9 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
                 <Download className="mr-1.5 h-3.5 w-3.5" />
                 エクスポート
               </Button>
-              <Button size="sm" onClick={handleSave} loading={saving} loadingLabel="保存中...">
+              <Button size="sm" onClick={handleSave} disabled={card.status === "saved"} loading={saving} loadingLabel="保存中...">
                 <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />
-                学習カードに保存
+                {card.status === "saved" ? "保存済み ✓" : "学習カードに保存"}
               </Button>
             </div>
           )}
@@ -835,6 +854,9 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
 
       {!card || !output ? (
         <Card>
+          {!generating && message && !error && (
+            <p className="mb-4 text-xs text-text-muted">{message}</p>
+          )}
           {generating ? (
             <div>
               <div className="mb-4 flex items-center gap-3">
@@ -856,6 +878,9 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
               <p className="mt-4 text-xs text-text-muted">
                 内容量により30秒〜数分かかることがあります。完了までこのままお待ちください。
               </p>
+              <Button type="button" variant="secondary" onClick={cancelGenerate} className="mt-5 w-full sm:w-auto">
+                中止する
+              </Button>
             </div>
           ) : tokenExpired ? (
             <div className="space-y-4">
@@ -910,6 +935,9 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
               <p className="text-sm text-text">
                 選択したモデルで学習カードを作り直しています…（内容量により数分かかることがあります）
               </p>
+              <Button type="button" variant="secondary" onClick={cancelGenerate} className="shrink-0">
+                中止する
+              </Button>
             </div>
           )}
           {!generating && (message || error) && (

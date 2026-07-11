@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -18,6 +18,7 @@ import {
   TrendingUp,
   X as XIcon,
   Bookmark,
+  Library,
   Network,
 } from "lucide-react";
 import { clsx } from "clsx";
@@ -47,6 +48,7 @@ const drawerGroups: {
       { href: "/posts", label: "保存した投稿", icon: Archive },
       { href: "/chat", label: "AIに聞く", icon: Sparkles },
       { href: "/map", label: "知識マップ", icon: Network },
+      { href: "/assets", label: "資産庫", icon: Library },
     ],
   },
   {
@@ -91,16 +93,34 @@ export function MobileNav() {
   const pathname = usePathname();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const closeDrawer = () => setDrawerOpen(false);
+  const drawerScrollYRef = useRef(0);
 
-  // Prevent body scroll when drawer is open.
+  // Prevent body scroll when drawer is open, including touch scrolling on mobile.
   useEffect(() => {
-    if (drawerOpen) {
-      const prev = document.body.style.overflow;
-      document.body.style.overflow = "hidden";
-      return () => {
-        document.body.style.overflow = prev;
-      };
-    }
+    if (!drawerOpen) return;
+
+    const body = document.body;
+    const scrollY = window.scrollY;
+    drawerScrollYRef.current = scrollY;
+    const previous = {
+      overflow: body.style.overflow,
+      position: body.style.position,
+      top: body.style.top,
+      width: body.style.width,
+    };
+
+    body.style.position = "fixed";
+    body.style.top = `-${scrollY}px`;
+    body.style.width = "100%";
+    body.style.overflow = "hidden";
+
+    return () => {
+      body.style.overflow = previous.overflow;
+      body.style.position = previous.position;
+      body.style.top = previous.top;
+      body.style.width = previous.width;
+      window.scrollTo(0, drawerScrollYRef.current);
+    };
   }, [drawerOpen]);
 
   return (
@@ -117,7 +137,7 @@ export function MobileNav() {
             type="button"
             onClick={() => setDrawerOpen(true)}
             aria-label="メニューを開く"
-            className="rounded-lg p-1.5 text-text-secondary hover:bg-border-light hover:text-text"
+            className="-my-1.5 flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-lg p-0 text-text-secondary hover:bg-border-light hover:text-text"
           >
             <Menu className="h-5 w-5" />
           </button>
@@ -154,7 +174,7 @@ export function MobileNav() {
       {drawerOpen && (
         <div className="fixed inset-0 z-50 md:hidden" role="dialog" aria-modal="true">
           <div
-            className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+            className="absolute inset-0 touch-none overscroll-contain bg-black/40 backdrop-blur-sm"
             onClick={closeDrawer}
           />
           <aside className="absolute right-0 top-0 flex h-full w-[280px] max-w-[85vw] flex-col bg-white shadow-xl">
@@ -169,7 +189,7 @@ export function MobileNav() {
                 type="button"
                 onClick={closeDrawer}
                 aria-label="メニューを閉じる"
-                className="rounded-lg p-1.5 text-text-secondary hover:bg-border-light hover:text-text"
+                className="-my-1.5 flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-lg p-0 text-text-secondary hover:bg-border-light hover:text-text"
               >
                 <XIcon className="h-5 w-5" />
               </button>
