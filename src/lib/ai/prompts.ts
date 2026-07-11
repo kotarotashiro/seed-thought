@@ -11,6 +11,7 @@ import type {
   SeminarContent,
   SeminarDesign,
   SourcePostForLearning,
+  SynthesisInput,
   TranslateTextInput,
 } from "./types";
 import { strictLearningKnowledge, beginnerTeachingRules } from "./knowledge";
@@ -1018,6 +1019,42 @@ ${sourceCiteRule}
   "contentJson": {},
   "satoriTypeUsed": "A" | "B" | "C" | "D" | "E"
 }
+JSONのみ返してください。`;
+}
+
+export function buildSynthesisPrompt(input: SynthesisInput): string {
+  const materialA = JSON.stringify(input.materialA, null, 2);
+  const materialB = JSON.stringify(input.materialB, null, 2);
+
+  return `あなたは「掛け合わせエンジン」。2つの素材から、新しい発信ネタの種を1つ提案する。
+
+ルール:
+- 2つを並べて紹介するのではなく、「共通する構造」か「緊張関係（対立・補完）」を1つだけ特定し、それを軸にする
+- 素材に書かれていない固有名詞・数字・事例・実績を創作しない
+- 煽り・誇張表現（「革命」「震撼」「相乗効果」「シナジー」「覇権」など）を使わない
+- takeaway は1文。読者が明日から使える形（行動 or 視点の転換）にする
+- どちらか片方の素材だけで書ける提案は失格。両方が必須である理由を reason に書く
+
+出力は次のJSONのみ: { "title", "angle", "reason", "takeaway", "seedHook" }
+
+## 良い出力例
+素材A = 「LLM に一発で正解を出させず、生成→自己検品の2段にする」というポストの解読。
+素材B = 「営業は提案の場で考えるな、想定問答を先に書け」というポストの解読。
+
+{
+  "title": "一発で決めない設計は、AIにも営業にも効く",
+  "angle": "AIの2パス生成と営業の想定問答づくりは、どちらも「本番の一撃に賭けず、出力と検品を分離する」という同じ構造を持っている。この共通構造を軸に、仕事全般の準備論として語る。",
+  "reason": "素材Aは機械の出力精度、素材Bは人間の対話品質と、領域は全く違うのに解決策の形が同一。異分野で同じ型が独立に発見されている事実が、型の普遍性の証拠になる。片方だけでは「AIテクニック」か「営業論」で終わり、この普遍性は語れない。",
+  "takeaway": "大事な仕事は「つくる工程」と「疑う工程」を最初から別の時間に分けて予定に入れる。",
+  "seedHook": "AIへの指示が上手い人と、営業が上手い人。全然違う分野なのに、やっていることが同じでした。"
+}
+
+## 今回の素材A
+${materialA}
+
+## 今回の素材B
+${materialB}
+
 JSONのみ返してください。`;
 }
 

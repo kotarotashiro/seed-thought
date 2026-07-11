@@ -68,6 +68,46 @@ model LearningCard {
   videos     LearningCardVideo[]
   collectionItems CollectionItem[]
   drafts     XDraft[]
+  patternAsset PatternAsset?
+}
+
+// 資産庫: 解読器が抽出した「再利用可能な型」の第一級レコード（SeedThought 2 ステップ2）
+// 出所カードが消えても資産は残す（onDelete: SetNull）
+model PatternAsset {
+  id                String   @id @default(cuid())
+  learningCardId    String?  @unique
+  sourceKind        String   @default("decode") // "decode"（将来 "manual" 等を追加）
+  name              String
+  structure         String
+  variableSlotsJson String   @default("[]") // JSON array of strings
+  transferScope     String
+  usageNote         String?
+  tagsJson          String   @default("[]") // decode.synthesisTags のコピー。掛け合わせ突合に使う
+  status            String   @default("active") // "active" | "archived"
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  learningCard LearningCard? @relation(fields: [learningCardId], references: [id], onDelete: SetNull)
+}
+
+// 掛け合わせ提案の記録（= 資産庫の「掛け合わせの当たり」の記録を兼ねる）
+model SynthesisSuggestion {
+  id             String   @id @default(cuid())
+  dateKey        String   // JST の "YYYY-MM-DD"
+  status         String   @default("proposed") // "proposed" | "accepted" | "dismissed"
+  cardAId        String   // LearningCard.id（FK は張らない。カード削除後も記録として残す）
+  cardBId        String?  // 素材×素材のとき。素材×型のときは null
+  patternAssetId String?  // 素材×型のとき。素材×素材のときは null
+  title          String
+  angle          String
+  reason         String
+  takeaway       String
+  seedHook       String?
+  collectionId   String?  // accept 時に作成した Collection.id
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([dateKey, createdAt])
 }
 
 model LearningCardImage {

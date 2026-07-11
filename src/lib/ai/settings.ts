@@ -27,6 +27,7 @@ export type AiTaskName =
   | "generateLearningCard"
   | "generateStrictLearning"
   | "generateOutput"
+  | "generateSynthesis"
   | "searchSemantically"
   | "analyzeLikeTrends"
   | "chat";
@@ -37,6 +38,7 @@ export const TASK_LABELS: Record<AiTaskName, string> = {
   generateLearningCard: "学習カード生成",
   generateStrictLearning: "厳密学習生成",
   generateOutput: "アウトプット生成",
+  generateSynthesis: "掛け合わせ生成",
   searchSemantically: "セマンティック検索",
   analyzeLikeTrends: "傾向分析",
   chat: "チャット",
@@ -111,6 +113,7 @@ const ALL_TASKS: AiTaskName[] = [
   "generateLearningCard",
   "generateStrictLearning",
   "generateOutput",
+  "generateSynthesis",
   "searchSemantically",
   "analyzeLikeTrends",
   "chat",

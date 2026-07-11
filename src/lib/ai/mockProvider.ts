@@ -12,6 +12,8 @@ import type {
   SemanticSearchResult,
   SourcePostForLearning,
   StrictLearningOutput,
+  SynthesisInput,
+  SynthesisOutput,
   TranslateTextInput,
   TrendInsight,
 } from "./types";
@@ -198,6 +200,17 @@ export const mockProvider: AiProvider = {
       default:
         return { title: "出力", content: context };
     }
+  },
+
+  async generateSynthesis(input: SynthesisInput): Promise<SynthesisOutput> {
+    await delay(500);
+    return {
+      title: `${input.materialA.title} × ${input.materialB.title}`,
+      angle: "2つの素材に共通する構造を取り出し、別領域でも使える発信ネタとしてまとめる。",
+      reason: "片方は具体素材、もう片方は別角度の型を示しており、両方を見ることで同じ考え方の転用可能性が見える。",
+      takeaway: "気になったノウハウは内容だけでなく、別の場面に移せる形まで一緒に書き出す。",
+      seedHook: "一見別の話に見える2つを並べたら、同じ型が見えてきました。",
+    };
   },
 
   async generateStrictLearning(input: {

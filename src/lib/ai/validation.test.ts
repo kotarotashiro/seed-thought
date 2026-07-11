@@ -8,6 +8,7 @@ import {
   isLearningCoreOutput,
   isLearningSupplementOutput,
   isStrictLearningOutput,
+  validateSynthesisOutput,
 } from "./validation";
 
 const validClassification = {
@@ -338,5 +339,40 @@ describe("isDecodeOutput", () => {
 
   it("rejects null", () => {
     expect(isDecodeOutput(null)).toBe(false);
+  });
+});
+
+const validSynthesis = {
+  title: "一発で決めない設計は、AIにも営業にも効く",
+  angle: "AIの2パス生成と営業の想定問答づくりは、どちらも出力と検品を分離する同じ構造を持っている。この共通構造を軸に、仕事全般の準備論として語る。",
+  reason: "素材Aは機械の出力精度、素材Bは人間の対話品質と領域は違うのに解決策の形が同一。片方だけではAIテクニックか営業論で終わり、この普遍性は語れない。",
+  takeaway: "大事な仕事はつくる工程と疑う工程を最初から別の時間に分けて予定に入れる。",
+  seedHook: "AIへの指示が上手い人と、営業が上手い人。全然違う分野なのに、やっていることが同じでした。",
+};
+
+describe("validateSynthesisOutput", () => {
+  it("accepts a valid synthesis output", () => {
+    expect(validateSynthesisOutput(validSynthesis)).toEqual(validSynthesis);
+  });
+
+  it("throws when title is longer than 60 characters", () => {
+    expect(() =>
+      validateSynthesisOutput({ ...validSynthesis, title: "a".repeat(61) })
+    ).toThrow();
+  });
+
+  it("throws when takeaway is empty", () => {
+    expect(() => validateSynthesisOutput({ ...validSynthesis, takeaway: " " })).toThrow();
+  });
+
+  it("throws when a banned word appears in angle", () => {
+    expect(() =>
+      validateSynthesisOutput({ ...validSynthesis, angle: "相乗効果を狙う" })
+    ).toThrow();
+  });
+
+  it("normalizes undefined seedHook to null", () => {
+    const { seedHook: _seedHook, ...withoutHook } = validSynthesis;
+    expect(validateSynthesisOutput(withoutHook).seedHook).toBeNull();
   });
 });

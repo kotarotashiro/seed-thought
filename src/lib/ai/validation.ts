@@ -8,6 +8,7 @@ import type {
   SeminarContent,
   SeminarDesign,
   StrictLearningOutput,
+  SynthesisOutput,
   TrendInsight,
 } from "./types";
 
@@ -292,6 +293,39 @@ export function isDecodeOutput(value: unknown): value is DecodeOutput {
     }
   }
   return true;
+}
+
+export function validateSynthesisOutput(raw: unknown): SynthesisOutput {
+  if (!isRecord(raw)) {
+    throw new Error("掛け合わせ生成の形式が不正です");
+  }
+
+  const title = typeof raw.title === "string" ? raw.title.trim() : "";
+  const angle = typeof raw.angle === "string" ? raw.angle.trim() : "";
+  const reason = typeof raw.reason === "string" ? raw.reason.trim() : "";
+  const takeaway = typeof raw.takeaway === "string" ? raw.takeaway.trim() : "";
+
+  if (!title || !angle || !reason || !takeaway) {
+    throw new Error("掛け合わせ生成の必須フィールドが空です");
+  }
+  if (title.length > 60) {
+    throw new Error("掛け合わせ生成のtitleが60文字を超えています");
+  }
+
+  const bannedWords = ["相乗効果", "シナジー", "革命", "震撼", "覇権"];
+  const body = `${angle}\n${reason}\n${takeaway}`;
+  const banned = bannedWords.find((word) => body.includes(word));
+  if (banned) {
+    throw new Error(`掛け合わせ生成に禁止語が含まれています: ${banned}`);
+  }
+
+  return {
+    title,
+    angle,
+    reason,
+    takeaway,
+    seedHook: typeof raw.seedHook === "string" ? raw.seedHook.trim() || null : null,
+  };
 }
 
 export function isStrictLearningOutput(value: unknown): value is StrictLearningOutput {

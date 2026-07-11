@@ -131,6 +131,35 @@ export interface DecodeOutput {
   };
 }
 
+export interface SynthesisMaterial {
+  kind: "card" | "pattern";
+  title: string;
+  oneLiner: string;
+  beforeAfter: string;
+  patternSummary: string | null;
+  tags: string[];
+  outputSeedAngle: string | null;
+}
+
+export interface SynthesisInput {
+  materialA: SynthesisMaterial;
+  materialB: SynthesisMaterial;
+}
+
+/** 掛け合わせエンジン（SeedThought 2 ステップ4最小版）の LLM 出力 */
+export interface SynthesisOutput {
+  /** 提案のタイトル。60字以内 */
+  title: string;
+  /** 切り口。何を軸に掛け合わせるか（1〜3文） */
+  angle: string;
+  /** なぜこの2つを掛けるのか。共通構造 or 緊張関係を明示（1〜3文） */
+  reason: string;
+  /** 読者の持ち帰り。1文 */
+  takeaway: string;
+  /** 発信の冒頭フック案。なければ null */
+  seedHook: string | null;
+}
+
 export interface LearningOutput {
   sourcePostId: string;
   title: string;
@@ -397,6 +426,7 @@ export interface AiProvider {
     override?: AiModelOverride | null
   ): Promise<LearningOutput>;
   generateOutput(input: GenerateOutputInput): Promise<GeneratedOutputResult>;
+  generateSynthesis(input: SynthesisInput): Promise<SynthesisOutput>;
   generateStrictLearning(input: {
     postText: string;
     classification: { primaryCategory: string; summary: string };

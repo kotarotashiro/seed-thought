@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db/prisma";
 import { getAiProvider } from "@/lib/ai/provider";
 import type { SourcePostForLearning } from "@/lib/ai/types";
 import { getUserFacingError } from "@/lib/api/errors";
+import { promotePatternAsset } from "@/lib/assets/promotePattern";
 import { getPostForLearning, buildSourcePost } from "@/lib/posts/learningSource";
 import { XaiTokenExpiredError } from "@/lib/xai/oauth";
 
@@ -94,6 +95,8 @@ export async function POST(
         strictLearningJson: null,
       },
     });
+
+    await promotePatternAsset(learningCard.id, draftOutput.decode);
 
     return NextResponse.json(
       { learningCard, output: draftOutput, strictLearning: null },

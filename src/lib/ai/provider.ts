@@ -17,6 +17,8 @@ import type {
   SeminarDesign,
   SourcePostForLearning,
   StrictLearningOutput,
+  SynthesisInput,
+  SynthesisOutput,
   TranslateTextInput,
   TrendInsight,
 } from "./types";
@@ -38,6 +40,7 @@ import {
   REFINABLE_OUTPUT_TYPES,
   buildSemanticSearchPrompt,
   buildStrictLearningPrompt,
+  buildSynthesisPrompt,
   buildTranslatePrompt,
   buildTrendAnalysisPrompt,
 } from "./prompts";
@@ -55,6 +58,7 @@ import {
   isStrictLearningOutput,
   isTrendInsight,
   isTranslatedTextResult,
+  validateSynthesisOutput,
   type LearningCoreOutput,
   type LearningSupplementOutput,
 } from "./validation";
@@ -232,6 +236,32 @@ async function chatJsonValidated<T>(
       lastErr = err;
       if (attempt < retries) {
         console.warn(`[ai] ${label} の応答が形式不正、再試行します（${attempt + 1}/${retries}回目）`);
+      }
+    }
+  }
+  throw lastErr;
+}
+
+async function generateSynthesisWithRetry(
+  client: LLMClient,
+  input: SynthesisInput
+): Promise<SynthesisOutput> {
+  const prompt = buildSynthesisPrompt(input);
+  let lastErr: unknown;
+  for (let attempt = 0; attempt <= 1; attempt += 1) {
+    try {
+      const raw = await client.chatJson(prompt);
+      const parsed = parseAiJson(
+        raw,
+        (value): value is Record<string, unknown> =>
+          typeof value === "object" && value !== null && !Array.isArray(value),
+        "掛け合わせ生成"
+      );
+      return validateSynthesisOutput(parsed);
+    } catch (err) {
+      lastErr = err;
+      if (attempt === 0) {
+        console.warn("[ai/generateSynthesis] 応答が形式不正、再試行します（1/1回目）");
       }
     }
   }
@@ -548,6 +578,17 @@ export function getAiProvider(): AiProvider {
         return finalResult;
       } catch (err) {
         logAiError("generateOutput", ctx.provider, ctx.model, err);
+        throw err;
+      }
+    },
+
+    async generateSynthesis(input: SynthesisInput): Promise<SynthesisOutput> {
+      const ctx = await getClient("generateSynthesis");
+      if (ctx.isMock) return mockProvider.generateSynthesis(input);
+      try {
+        return await generateSynthesisWithRetry(ctx.client, input);
+      } catch (err) {
+        logAiError("generateSynthesis", ctx.provider, ctx.model, err);
         throw err;
       }
     },

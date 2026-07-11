@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { PostCard } from "@/components/posts/PostCard";
 import { RecommendationModeSelect } from "@/components/posts/RecommendationModeSelect";
+import { TodaySynthesisCard } from "@/components/synthesis/TodaySynthesisCard";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
@@ -285,6 +286,8 @@ export default function HomePage() {
           保存した投稿から1件を選んで深掘りしましょう
         </p>
       </div>
+
+      <TodaySynthesisCard />
 
       {/* Hero */}
       <TodayHero post={heroPost} loading={heroLoading} error={heroError} />

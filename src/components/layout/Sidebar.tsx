@@ -17,6 +17,7 @@ import {
   Layers,
   FileText,
   Bookmark,
+  Library,
   Network,
 } from "lucide-react";
 import { clsx } from "clsx";
@@ -38,6 +39,7 @@ const navGroups: {
       { href: "/posts", label: "保存した投稿", icon: Archive },
       { href: "/chat", label: "AIに聞く", icon: Sparkles },
       { href: "/map", label: "知識マップ", icon: Network },
+      { href: "/assets", label: "資産庫", icon: Library },
     ],
   },
   {

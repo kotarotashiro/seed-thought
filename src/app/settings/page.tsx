@@ -33,6 +33,7 @@ type AiTaskName =
   | "generateLearningCard"
   | "generateStrictLearning"
   | "generateOutput"
+  | "generateSynthesis"
   | "searchSemantically"
   | "analyzeLikeTrends"
   | "chat";
