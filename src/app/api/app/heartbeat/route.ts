@@ -1,14 +1,24 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { findXaiAuth } from "@/lib/xai/authStore";
+import { refreshStoredXaiTokens } from "@/lib/xai/refresh";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 export async function GET() {
   try {
-    // Keep heartbeat read-only: opening/focusing the app must not consume
-    // background DB/API quota through sync or token refresh side effects.
+    // Keep the UI response lightweight, but refresh OAuth in the background
+    // while the app is actively used. The hourly GitHub Action is primary.
+    after(async () => {
+      try {
+        const refresh = await refreshStoredXaiTokens();
+        if (refresh.ok) console.log("[heartbeat] grok refresh ok", refresh);
+      } catch (error) {
+        console.error("[heartbeat] grok refresh failed", error);
+      }
+    });
+
     const [auth, xAccount, lastSyncRun] = await Promise.all([
       findXaiAuth(),
       prisma.xAccount.findFirst({ select: { id: true } }),

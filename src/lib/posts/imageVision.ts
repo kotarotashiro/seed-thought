@@ -1,7 +1,7 @@
 // 投稿に添付された画像の中身を、xAI のビジョンモデルで日本語テキスト化する。
 // 「画像で示す」とだけ書かれた投稿でも、画像内のテキスト・図・スクショを読み取り、
 // 記事本文や動画文字起こしと同列の「学習素材」として扱えるようにするための前処理。
-import { getAuthHeader } from "@/lib/xai/client";
+import { xaiFetch } from "@/lib/xai/client";
 
 const XAI_CHAT_URL = "https://api.x.ai/v1/chat/completions";
 
@@ -28,12 +28,10 @@ export async function describeImageUrl(
   const mimeType = imgRes.headers.get("content-type")?.split(";")[0] || "image/jpeg";
   const dataUrl = `data:${mimeType};base64,${base64}`;
 
-  const authHeader = await getAuthHeader();
-  const res = await fetch(XAI_CHAT_URL, {
+  const res = await xaiFetch(XAI_CHAT_URL, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: authHeader,
     },
     body: JSON.stringify({
       model,

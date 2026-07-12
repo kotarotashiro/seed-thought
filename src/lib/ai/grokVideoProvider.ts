@@ -2,7 +2,7 @@
 // Uses OAuth bearer token — X Premium+ / SuperGrok でコスト無し。
 // xAI video generation is async: submit a job, poll for completion.
 
-import { getAuthHeader } from "@/lib/xai/client";
+import { xaiFetch } from "@/lib/xai/client";
 
 const XAI_API_BASE = "https://api.x.ai/v1";
 
@@ -26,13 +26,11 @@ export async function submitVideoGeneration(prompt: string): Promise<{ jobId: st
   if (!trimmed) throw new Error("プロンプトが空です");
 
   const styledPrompt = VIDEO_STYLE_PREFIX + trimmed;
-  const authHeader = await getAuthHeader();
 
-  const res = await fetch(`${XAI_API_BASE}/videos/generations`, {
+  const res = await xaiFetch(`${XAI_API_BASE}/videos/generations`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: authHeader,
     },
     body: JSON.stringify({
       model: getVideoModel(),
@@ -71,11 +69,7 @@ export async function submitVideoGeneration(prompt: string): Promise<{ jobId: st
 }
 
 export async function pollVideoGeneration(jobId: string): Promise<VideoGenerationJob> {
-  const authHeader = await getAuthHeader();
-
-  const res = await fetch(`${XAI_API_BASE}/videos/${jobId}`, {
-    headers: { Authorization: authHeader },
-  });
+  const res = await xaiFetch(`${XAI_API_BASE}/videos/${jobId}`);
 
   if (!res.ok) {
     const text = await res.text();

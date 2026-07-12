@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getAuthHeader } from "@/lib/xai/client";
+import { xaiFetch } from "@/lib/xai/client";
 
 const XAI_CHAT_URL = "https://api.x.ai/v1/chat/completions";
 
@@ -17,13 +17,10 @@ export async function POST(request: Request) {
     const base64 = Buffer.from(arrayBuffer).toString("base64");
     const mimeType = file.type || "image/jpeg";
 
-    const authHeader = await getAuthHeader();
-
-    const res = await fetch(XAI_CHAT_URL, {
+    const res = await xaiFetch(XAI_CHAT_URL, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: authHeader,
       },
       body: JSON.stringify({
         model: process.env.GROK_MODEL ?? "grok-4.3",

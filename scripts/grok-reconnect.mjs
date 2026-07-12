@@ -88,13 +88,21 @@ async function exchangeCode(tokenEndpoint, clientId, code, codeVerifier, codeCha
   const data = await res.json();
   if (!data.access_token) fail("レスポンスに access_token がありません");
   const expiresIn =
-    typeof data.expires_in === "number" && Number.isFinite(data.expires_in)
+    typeof data.expires_in === "number"
       ? data.expires_in
+      : typeof data.expires_in === "string" && data.expires_in.trim() !== ""
+        ? Number(data.expires_in)
+        : null;
+  const validExpiresIn =
+    typeof expiresIn === "number" && Number.isFinite(expiresIn) && expiresIn > 0
+      ? expiresIn
       : null;
   return {
     accessToken: data.access_token,
     refreshToken: data.refresh_token ?? null,
-    expiresAt: expiresIn ? new Date(Date.now() + expiresIn * 1000).toISOString() : null,
+    expiresAt: validExpiresIn
+      ? new Date(Date.now() + validExpiresIn * 1000).toISOString()
+      : null,
     scope: data.scope ?? SCOPE,
   };
 }

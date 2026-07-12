@@ -4,7 +4,7 @@
 // URL の場合は別途ダウンロードして base64 化する。
 
 import type { GeneratedImage } from "./imageProvider";
-import { getAuthHeader } from "@/lib/xai/client";
+import { xaiFetch } from "@/lib/xai/client";
 
 const XAI_API_BASE = "https://api.x.ai/v1";
 
@@ -28,13 +28,11 @@ export async function generateImageWithGrok(prompt: string): Promise<GeneratedIm
   if (!trimmed) throw new Error("プロンプトが空です");
 
   const styledPrompt = STYLE_PREFIX + trimmed;
-  const authHeader = await getAuthHeader();
 
-  const res = await fetch(`${XAI_API_BASE}/images/generations`, {
+  const res = await xaiFetch(`${XAI_API_BASE}/images/generations`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: authHeader,
     },
     body: JSON.stringify({
       model: getApiModel(),

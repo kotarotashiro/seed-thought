@@ -95,7 +95,7 @@ function parseTokenPayload(data: unknown): XaiTokenResult {
   const payload = data as {
     access_token?: string;
     refresh_token?: string;
-    expires_in?: number;
+    expires_in?: number | string;
     scope?: string;
   };
 
@@ -104,14 +104,20 @@ function parseTokenPayload(data: unknown): XaiTokenResult {
   }
 
   const expiresIn =
-    typeof payload.expires_in === "number" && Number.isFinite(payload.expires_in)
+    typeof payload.expires_in === "number"
       ? payload.expires_in
+      : typeof payload.expires_in === "string" && payload.expires_in.trim() !== ""
+        ? Number(payload.expires_in)
+        : null;
+  const validExpiresIn =
+    typeof expiresIn === "number" && Number.isFinite(expiresIn) && expiresIn > 0
+      ? expiresIn
       : null;
 
   return {
     accessToken: payload.access_token,
     refreshToken: payload.refresh_token,
-    expiresAt: expiresIn ? new Date(Date.now() + expiresIn * 1000) : null,
+    expiresAt: validExpiresIn ? new Date(Date.now() + validExpiresIn * 1000) : null,
     scope: payload.scope ?? XAI_OAUTH_SCOPE,
   };
 }
@@ -131,7 +137,7 @@ async function postTokenRequest(params: URLSearchParams): Promise<XaiTokenResult
 
   if (!response.ok) {
     const text = await response.text();
-    throw new Error(`xAI OAuth token request failed: ${response.status} ${text.slice(0, 200)}`);
+    throw new XaiOAuthTokenRequestError(response.status, text);
   }
 
   return parseTokenPayload(await response.json());
@@ -163,5 +169,32 @@ export async function refreshXaiToken(refreshToken: string): Promise<XaiTokenRes
       grant_type: "refresh_token",
       refresh_token: refreshToken,
     })
+  );
+}
+
+export class XaiOAuthTokenRequestError extends Error {
+  constructor(
+    public readonly status: number,
+    public readonly responseBody: string
+  ) {
+    super(`xAI OAuth token request failed: ${status} ${responseBody.slice(0, 200)}`);
+    this.name = "XaiOAuthTokenRequestError";
+  }
+}
+
+export function isTerminalXaiRefreshError(error: unknown): boolean {
+  if (error instanceof XaiOAuthTokenRequestError) {
+    return (
+      error.status === 401 ||
+      error.responseBody.includes("invalid_client") ||
+      error.responseBody.includes("invalid_grant")
+    );
+  }
+
+  const message = error instanceof Error ? error.message : String(error);
+  return (
+    /(?:^|\s)401(?:\s|$)/.test(message) ||
+    message.includes("invalid_client") ||
+    message.includes("invalid_grant")
   );
 }

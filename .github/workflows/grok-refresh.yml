@@ -6,8 +6,8 @@ name: Keep Grok OAuth warm
 
 on:
   schedule:
-    # 6時間ごと（UTC基準。GitHub Actions は混雑時に多少遅延することがある）
-    - cron: "0 */6 * * *"
+    # 1時間ごと（UTC基準）。実際のrefreshは期限判定で必要な時だけ行う。
+    - cron: "0 * * * *"
   workflow_dispatch: {} # 手動実行も可能
 
 jobs:

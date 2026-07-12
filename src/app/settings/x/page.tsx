@@ -217,6 +217,13 @@ export default function XSettingsPage() {
 
   const handleGrokConnect = () => {
     setError(null);
+    const hostname = window.location.hostname;
+    const isLocal = hostname === "localhost" || hostname === "127.0.0.1";
+    if (!isLocal) {
+      setShowReauthHelp(true);
+      setError("本番画面からOAuthを開始するには、リポジトリの grok-reconnect.cmd をダブルクリックしてください。");
+      return;
+    }
     window.open("/api/grok/auth", "_blank", "noopener,noreferrer");
   };
 
@@ -383,13 +390,13 @@ export default function XSettingsPage() {
           <div className="mb-4 rounded-xl border border-border bg-border-light px-4 py-3 space-y-2">
             <p className="text-xs font-semibold text-text">認証が切れたときの再接続手順</p>
             <ol className="space-y-1 text-xs text-text-secondary list-decimal list-inside">
-              <li>ローカルでターミナルを開き <code className="bg-white rounded px-1">pnpm run dev</code> を実行</li>
-              <li>ブラウザで <code className="bg-white rounded px-1">http://localhost:3000/settings/x</code> を開く</li>
-              <li>「Grokを切断」→「Grokに接続」でX認証を完了</li>
-              <li>Vercelでの学習カード生成が復旧します（ターミナルは止めてOK）</li>
+              <li>リポジトリの <code className="bg-white rounded px-1">grok-reconnect.cmd</code> をダブルクリック</li>
+              <li>開いたブラウザでGrokの承認を1回だけ行う</li>
+              <li>トークンは本番DBへ暗号化保存され、画面の「更新」で反映</li>
+              <li>以後は自動更新されるため、数時間ごとの再接続は不要</li>
             </ol>
             <p className="text-xs text-text-muted">
-              ※ X Premium+サブスクが有効な間は無料で使えます。トークンは数日〜数週間で期限切れになります。
+              ※ コマンドの代わりにリポジトリで <code className="bg-white rounded px-1">pnpm grok:auth</code> でも実行できます。
             </p>
           </div>
         )}
