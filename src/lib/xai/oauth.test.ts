@@ -1,11 +1,16 @@
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { refreshXaiToken } from "./oauth";
+import {
+  isTerminalXaiRefreshError,
+  refreshXaiToken,
+  XaiOAuthTokenRequestError,
+} from "./oauth";
 
 const originalClientId = process.env.XAI_CLIENT_ID;
 
 describe("xAI OAuth token response", () => {
   beforeEach(() => {
-    process.env.XAI_CLIENT_ID = "test-client-id";
+    process.env.XAI_CLIENT_ID =
+      " 00000000-0000-4000-8000-000000000001\r\n";
   });
 
   afterAll(() => {
@@ -40,5 +45,24 @@ describe("xAI OAuth token response", () => {
     expect(result.refreshToken).toBe("refresh-token");
     expect(result.expiresAt?.getTime()).toBeGreaterThanOrEqual(before + 21_599_000);
     expect(result.expiresAt?.getTime()).toBeLessThanOrEqual(Date.now() + 21_600_000);
+
+    const tokenRequestBody = new URLSearchParams(
+      String(fetchMock.mock.calls[1]?.[1]?.body)
+    );
+    expect(tokenRequestBody.get("client_id")).toBe(
+      "00000000-0000-4000-8000-000000000001"
+    );
+  });
+
+  it("deletes auth only for invalid_grant, not invalid_client", () => {
+    expect(isTerminalXaiRefreshError(new Error("400 invalid_grant"))).toBe(true);
+    expect(
+      isTerminalXaiRefreshError(
+        new XaiOAuthTokenRequestError(
+          401,
+          '{"error":"invalid_client","error_description":"client_id is not a valid UUID"}'
+        )
+      )
+    ).toBe(false);
   });
 });

@@ -29,6 +29,7 @@ vi.mock("@/lib/x/tokenStore", () => ({
 import {
   getXaiAccessToken,
   isXaiAccessTokenRefreshDue,
+  refreshStoredXaiTokens,
 } from "./refresh";
 
 const originalClientId = process.env.XAI_CLIENT_ID;
@@ -52,7 +53,7 @@ function auth(overrides: Partial<{
 
 describe("xAI OAuth refresh policy", () => {
   beforeEach(() => {
-    process.env.XAI_CLIENT_ID = "test-client-id";
+    process.env.XAI_CLIENT_ID = "00000000-0000-4000-8000-000000000001";
     mocks.findXaiAuth.mockReset();
     mocks.upsertXaiAuth.mockReset();
     mocks.deleteXaiAuth.mockReset();
@@ -66,17 +67,17 @@ describe("xAI OAuth refresh policy", () => {
     else process.env.XAI_CLIENT_ID = originalClientId;
   });
 
-  it("refreshes one hour before a known expiry and not earlier", () => {
+  it("refreshes four hours before a known expiry and not earlier", () => {
     const now = Date.now();
     expect(
       isXaiAccessTokenRefreshDue(
-        { expiresAt: new Date(now + 2 * 60 * 60 * 1000), updatedAt: new Date(now) },
+        { expiresAt: new Date(now + 5 * 60 * 60 * 1000), updatedAt: new Date(now) },
         now
       )
     ).toBe(false);
     expect(
       isXaiAccessTokenRefreshDue(
-        { expiresAt: new Date(now + 30 * 60 * 1000), updatedAt: new Date(now) },
+        { expiresAt: new Date(now + 3.5 * 60 * 60 * 1000), updatedAt: new Date(now) },
         now
       )
     ).toBe(true);
@@ -86,13 +87,13 @@ describe("xAI OAuth refresh policy", () => {
     const now = Date.now();
     expect(
       isXaiAccessTokenRefreshDue(
-        { expiresAt: null, updatedAt: new Date(now - 4 * 60 * 60 * 1000) },
+        { expiresAt: null, updatedAt: new Date(now - 60 * 60 * 1000) },
         now
       )
     ).toBe(false);
     expect(
       isXaiAccessTokenRefreshDue(
-        { expiresAt: null, updatedAt: new Date(now - 6 * 60 * 60 * 1000) },
+        { expiresAt: null, updatedAt: new Date(now - 3 * 60 * 60 * 1000) },
         now
       )
     ).toBe(true);
@@ -146,6 +147,34 @@ describe("xAI OAuth refresh policy", () => {
     const result = await getXaiAccessToken({ force: true });
 
     expect(result?.token).toBe("plain:enc:new-access");
+    expect(mocks.deleteXaiAuth).not.toHaveBeenCalled();
+  });
+
+  it("keeps auth when xAI rejects the configured client id", async () => {
+    const expired = auth({ expiresAt: new Date(Date.now() - 1_000) });
+    mocks.findXaiAuth.mockResolvedValue(expired);
+    mocks.refreshXaiToken.mockRejectedValue(new Error("401 invalid_client"));
+
+    await expect(getXaiAccessToken({ force: true })).rejects.toThrow(
+      "invalid_client"
+    );
+    expect(mocks.deleteXaiAuth).not.toHaveBeenCalled();
+  });
+
+  it("can force an authenticated refresh for deployment verification", async () => {
+    const fresh = auth({ expiresAt: new Date(Date.now() + 6 * 60 * 60 * 1000) });
+    mocks.findXaiAuth.mockResolvedValue(fresh);
+    mocks.refreshXaiToken.mockResolvedValue({
+      accessToken: "forced-access",
+      refreshToken: "forced-refresh",
+      expiresAt: new Date(Date.now() + 6 * 60 * 60 * 1000),
+      scope: "offline_access",
+    });
+
+    const result = await refreshStoredXaiTokens({ force: true });
+
+    expect(result.ok).toBe(true);
+    expect(mocks.refreshXaiToken).toHaveBeenCalledTimes(1);
     expect(mocks.deleteXaiAuth).not.toHaveBeenCalled();
   });
 });

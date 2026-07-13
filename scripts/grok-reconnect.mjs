@@ -107,14 +107,14 @@ async function exchangeCode(tokenEndpoint, clientId, code, codeVerifier, codeCha
   };
 }
 
-async function pushTokens(baseUrl, secret, tokens) {
+async function pushTokens(baseUrl, secret, clientId, tokens) {
   const res = await fetch(`${baseUrl.replace(/\/$/, "")}/api/grok/token`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${secret}`,
     },
-    body: JSON.stringify(tokens),
+    body: JSON.stringify({ clientId, ...tokens }),
   });
   if (!res.ok) {
     const text = await res.text();
@@ -123,8 +123,15 @@ async function pushTokens(baseUrl, secret, tokens) {
 }
 
 async function main() {
-  const clientId = process.env.XAI_CLIENT_ID;
+  const clientId = process.env.XAI_CLIENT_ID?.trim();
   if (!clientId) fail("XAI_CLIENT_ID が未設定です（.env に追加してください）");
+  if (
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+      clientId
+    )
+  ) {
+    fail("XAI_CLIENT_ID は改行を含まないUUID形式で設定してください");
+  }
 
   const baseUrl = process.env.APP_BASE_URL || "http://localhost:3000";
   const secret = process.env.CRON_SECRET;
@@ -187,7 +194,7 @@ async function main() {
           codeVerifier,
           codeChallenge
         );
-        await pushTokens(baseUrl, secret, tokens);
+        await pushTokens(baseUrl, secret, clientId, tokens);
 
         res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
         res.end(

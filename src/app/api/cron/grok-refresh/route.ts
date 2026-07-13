@@ -21,13 +21,22 @@ export async function GET(request: Request) {
   }
 
   try {
-    const result = await refreshStoredXaiTokens();
+    const force = new URL(request.url).searchParams.get("force") === "1";
+    const result = await refreshStoredXaiTokens({ force });
+    const benignSkip =
+      !result.ok && (result.code === "not_due" || result.code === "concurrent_refresh");
+
     if (result.ok) {
       console.log("[cron/grok-refresh] refreshed successfully", result);
-    } else {
+    } else if (benignSkip) {
       console.log("[cron/grok-refresh] skipped:", result.reason);
+    } else {
+      console.error("[cron/grok-refresh] action required:", result.reason);
     }
-    return NextResponse.json(result);
+
+    const status =
+      result.ok || benignSkip ? 200 : result.code === "misconfigured" ? 503 : 409;
+    return NextResponse.json(result, { status });
   } catch (error) {
     const message = error instanceof Error ? error.message : "refresh failed";
     console.error("[cron/grok-refresh]", message);

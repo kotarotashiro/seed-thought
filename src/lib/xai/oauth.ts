@@ -34,9 +34,15 @@ export interface XaiTokenResult {
   scope: string;
 }
 
-function getXaiClientId(): string {
-  const clientId = process.env.XAI_CLIENT_ID;
+const XAI_CLIENT_ID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+export function getXaiClientId(): string {
+  const clientId = process.env.XAI_CLIENT_ID?.trim();
   if (!clientId) throw new Error("XAI_CLIENT_ID is not set");
+  if (!XAI_CLIENT_ID_PATTERN.test(clientId)) {
+    throw new Error("XAI_CLIENT_ID must be a UUID without surrounding whitespace");
+  }
   return clientId;
 }
 
@@ -184,17 +190,9 @@ export class XaiOAuthTokenRequestError extends Error {
 
 export function isTerminalXaiRefreshError(error: unknown): boolean {
   if (error instanceof XaiOAuthTokenRequestError) {
-    return (
-      error.status === 401 ||
-      error.responseBody.includes("invalid_client") ||
-      error.responseBody.includes("invalid_grant")
-    );
+    return error.responseBody.includes("invalid_grant");
   }
 
   const message = error instanceof Error ? error.message : String(error);
-  return (
-    /(?:^|\s)401(?:\s|$)/.test(message) ||
-    message.includes("invalid_client") ||
-    message.includes("invalid_grant")
-  );
+  return message.includes("invalid_grant");
 }

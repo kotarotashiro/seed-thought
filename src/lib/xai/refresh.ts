@@ -13,7 +13,11 @@ import {
 
 export type XaiRefreshResult =
   | { ok: true; expiresAt: string | null; rotated: boolean }
-  | { ok: false; reason: string };
+  | {
+      ok: false;
+      code: "not_due" | "reauth_required" | "misconfigured" | "concurrent_refresh";
+      reason: string;
+    };
 
 export interface XaiAccessTokenResult {
   token: string;
@@ -23,10 +27,10 @@ export interface XaiAccessTokenResult {
   rotated: boolean;
 }
 
-/** xAIの短命アクセストークンは期限の1時間前から更新する。 */
-export const ACCESS_TOKEN_REFRESH_WINDOW_MS = 60 * 60 * 1000;
-/** expiresAt が取れない応答でも、5時間以上同じアクセストークンを使わない。 */
-export const UNKNOWN_EXPIRY_REFRESH_INTERVAL_MS = 5 * 60 * 60 * 1000;
+/** GitHub Actionsの遅延を吸収するため、6時間tokenは期限の4時間前から更新する。 */
+export const ACCESS_TOKEN_REFRESH_WINDOW_MS = 4 * 60 * 60 * 1000;
+/** expiresAt が取れない応答でも、2時間以上同じアクセストークンを使わない。 */
+export const UNKNOWN_EXPIRY_REFRESH_INTERVAL_MS = 2 * 60 * 60 * 1000;
 
 let refreshInFlight: Promise<XaiAccessTokenResult | null> | null = null;
 
@@ -132,7 +136,7 @@ async function performXaiTokenRefresh(options: {
     }
 
     const message = refreshErr instanceof Error ? refreshErr.message : String(refreshErr);
-    console.warn("[xai/refresh] refresh token rejected — deleting stale auth", message);
+    console.warn("[xai/refresh] refresh token invalid — deleting stale auth", message);
     await deleteXaiAuth().catch(() => {});
     return null;
   }
@@ -146,7 +150,7 @@ export async function getXaiAccessToken(options: {
   force?: boolean;
   expectedStoredAccessToken?: string;
 } = {}): Promise<XaiAccessTokenResult | null> {
-  if (!process.env.XAI_CLIENT_ID) return null;
+  if (!process.env.XAI_CLIENT_ID?.trim()) return null;
 
   if (refreshInFlight) return refreshInFlight;
 
@@ -178,27 +182,38 @@ export async function getXaiAccessToken(options: {
  * Cronや手動heartbeatから呼ぶ更新処理。必要な時だけ更新し、refresh tokenの競合で
  * 正常なDBレコードを削除しない。
  */
-export async function refreshStoredXaiTokens(): Promise<XaiRefreshResult> {
-  if (!process.env.XAI_CLIENT_ID) {
-    return { ok: false, reason: "XAI_CLIENT_ID not set" };
+export async function refreshStoredXaiTokens(options: {
+  force?: boolean;
+} = {}): Promise<XaiRefreshResult> {
+  if (!process.env.XAI_CLIENT_ID?.trim()) {
+    return { ok: false, code: "misconfigured", reason: "XAI_CLIENT_ID not set" };
   }
 
   const oauth = await findXaiAuth();
   if (!oauth?.refreshToken) {
-    return { ok: false, reason: "no refresh token stored" };
+    return { ok: false, code: "reauth_required", reason: "no refresh token stored" };
   }
-  if (!isXaiAccessTokenRefreshDue(oauth)) {
-    return { ok: false, reason: "token not due for refresh, skip" };
+  if (!options.force && !isXaiAccessTokenRefreshDue(oauth)) {
+    return { ok: false, code: "not_due", reason: "token not due for refresh, skip" };
   }
 
   const result = await getXaiAccessToken({
+    force: options.force,
     expectedStoredAccessToken: oauth.accessToken,
   });
   if (!result) {
-    return { ok: false, reason: "refresh token expired, re-auth required" };
+    return {
+      ok: false,
+      code: "reauth_required",
+      reason: "refresh token expired, re-auth required",
+    };
   }
   if (!result.refreshed) {
-    return { ok: false, reason: "token was refreshed by another request, skip" };
+    return {
+      ok: false,
+      code: "concurrent_refresh",
+      reason: "token was refreshed by another request, skip",
+    };
   }
 
   return {

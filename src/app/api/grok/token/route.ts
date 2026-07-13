@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getUserFacingError } from "@/lib/api/errors";
 import { saveXaiTokens } from "@/lib/xai/authStore";
+import { getXaiClientId } from "@/lib/xai/oauth";
 
 // Token ingest endpoint for the local reconnect script (scripts/grok-reconnect.mjs).
 //
@@ -22,6 +23,7 @@ function isAuthorized(request: Request): boolean {
 }
 
 interface TokenIngestBody {
+  clientId?: string;
   accessToken?: string;
   refreshToken?: string | null;
   expiresAt?: string | null;
@@ -40,6 +42,17 @@ export async function POST(request: Request) {
       return NextResponse.json(
         { error: "accessToken is required" },
         { status: 400 }
+      );
+    }
+
+    const serverClientId = getXaiClientId();
+    if (body.clientId?.trim() !== serverClientId) {
+      return NextResponse.json(
+        {
+          error:
+            "再接続に使ったXAI_CLIENT_IDと本番設定が一致しません。本番環境変数を確認してください。",
+        },
+        { status: 409 }
       );
     }
 

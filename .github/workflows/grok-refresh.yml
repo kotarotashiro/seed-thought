@@ -6,9 +6,16 @@ name: Keep Grok OAuth warm
 
 on:
   schedule:
-    # 1時間ごと（UTC基準）。実際のrefreshは期限判定で必要な時だけ行う。
-    - cron: "0 * * * *"
+    # 毎時17分（UTC基準）。毎時0分の混雑による大幅遅延を避ける。
+    - cron: "17 * * * *"
   workflow_dispatch: {} # 手動実行も可能
+
+permissions:
+  contents: read
+
+concurrency:
+  group: grok-oauth-refresh
+  cancel-in-progress: false
 
 jobs:
   refresh:
@@ -16,6 +23,7 @@ jobs:
     steps:
       - name: Ping grok-refresh
         run: |
-          curl -fsS -X GET "${{ secrets.APP_BASE_URL }}/api/cron/grok-refresh" \
+          curl --fail-with-body --silent --show-error --retry 3 --retry-delay 5 \
+            --max-time 30 -X GET "${{ secrets.APP_BASE_URL }}/api/cron/grok-refresh" \
             -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
             && echo "grok-refresh ok"
