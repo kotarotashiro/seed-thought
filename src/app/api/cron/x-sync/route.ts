@@ -39,10 +39,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ ok: true, skipped: true, reason: decision.reason });
     }
 
-    const result = await syncXPosts("both", decision.limit, undefined, {
-      auto: true,
-      enrichWithAi: false,
-    });
+    const result = await syncXPosts("both", decision.limit);
     await recordAutoXSyncUsage(result.results);
 
     if (

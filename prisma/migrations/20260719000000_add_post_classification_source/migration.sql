@@ -1,0 +1,2 @@
+ALTER TABLE "PostClassification"
+  ADD COLUMN IF NOT EXISTS "source" TEXT NOT NULL DEFAULT 'ai';

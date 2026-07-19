@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "pnpm exec prisma generate && node scripts/migrate-deploy.mjs && next build",
+    "build": "node scripts/migrate-deploy.mjs && pnpm exec prisma generate && next build",
     "preview": "next start -p 3003",
     "start": "next start",
     "typecheck": "tsc --noEmit",

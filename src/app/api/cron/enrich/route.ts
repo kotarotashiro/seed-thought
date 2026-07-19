@@ -1,9 +1,12 @@
 import { NextResponse } from "next/server";
 import { enrichPendingPosts } from "@/lib/posts/enrich";
+import { backfillAiClassifications } from "@/lib/posts/aiBackfill";
 import {
   canRunAutoEnrich,
   isQuotaLikeError,
   recordAutoEnrichUsage,
+  canRunAutoClassify,
+  recordAutoClassifyUsage,
   recordQuotaError,
 } from "@/lib/ops/autoRun";
 
@@ -24,14 +27,29 @@ export async function GET(request: Request) {
   }
 
   try {
-    const decision = await canRunAutoEnrich(20);
-    if (!decision.allowed) {
-      return NextResponse.json({ ok: true, skipped: true, reason: decision.reason });
+    const enrichDecision = await canRunAutoEnrich(20);
+    let urlEnrichedCount = 0;
+    if (enrichDecision.allowed) {
+      const result = await enrichPendingPosts(enrichDecision.limit);
+      urlEnrichedCount = result.processedCount;
+      await recordAutoEnrichUsage(result.processedCount);
     }
 
-    const result = await enrichPendingPosts(decision.limit);
-    await recordAutoEnrichUsage(result.processedCount);
-    return NextResponse.json({ ok: true, processedCount: result.processedCount });
+    const classifyDecision = await canRunAutoClassify(30);
+    let aiClassifiedCount = 0;
+    if (classifyDecision.allowed) {
+      const result = await backfillAiClassifications(undefined, classifyDecision.limit);
+      aiClassifiedCount = result.processedCount;
+      await recordAutoClassifyUsage(result.processedCount);
+    }
+
+    return NextResponse.json({
+      ok: true,
+      processedCount: urlEnrichedCount,
+      aiClassifiedCount,
+      urlEnrichSkipped: enrichDecision.allowed ? undefined : enrichDecision.reason,
+      aiClassifySkipped: classifyDecision.allowed ? undefined : classifyDecision.reason,
+    });
   } catch (error) {
     if (isQuotaLikeError(error)) {
       try {

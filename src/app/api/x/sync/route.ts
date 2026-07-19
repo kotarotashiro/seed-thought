@@ -1,6 +1,10 @@
+import { after } from "next/server";
 import { NextResponse } from "next/server";
 import { getUserFacingError } from "@/lib/api/errors";
 import { syncXPosts } from "@/lib/x/sync";
+import { backfillAiClassifications } from "@/lib/posts/aiBackfill";
+
+export const maxDuration = 300;
 
 export async function POST(request: Request) {
   try {
@@ -23,6 +27,20 @@ export async function POST(request: Request) {
     };
 
     const result = await syncXPosts(syncType, safeLimit, dateRange);
+    if (result.insertedPostIds.length > 0) {
+      after(async () => {
+        try {
+          const backfill = await backfillAiClassifications(
+            result.insertedPostIds,
+            result.insertedPostIds.length,
+          );
+          console.log("[api/x/sync] AI backfill completed", backfill);
+        } catch (error) {
+          console.error("[api/x/sync] AI backfill failed:", error);
+        }
+      });
+    }
+
 
     return NextResponse.json(result);
   } catch (error) {

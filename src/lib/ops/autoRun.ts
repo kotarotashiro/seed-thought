@@ -22,6 +22,8 @@ interface DailyUsage {
   autoXInserted: number;
   autoEnrichRuns: number;
   autoEnrichItems: number;
+  autoClassifyRuns: number;
+  autoClassifyItems: number;
 }
 
 function envFlag(name: string, defaultValue: boolean): boolean {
@@ -57,6 +59,8 @@ function emptyUsage(date = utcDay()): DailyUsage {
     autoXInserted: 0,
     autoEnrichRuns: 0,
     autoEnrichItems: 0,
+    autoClassifyRuns: 0,
+    autoClassifyItems: 0,
   };
 }
 
@@ -188,6 +192,35 @@ export async function recordAutoEnrichUsage(processedCount: number): Promise<voi
   const usage = await readDailyUsage();
   usage.autoEnrichRuns += 1;
   usage.autoEnrichItems += Math.max(0, processedCount);
+  await writeDailyUsage(usage);
+}
+
+export async function canRunAutoClassify(requestedLimit: number): Promise<AutoRunDecision> {
+  if (!envFlag("AUTO_ENRICH_ENABLED", true)) {
+    return { allowed: false, reason: "AUTO_ENRICH_ENABLED is off", limit: 0 };
+  }
+
+  const quotaReason = await quotaBlockReason();
+  if (quotaReason) return { allowed: false, reason: quotaReason, limit: 0 };
+
+  const dailyLimit = envInt("DAILY_AUTO_CLASSIFY_LIMIT", 30);
+  if (dailyLimit <= 0) {
+    return { allowed: false, reason: "DAILY_AUTO_CLASSIFY_LIMIT is 0", limit: 0 };
+  }
+
+  const usage = await readDailyUsage();
+  const remaining = Math.max(0, dailyLimit - usage.autoClassifyItems);
+  if (remaining <= 0) {
+    return { allowed: false, reason: "daily auto classify limit reached", limit: 0 };
+  }
+
+  return { allowed: true, limit: Math.min(requestedLimit, remaining) };
+}
+
+export async function recordAutoClassifyUsage(processedCount: number): Promise<void> {
+  const usage = await readDailyUsage();
+  usage.autoClassifyRuns += 1;
+  usage.autoClassifyItems += Math.max(0, processedCount);
   await writeDailyUsage(usage);
 }
 

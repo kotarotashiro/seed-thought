@@ -209,6 +209,7 @@ model ThreadPost {
 model PostClassification {
   id                    String   @id @default(cuid())
   postId                String   @unique
+  source                String   @default("ai") // "ai" | "fallback"
   postType              String   // "thought" | "learning" | "output_material" | "unknown"
   primaryCategory       String
   tagsJson              String   // JSON array of strings
