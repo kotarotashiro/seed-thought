@@ -1,10 +1,7 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/db/prisma";
-import { getAiProvider } from "@/lib/ai/provider";
-import type { SourcePostForLearning } from "@/lib/ai/types";
 import { getUserFacingError } from "@/lib/api/errors";
-import { promotePatternAsset } from "@/lib/assets/promotePattern";
-import { getPostForLearning, buildSourcePost } from "@/lib/posts/learningSource";
+import { generateLearningCard } from "@/lib/learning/generate";
+import { getPostForLearning } from "@/lib/posts/learningSource";
 import { XaiTokenExpiredError } from "@/lib/xai/oauth";
 
 // 学習カード生成（LLM 1回）。厳密学習は別ルート（./strict）で生成する。
@@ -53,53 +50,13 @@ export async function POST(
         ? { provider, model: typeof model === "string" ? model : undefined }
         : undefined;
 
-    const post = await getPostForLearning(postId);
-    if (!post) {
+    const result = await generateLearningCard(postId, { learningMode, override });
+    if (!result) {
       return NextResponse.json({ error: "投稿が見つかりません" }, { status: 404 });
     }
 
-    const source = await buildSourcePost(post);
-    const sourceWithMode: SourcePostForLearning = { ...source, learningMode };
-
-    const learningOutput = await getAiProvider().generateLearningCard(sourceWithMode, override);
-    const draftOutput = { ...learningOutput, sourcePostId: post.id, status: "draft" as const };
-
-    // 学習カードを再生成したら厳密学習は古くなるため null に戻し、クライアント側で別途再生成させる。
-    const learningCard = await prisma.learningCard.upsert({
-      where: { sourcePostId: post.id },
-      create: {
-        sourcePostId: post.id,
-        title: draftOutput.title,
-        summary: draftOutput.summary,
-        coreInsight: draftOutput.coreInsight ?? "",
-        manual: draftOutput.manual ?? "",
-        diagramPrompt: JSON.stringify(draftOutput.diagramStructure ?? {}),
-        imagePrompt: draftOutput.imageExplanationPrompt ?? "",
-        outputJson: JSON.stringify(draftOutput),
-        userMemo: draftOutput.userLearningMemo,
-        status: "draft",
-        learningMode,
-        strictLearningJson: null,
-      },
-      update: {
-        title: draftOutput.title,
-        summary: draftOutput.summary,
-        coreInsight: draftOutput.coreInsight ?? "",
-        manual: draftOutput.manual ?? "",
-        diagramPrompt: JSON.stringify(draftOutput.diagramStructure ?? {}),
-        imagePrompt: draftOutput.imageExplanationPrompt ?? "",
-        outputJson: JSON.stringify(draftOutput),
-        userMemo: draftOutput.userLearningMemo,
-        status: "draft",
-        learningMode,
-        strictLearningJson: null,
-      },
-    });
-
-    await promotePatternAsset(learningCard.id, draftOutput.decode);
-
     return NextResponse.json(
-      { learningCard, output: draftOutput, strictLearning: null },
+      { learningCard: result.learningCard, output: result.output, strictLearning: null },
       { status: 201 }
     );
   } catch (error) {

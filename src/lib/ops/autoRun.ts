@@ -24,6 +24,8 @@ interface DailyUsage {
   autoEnrichItems: number;
   autoClassifyRuns: number;
   autoClassifyItems: number;
+  autoLearnRuns: number;
+  autoLearnItems: number;
 }
 
 function envFlag(name: string, defaultValue: boolean): boolean {
@@ -61,6 +63,8 @@ function emptyUsage(date = utcDay()): DailyUsage {
     autoEnrichItems: 0,
     autoClassifyRuns: 0,
     autoClassifyItems: 0,
+    autoLearnRuns: 0,
+    autoLearnItems: 0,
   };
 }
 
@@ -192,6 +196,35 @@ export async function recordAutoEnrichUsage(processedCount: number): Promise<voi
   const usage = await readDailyUsage();
   usage.autoEnrichRuns += 1;
   usage.autoEnrichItems += Math.max(0, processedCount);
+  await writeDailyUsage(usage);
+}
+
+export async function canRunAutoLearn(requestedLimit: number): Promise<AutoRunDecision> {
+  if (!envFlag("AUTO_LEARN_ENABLED", true)) {
+    return { allowed: false, reason: "AUTO_LEARN_ENABLED is off", limit: 0 };
+  }
+
+  const quotaReason = await quotaBlockReason();
+  if (quotaReason) return { allowed: false, reason: quotaReason, limit: 0 };
+
+  const dailyLimit = envInt("DAILY_AUTO_LEARN_LIMIT", 12);
+  if (dailyLimit <= 0) {
+    return { allowed: false, reason: "DAILY_AUTO_LEARN_LIMIT is 0", limit: 0 };
+  }
+
+  const usage = await readDailyUsage();
+  const remaining = Math.max(0, dailyLimit - usage.autoLearnItems);
+  if (remaining <= 0) {
+    return { allowed: false, reason: "daily auto learn limit reached", limit: 0 };
+  }
+
+  return { allowed: true, limit: Math.min(requestedLimit, remaining) };
+}
+
+export async function recordAutoLearnUsage(processedCount: number): Promise<void> {
+  const usage = await readDailyUsage();
+  usage.autoLearnRuns += 1;
+  usage.autoLearnItems += Math.max(0, processedCount);
   await writeDailyUsage(usage);
 }
 

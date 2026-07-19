@@ -99,6 +99,9 @@ async function saveTweets(
         savedAt: new Date(),
         rawJson: JSON.stringify(tweet),
         enrichmentStatus: xArticleUrl ? "x_article_pending" : (hasUrl ? "pending" : "done"),
+        autoLearnTask: {
+          create: { status: "queued" },
+        },
       },
     });
 

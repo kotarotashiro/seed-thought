@@ -1,0 +1,25 @@
+name: Auto generate learning card
+
+on:
+  schedule:
+    # 毎時37分（UTC基準）。毎時0分の混雑による大幅遅延を避ける。
+    - cron: "37 * * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: auto-learn
+  cancel-in-progress: false
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping auto-learn
+        run: |
+          curl --fail-with-body --silent --show-error \
+            --max-time 290 -X GET "${{ secrets.APP_BASE_URL }}/api/cron/auto-learn" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            && echo "auto-learn ok"

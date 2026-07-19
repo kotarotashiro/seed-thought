@@ -35,6 +35,7 @@ model Post {
   classification  PostClassification?
   threadPosts      ThreadPost[]
   learningCard     LearningCard?
+  autoLearnTask    AutoLearnTask?
 
   @@unique([sourcePostId, savedType])
 }
@@ -69,6 +70,20 @@ model LearningCard {
   collectionItems CollectionItem[]
   drafts     XDraft[]
   patternAsset PatternAsset?
+}
+
+model AutoLearnTask {
+  id        String   @id @default(cuid())
+  postId    String   @unique
+  status    String   @default("queued") // "queued" | "running" | "done" | "failed" | "skipped"
+  attempts  Int      @default(0)
+  lastError String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@index([status, createdAt])
 }
 
 // 資産庫: 解読器が抽出した「再利用可能な型」の第一級レコード（SeedThought 2 ステップ2）
