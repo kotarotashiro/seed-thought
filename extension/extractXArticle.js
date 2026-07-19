@@ -1,16 +1,17 @@
-// X Article DOM extraction — runs via chrome.scripting.executeScript in page context.
-// Selector order: article element → OG tags → document.title.
-// Returns { title: string|null, body: string } or throws if body < 100 chars.
+// X Article DOM extraction helper for manual/debug execution.
+// The background service worker injects an equivalent self-contained function.
 
+const MIN_BODY_LENGTH = 30;
 const ARTICLE_SELECTORS = [
   "[data-testid='article']",
+  "[data-testid='noteContent']",
+  "[data-testid='articleBody']",
   "article",
   "[role='article']",
+  "[data-testid='primaryColumn']",
   "main",
   "[role='main']",
 ];
-
-const NOISE_RE = /^(Follow|Following|Subscribe|Like|Reply|Retweet|Share|More|···|\.{3}|@\w+\s*·)$/im;
 
 function ogMeta(property) {
   const el =
@@ -28,42 +29,59 @@ function compactText(raw) {
     .trim();
 }
 
-function extractTitle() {
-  return (
-    ogMeta("og:title") ??
-    document.querySelector("h1")?.innerText?.trim() ??
-    document.title?.replace(/\s*[|\-–—].*$/, "").trim() ??
-    null
-  );
-}
-
-function extractBody() {
-  for (const sel of ARTICLE_SELECTORS) {
-    const el = document.querySelector(sel);
-    if (!el) continue;
-
-    // Filter out nav/aside/footer inside the article container
-    const clone = el.cloneNode(true);
-    for (const noise of clone.querySelectorAll("nav, aside, footer, [aria-label='Trending'], [data-testid='sidebarColumn']")) {
-      noise.remove();
-    }
-
-    const text = compactText(clone.innerText || "");
-    if (text.length >= 100) return text;
+function removeNoise(clone) {
+  for (const selector of [
+    "nav", "aside", "footer", "header",
+    "[data-testid='sidebarColumn']",
+    "[data-testid='TopNavBar']",
+    "[data-testid='AppTabBar']",
+    "[aria-label='Trending']",
+    "[aria-label='Follow']",
+  ]) {
+    clone.querySelectorAll(selector).forEach((el) => el.remove());
   }
-
-  // OG description fallback
-  const ogDesc = ogMeta("og:description");
-  if (ogDesc && ogDesc.length >= 100) return ogDesc;
-
-  return null;
 }
 
 (function () {
-  const title = extractTitle();
-  const body = extractBody();
-  if (!body || body.length < 100) {
-    throw new Error(`X Article body too short (${body?.length ?? 0} chars) — page may still be loading`);
+  const pageText = compactText(document.body?.innerText || "");
+  const pageTitle = document.title || "";
+  if (
+    /(^|\n)(ログイン|Sign in|Log in)(\s|$)/i.test(pageText) ||
+    /(ログイン|Sign in|Log in)/i.test(pageTitle)
+  ) {
+    throw new Error("login page shown — not authenticated");
+  }
+
+  const title =
+    ogMeta("og:title") ??
+    document.querySelector("h1")?.innerText?.trim() ??
+    pageTitle.replace(/\s*[|\-–—].*$/, "").trim() ??
+    null;
+
+  let body = null;
+  for (const selector of ARTICLE_SELECTORS) {
+    const element = document.querySelector(selector);
+    if (!element) continue;
+    const clone = element.cloneNode(true);
+    removeNoise(clone);
+    const text = compactText(clone.innerText || "");
+    if (text.length >= MIN_BODY_LENGTH) {
+      body = text;
+      break;
+    }
+  }
+
+  const ogDescription = ogMeta("og:description");
+  if (!body && ogDescription && ogDescription.length >= MIN_BODY_LENGTH) body = ogDescription;
+  if (!body && pageText.length >= MIN_BODY_LENGTH) {
+    const clone = document.body.cloneNode(true);
+    removeNoise(clone);
+    const text = compactText(clone.innerText || "");
+    if (text.length >= MIN_BODY_LENGTH) body = text;
+  }
+
+  if (!body || body.length < MIN_BODY_LENGTH) {
+    throw new Error(`X Article body too short (${body?.length ?? 0} chars)`);
   }
   return { title, body };
 })();

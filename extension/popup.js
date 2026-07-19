@@ -11,10 +11,10 @@ async function refreshEndpoint() {
     : "送信先: 未設定（右上「設定」から指定）";
 }
 
-refreshEndpoint();
+void refreshEndpoint();
 
-optionsLink.addEventListener("click", (e) => {
-  e.preventDefault();
+optionsLink.addEventListener("click", (event) => {
+  event.preventDefault();
   chrome.runtime.openOptionsPage();
 });
 
@@ -30,26 +30,28 @@ sendBtn.addEventListener("click", () => {
       statusEl.textContent = "送信しました ✓";
     } else {
       statusEl.className = "status err";
-      statusEl.textContent =
-        "送信に失敗: " + ((response && response.error) || "不明なエラー");
+      statusEl.textContent = "送信に失敗: " + ((response && response.error) || "不明なエラー");
     }
   });
 });
 
 fetchArticlesBtn.addEventListener("click", () => {
   statusEl.className = "status";
-  statusEl.textContent = "X Article 取得中…";
+  statusEl.textContent = "X Article 取得を開始中…";
   fetchArticlesBtn.disabled = true;
 
   chrome.runtime.sendMessage({ type: "fetch-x-articles" }, (response) => {
     fetchArticlesBtn.disabled = false;
     if (response && response.ok) {
       statusEl.className = "status ok";
-      statusEl.textContent = "X Article 取得完了 ✓";
+      statusEl.textContent = response.started
+        ? `X Article ${response.count}件の処理を開始しました ✓`
+        : response.reason === "busy"
+          ? "X Article は処理中です"
+          : "処理対象はありません";
     } else {
       statusEl.className = "status err";
-      statusEl.textContent =
-        "取得に失敗: " + ((response && response.error) || "不明なエラー");
+      statusEl.textContent = "取得に失敗: " + ((response && response.error) || "不明なエラー");
     }
   });
 });

@@ -1,5 +1,5 @@
-// SeedThought Clipper — service worker
-// Handles the right-click context menu and the popup's "send" command.
+// SeedThought Clipper — Manifest V3 service worker
+// Handles the right-click context menu and the popup's send command.
 
 const DEFAULT_ENDPOINT = "http://localhost:3003";
 const STORAGE_KEYS = ["endpoint", "token"];
@@ -12,28 +12,23 @@ async function getSettings() {
   };
 }
 
-// Extract the visible page content. Prefers selection, then <article>/<main>,
-// then falls back to body innerText. Truncates so the payload stays sane.
 function extractFromPage() {
   const TRUNCATE = 8000;
 
   function clip(text) {
     const compact = (text || "").replace(/\s+\n/g, "\n").replace(/\n\s+/g, "\n").trim();
-    if (compact.length > TRUNCATE) return compact.slice(0, TRUNCATE) + "…";
-    return compact;
+    return compact.length > TRUNCATE ? compact.slice(0, TRUNCATE) + "…" : compact;
   }
 
   const selection = (window.getSelection && window.getSelection().toString().trim()) || "";
-
   const article = document.querySelector("article, main, [role='main']");
   const fallbackEl = article || document.body;
-  const body = fallbackEl ? fallbackEl.innerText : "";
 
   return {
     url: location.href,
     title: document.title || location.hostname,
     selection: clip(selection),
-    content: clip(body),
+    content: clip(fallbackEl ? fallbackEl.innerText : ""),
   };
 }
 
@@ -45,9 +40,8 @@ async function notify(title, message) {
       title,
       message,
     });
-  } catch (e) {
-    // Some environments don't allow notifications without an iconUrl that exists.
-    console.log("[SeedThought]", title, message);
+  } catch (error) {
+    console.log("[SeedThought]", title, message, error);
   }
 }
 
@@ -65,8 +59,8 @@ async function clipTab(tab) {
       func: extractFromPage,
     });
     payload = result;
-  } catch (e) {
-    await notify("送信できません", "ページ内容の取得に失敗しました: " + (e && e.message ? e.message : e));
+  } catch (error) {
+    await notify("送信できません", "ページ内容の取得に失敗しました: " + (error?.message || error));
     return;
   }
 
@@ -100,23 +94,43 @@ async function clipTab(tab) {
       },
       body: JSON.stringify(body),
     });
-    if (!res.ok) {
-      const errText = await res.text().catch(() => "");
-      throw new Error(`HTTP ${res.status} ${errText}`);
-    }
+    if (!res.ok) throw new Error(`HTTP ${res.status} ${await res.text().catch(() => "")}`);
     await notify("SeedThoughtに保存しました", payload.title);
-  } catch (e) {
-    await notify("送信に失敗しました", e && e.message ? e.message : String(e));
+  } catch (error) {
+    await notify("送信に失敗しました", error?.message || String(error));
   }
 }
 
 // ── X Article auto-fetch ──────────────────────────────────────────────────────
+// The job is persisted in storage.local. Tab completion and chrome.alarms drive
+// each state transition, so the service worker never relies on a long sleep.
 
 const ARTICLE_ALARM = "x-article-poll";
-const ARTICLE_POLL_MINUTES = 5;
+const ARTICLE_STEP_ALARM = "x-article-step";
+const ARTICLE_TIMEOUT_ALARM = "x-article-timeout";
+const ARTICLE_POLL_OPTIONS = [15, 30, 60];
+const ARTICLE_POLL_DEFAULT_MINUTES = 30;
+const ARTICLE_BATCH_LIMIT = 3;
+const ARTICLE_MIN_BODY_LENGTH = 30;
+const ARTICLE_MAX_EXTRACTION_ATTEMPTS = 4;
+const ARTICLE_RENDER_WAIT_MS = 5000;
+const ARTICLE_RETRY_WAIT_MS = 3000;
+const ARTICLE_NEXT_ITEM_MIN_MS = 5000;
+const ARTICLE_NEXT_ITEM_MAX_MS = 10000;
+const ARTICLE_TAB_TIMEOUT_MS = 30000;
+const ARTICLE_FAILURE_COOLDOWN_MS = 24 * 60 * 60 * 1000;
+const ARTICLE_SETTINGS_KEYS = ["xArticleAutoEnabled", "xArticleIntervalMinutes"];
+const ARTICLE_JOB_KEY = "xArticleJob";
+const ARTICLE_FAILURES_KEY = "xArticleFailures";
+const ARTICLE_FAILURE_STREAK_KEY = "xArticleFailureStreak";
+const ARTICLE_FAILURE_NOTIFIED_KEY = "xArticleFailureNotified";
+
+let articleJobRunnerActive = false;
+const articleTabWaiters = new Map();
 
 function extractXArticleFromPage() {
-  // Inline — must be self-contained (no closures over outer scope).
+  // This function is injected into the X tab and must stay self-contained.
+  const MIN_BODY_LENGTH = 30;
 
   function ogMeta(property) {
     const el =
@@ -135,36 +149,34 @@ function extractXArticleFromPage() {
   }
 
   function removeNoise(clone) {
-    const noiseSelectors = [
+    for (const selector of [
       "nav", "aside", "footer", "header",
       "[data-testid='sidebarColumn']",
       "[data-testid='TopNavBar']",
       "[data-testid='AppTabBar']",
       "[aria-label='Trending']",
       "[aria-label='Follow']",
-    ];
-    for (const sel of noiseSelectors) {
-      clone.querySelectorAll(sel).forEach((el) => el.remove());
+    ]) {
+      clone.querySelectorAll(selector).forEach((el) => el.remove());
     }
   }
 
-  // Detect login/redirect page (article not accessible)
   const pageText = compactText(document.body?.innerText || "");
-  const isLoginPage = /^(ログイン|Sign in|Log in)/.test(pageText) ||
-    document.title.includes("ログイン") ||
-    document.title.includes("Sign in");
-  if (isLoginPage) {
+  const pageTitle = document.title || "";
+  if (
+    /(^|\n)(ログイン|Sign in|Log in)(\s|$)/i.test(pageText) ||
+    /(ログイン|Sign in|Log in)/i.test(pageTitle)
+  ) {
     return { ok: false, reason: "login page shown — not authenticated" };
   }
 
   const title =
     ogMeta("og:title") ??
     document.querySelector("h1")?.innerText?.trim() ??
-    document.title?.replace(/\s*[|\-–—].*$/, "").trim() ??
+    pageTitle.replace(/\s*[|\-–—].*$/, "").trim() ??
     null;
 
-  // Try article-specific selectors first (X Notes / Article DOM)
-  const ARTICLE_SELECTORS = [
+  const selectors = [
     "[data-testid='article']",
     "[data-testid='noteContent']",
     "[data-testid='articleBody']",
@@ -176,142 +188,449 @@ function extractXArticleFromPage() {
   ];
 
   let body = null;
-
-  for (const sel of ARTICLE_SELECTORS) {
-    const el = document.querySelector(sel);
-    if (!el) continue;
-    const clone = el.cloneNode(true);
+  for (const selector of selectors) {
+    const element = document.querySelector(selector);
+    if (!element) continue;
+    const clone = element.cloneNode(true);
     removeNoise(clone);
     const text = compactText(clone.innerText || "");
-    if (text.length >= 100) { body = text; break; }
+    if (text.length >= MIN_BODY_LENGTH) {
+      body = text;
+      break;
+    }
   }
 
-  // OG description fallback
-  if (!body) {
-    const ogDesc = ogMeta("og:description");
-    if (ogDesc && ogDesc.length >= 100) body = ogDesc;
-  }
+  const ogDescription = ogMeta("og:description");
+  if (!body && ogDescription && ogDescription.length >= MIN_BODY_LENGTH) body = ogDescription;
 
-  // Full body fallback (last resort)
-  if (!body && pageText.length >= 100) {
+  if (!body && pageText.length >= MIN_BODY_LENGTH) {
     const bodyClone = document.body.cloneNode(true);
     removeNoise(bodyClone);
     const cleaned = compactText(bodyClone.innerText || "");
-    if (cleaned.length >= 100) body = cleaned;
+    if (cleaned.length >= MIN_BODY_LENGTH) body = cleaned;
   }
 
-  const reason = `selectors tried: ${ARTICLE_SELECTORS.join(", ")} | title: ${title} | pageLen: ${pageText.length}`;
-  if (!body || body.length < 100) {
+  const reason = `selectors tried: ${selectors.join(", ")} | title: ${title} | pageLen: ${pageText.length}`;
+  if (!body || body.length < MIN_BODY_LENGTH) {
     return { ok: false, reason: `body too short (${body?.length ?? 0} chars). ${reason}` };
   }
   return { ok: true, title, body };
 }
 
-async function fetchXArticles() {
-  const settings = await getSettings();
-  if (!settings.endpoint) return;
+function normalizeArticleInterval(value) {
+  const interval = Number(value);
+  return ARTICLE_POLL_OPTIONS.includes(interval) ? interval : ARTICLE_POLL_DEFAULT_MINUTES;
+}
 
-  let items;
-  try {
-    const res = await fetch(`${settings.endpoint}/api/x/article-body?limit=5`, {
-      headers: settings.token ? { "X-Extension-Token": settings.token } : {},
+async function getArticleSettings() {
+  const stored = await chrome.storage.local.get(ARTICLE_SETTINGS_KEYS);
+  return {
+    enabled: stored.xArticleAutoEnabled !== false,
+    intervalMinutes: normalizeArticleInterval(stored.xArticleIntervalMinutes),
+  };
+}
+
+async function initializeArticleSettings() {
+  const stored = await chrome.storage.local.get(ARTICLE_SETTINGS_KEYS);
+  const defaults = {};
+  if (typeof stored.xArticleAutoEnabled !== "boolean") defaults.xArticleAutoEnabled = true;
+  if (!ARTICLE_POLL_OPTIONS.includes(Number(stored.xArticleIntervalMinutes))) {
+    defaults.xArticleIntervalMinutes = ARTICLE_POLL_DEFAULT_MINUTES;
+  }
+  if (Object.keys(defaults).length) await chrome.storage.local.set(defaults);
+}
+
+async function syncArticleAlarm() {
+  const settings = await getArticleSettings();
+  await chrome.alarms.clear(ARTICLE_ALARM);
+  if (settings.enabled) {
+    await chrome.alarms.create(ARTICLE_ALARM, { periodInMinutes: settings.intervalMinutes });
+  }
+}
+
+async function scheduleArticleStep(delayMs) {
+  await chrome.alarms.clear(ARTICLE_STEP_ALARM);
+  await chrome.alarms.create(ARTICLE_STEP_ALARM, { when: Date.now() + delayMs });
+}
+
+async function scheduleArticleTimeout() {
+  await chrome.alarms.clear(ARTICLE_TIMEOUT_ALARM);
+  await chrome.alarms.create(ARTICLE_TIMEOUT_ALARM, { when: Date.now() + ARTICLE_TAB_TIMEOUT_MS });
+}
+
+function randomItemDelay() {
+  return ARTICLE_NEXT_ITEM_MIN_MS +
+    Math.floor(Math.random() * (ARTICLE_NEXT_ITEM_MAX_MS - ARTICLE_NEXT_ITEM_MIN_MS + 1));
+}
+
+async function getActiveArticleFailures(now = Date.now()) {
+  const stored = await chrome.storage.local.get(ARTICLE_FAILURES_KEY);
+  const records = stored[ARTICLE_FAILURES_KEY] || {};
+  const active = {};
+  let changed = false;
+
+  for (const [url, record] of Object.entries(records)) {
+    if (record && Number(record.failedAt) + ARTICLE_FAILURE_COOLDOWN_MS > now) {
+      active[url] = record;
+    } else {
+      changed = true;
+    }
+  }
+  if (changed) await chrome.storage.local.set({ [ARTICLE_FAILURES_KEY]: active });
+  return active;
+}
+
+async function recordArticleFailure(articleUrl, reason) {
+  const records = await getActiveArticleFailures();
+  records[articleUrl] = {
+    failedAt: Date.now(),
+    reason: String(reason || "unknown").slice(0, 300),
+  };
+  await chrome.storage.local.set({ [ARTICLE_FAILURES_KEY]: records });
+}
+
+async function fetchPendingArticles(settings) {
+  const res = await fetch(
+    `${settings.endpoint}/api/x/article-body?limit=${ARTICLE_BATCH_LIMIT}`,
+    { headers: settings.token ? { "X-Extension-Token": settings.token } : {} },
+  );
+  if (!res.ok) throw new Error(`GET article-body failed: HTTP ${res.status}`);
+
+  const payload = await res.json();
+  const items = Array.isArray(payload) ? payload : payload?.items;
+  if (!Array.isArray(items)) return [];
+
+  const failures = await getActiveArticleFailures();
+  return items
+    .filter((item) => item?.postId && typeof item.articleUrl === "string" && item.articleUrl)
+    .filter((item) => !failures[item.articleUrl])
+    .slice(0, ARTICLE_BATCH_LIMIT);
+}
+
+async function loadArticleJob() {
+  const stored = await chrome.storage.local.get(ARTICLE_JOB_KEY);
+  return stored[ARTICLE_JOB_KEY] || null;
+}
+
+async function saveArticleJob(job) {
+  await chrome.storage.local.set({ [ARTICLE_JOB_KEY]: job });
+}
+
+async function clearArticleAlarm(name) {
+  try { await chrome.alarms.clear(name); } catch {}
+}
+
+async function closeArticleTab(tabId) {
+  if (!tabId) return;
+  const waiter = articleTabWaiters.get(tabId);
+  if (waiter) {
+    chrome.tabs.onUpdated.removeListener(waiter);
+    articleTabWaiters.delete(tabId);
+  }
+  try { await chrome.tabs.remove(tabId); } catch {}
+}
+
+async function finishArticleCycle(job) {
+  await chrome.storage.local.remove(ARTICLE_JOB_KEY);
+  await clearArticleAlarm(ARTICLE_STEP_ALARM);
+  await clearArticleAlarm(ARTICLE_TIMEOUT_ALARM);
+
+  const allFailed = job.items.length > 0 && job.successCount === 0;
+  const stored = await chrome.storage.local.get([
+    ARTICLE_FAILURE_STREAK_KEY,
+    ARTICLE_FAILURE_NOTIFIED_KEY,
+  ]);
+
+  if (allFailed) {
+    const alreadyNotified = stored[ARTICLE_FAILURE_NOTIFIED_KEY] === true;
+    await chrome.storage.local.set({
+      [ARTICLE_FAILURE_STREAK_KEY]: Number(stored[ARTICLE_FAILURE_STREAK_KEY] || 0) + 1,
+      [ARTICLE_FAILURE_NOTIFIED_KEY]: true,
     });
-    if (!res.ok) return;
-    ({ items } = await res.json());
-  } catch (e) {
-    console.warn("[SeedThought] X Article poll failed:", e);
+    if (!alreadyNotified) {
+      await notify(
+        "X Article自動取得に失敗しました",
+        `${job.items.length}件すべての本文取得に失敗しました。ログイン状態と拡張設定を確認してください。`,
+      );
+    }
     return;
   }
 
-  if (!Array.isArray(items) || items.length === 0) return;
+  await chrome.storage.local.set({
+    [ARTICLE_FAILURE_STREAK_KEY]: 0,
+    [ARTICLE_FAILURE_NOTIFIED_KEY]: false,
+  });
+}
 
-  for (const { postId, articleUrl } of items) {
-    await processOneArticle(settings, postId, articleUrl);
+async function finishCurrentArticle(job, { success, cooldown, reason }) {
+  const item = job.items[job.index];
+  await closeArticleTab(job.tabId);
+  await clearArticleAlarm(ARTICLE_TIMEOUT_ALARM);
+  if (cooldown && item?.articleUrl) await recordArticleFailure(item.articleUrl, reason);
+
+  const nextJob = {
+    ...job,
+    index: job.index + 1,
+    tabId: null,
+    stage: "between-items",
+    attempt: 0,
+    result: null,
+    successCount: job.successCount + (success ? 1 : 0),
+    failureCount: job.failureCount + (success ? 0 : 1),
+  };
+
+  if (nextJob.index >= nextJob.items.length) {
+    await finishArticleCycle(nextJob);
+    return;
   }
+
+  await saveArticleJob(nextJob);
+  await scheduleArticleStep(randomItemDelay());
 }
 
-function sleep(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+async function failCurrentArticle(job, reason, cooldown = true) {
+  console.warn("[SeedThought] X Article processing failed:", job.items[job.index]?.articleUrl, reason);
+  await finishCurrentArticle(job, { success: false, cooldown, reason });
 }
 
-async function extractWithRetry(tabId, maxAttempts = 4, intervalMs = 3000) {
-  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    try {
-      const [{ result }] = await chrome.scripting.executeScript({
-        target: { tabId },
-        func: extractXArticleFromPage,
-      });
-      if (result && result.ok) return result;
-      console.log(`[SeedThought] attempt ${attempt}/${maxAttempts}: ${result?.reason ?? "no result"}`);
-    } catch (e) {
-      console.log(`[SeedThought] attempt ${attempt}/${maxAttempts} error:`, e.message);
-    }
-    if (attempt < maxAttempts) await sleep(intervalMs);
+async function openCurrentArticle(job) {
+  const item = job.items[job.index];
+  if (!item?.articleUrl) {
+    await failCurrentArticle(job, "articleUrl is missing");
+    return;
   }
-  return null;
-}
 
-async function processOneArticle(settings, postId, articleUrl) {
-  let tabId;
+  const openingJob = { ...job, stage: "opening" };
+  await saveArticleJob(openingJob);
   try {
-    const tab = await chrome.tabs.create({ url: articleUrl, active: false });
-    tabId = tab.id;
+    const tab = await chrome.tabs.create({ url: item.articleUrl, active: false });
+    if (!tab?.id) throw new Error("Chrome did not return an Article tab id");
+    const loadingJob = { ...openingJob, stage: "loading", tabId: tab.id };
+    await saveArticleJob(loadingJob);
+    await waitForArticleTab(tab.id);
+  } catch (error) {
+    await failCurrentArticle(openingJob, error?.message || String(error));
+  }
+}
 
-    await waitForTabComplete(tabId, 30_000);
-    // Wait for SPA (React) to finish rendering article content after initial load
-    await sleep(5000);
+async function handleArticleTabComplete(tabId) {
+  const job = await loadArticleJob();
+  if (!job || job.stage !== "loading" || job.tabId !== tabId) return;
+  await clearArticleAlarm(ARTICLE_TIMEOUT_ALARM);
+  await saveArticleJob({ ...job, stage: "render-wait" });
+  await scheduleArticleStep(ARTICLE_RENDER_WAIT_MS);
+}
 
-    const result = await extractWithRetry(tabId, 4, 3000);
+async function waitForArticleTab(tabId) {
+  if (!tabId || articleTabWaiters.has(tabId)) return;
 
-    await chrome.tabs.remove(tabId);
-    tabId = null;
+  const listener = (updatedTabId, changeInfo) => {
+    if (updatedTabId !== tabId || changeInfo.status !== "complete") return;
+    chrome.tabs.onUpdated.removeListener(listener);
+    articleTabWaiters.delete(tabId);
+    void handleArticleTabComplete(tabId).catch((error) => {
+      console.warn("[SeedThought] Article tab completion handling failed:", error);
+    });
+  };
+  articleTabWaiters.set(tabId, listener);
+  chrome.tabs.onUpdated.addListener(listener);
 
-    if (!result || !result.ok) {
-      console.warn("[SeedThought] Extraction failed after all attempts for", articleUrl);
-      return;
+  try {
+    const tab = await chrome.tabs.get(tabId);
+    if (tab.status === "complete") {
+      chrome.tabs.onUpdated.removeListener(listener);
+      articleTabWaiters.delete(tabId);
+      await handleArticleTabComplete(tabId);
+    } else {
+      await scheduleArticleTimeout();
     }
+  } catch (error) {
+    chrome.tabs.onUpdated.removeListener(listener);
+    articleTabWaiters.delete(tabId);
+    const job = await loadArticleJob();
+    if (job?.tabId === tabId) await failCurrentArticle(job, error?.message || String(error));
+  }
+}
 
+async function attemptArticleExtraction(job) {
+  if (!job.tabId) {
+    await failCurrentArticle(job, "Article tab id is missing");
+    return;
+  }
+
+  const attempt = job.attempt + 1;
+  const extractingJob = { ...job, stage: "extracting", attempt };
+  await saveArticleJob(extractingJob);
+
+  let result;
+  try {
+    const [{ result: extracted }] = await chrome.scripting.executeScript({
+      target: { tabId: job.tabId },
+      func: extractXArticleFromPage,
+    });
+    result = extracted;
+  } catch (error) {
+    result = { ok: false, reason: error?.message || String(error) };
+  }
+
+  if (result?.ok && typeof result.body === "string" && result.body.length >= ARTICLE_MIN_BODY_LENGTH) {
+    const postingJob = {
+      ...extractingJob,
+      stage: "posting",
+      result: { title: result.title ?? null, body: result.body },
+    };
+    await saveArticleJob(postingJob);
+    await postCurrentArticle(postingJob);
+    return;
+  }
+
+  console.log(
+    `[SeedThought] X Article extraction attempt ${attempt}/${ARTICLE_MAX_EXTRACTION_ATTEMPTS}:`,
+    result?.reason || "body too short",
+  );
+  if (attempt < ARTICLE_MAX_EXTRACTION_ATTEMPTS) {
+    await saveArticleJob({ ...extractingJob, stage: "extract-retry" });
+    await scheduleArticleStep(ARTICLE_RETRY_WAIT_MS);
+  } else {
+    await failCurrentArticle(job, result?.reason || "body too short");
+  }
+}
+
+async function postCurrentArticle(job) {
+  const settings = await getSettings();
+  const item = job.items[job.index];
+  if (!job.result?.body || !item) {
+    await failCurrentArticle(job, "Article extraction result is missing");
+    return;
+  }
+
+  try {
     const res = await fetch(`${settings.endpoint}/api/x/article-body`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         ...(settings.token ? { "X-Extension-Token": settings.token } : {}),
       },
-      body: JSON.stringify({ postId, title: result.title ?? null, body: result.body }),
+      body: JSON.stringify({
+        postId: item.postId,
+        articleUrl: item.articleUrl,
+        title: job.result.title,
+        body: job.result.body,
+      }),
     });
     if (!res.ok) {
-      const txt = await res.text().catch(() => "");
-      console.warn("[SeedThought] POST article-body failed:", res.status, txt);
+      const text = await res.text().catch(() => "");
+      throw new Error(`POST article-body failed: HTTP ${res.status} ${text}`.trim());
     }
-  } catch (e) {
-    console.warn("[SeedThought] processOneArticle error:", articleUrl, e);
-    if (tabId) {
-      try { await chrome.tabs.remove(tabId); } catch {}
-    }
+    await finishCurrentArticle(job, { success: true, cooldown: false });
+  } catch (error) {
+    console.warn("[SeedThought] POST article-body failed:", error);
+    await finishCurrentArticle(job, {
+      success: false,
+      cooldown: false,
+      reason: error?.message || String(error),
+    });
   }
 }
 
-function waitForTabComplete(tabId, timeoutMs) {
-  return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => {
-      chrome.tabs.onUpdated.removeListener(listener);
-      reject(new Error(`Tab ${tabId} timed out after ${timeoutMs}ms`));
-    }, timeoutMs);
+async function resumeArticleJob(existingJob = null) {
+  if (articleJobRunnerActive) return;
+  articleJobRunnerActive = true;
+  try {
+    const job = existingJob || await loadArticleJob();
+    if (!job) return;
 
-    function listener(updatedTabId, changeInfo) {
-      if (updatedTabId === tabId && changeInfo.status === "complete") {
-        clearTimeout(timer);
-        chrome.tabs.onUpdated.removeListener(listener);
-        resolve();
-      }
+    switch (job.stage) {
+      case "opening":
+      case "between-items":
+        await openCurrentArticle({ ...job, stage: "opening" });
+        break;
+      case "loading":
+        await waitForArticleTab(job.tabId);
+        break;
+      case "render-wait":
+      case "extract-retry":
+      case "extracting":
+        await attemptArticleExtraction(job);
+        break;
+      case "posting":
+        await postCurrentArticle(job);
+        break;
+      default:
+        await failCurrentArticle(job, `Unknown Article job stage: ${job.stage}`);
     }
-    chrome.tabs.onUpdated.addListener(listener);
-  });
+  } catch (error) {
+    console.warn("[SeedThought] X Article job resume failed:", error);
+    const job = await loadArticleJob();
+    if (job) await failCurrentArticle(job, error?.message || String(error));
+  } finally {
+    articleJobRunnerActive = false;
+  }
+}
+
+async function fetchPendingArticleCycle({ force = false } = {}) {
+  const settings = await getArticleSettings();
+  if (!force && !settings.enabled) return { started: false, reason: "disabled" };
+
+  const currentJob = await loadArticleJob();
+  if (currentJob) {
+    void resumeArticleJob(currentJob);
+    return { started: false, reason: "busy" };
+  }
+
+  let items;
+  try {
+    items = await fetchPendingArticles(settings);
+  } catch (error) {
+    console.warn("[SeedThought] X Article poll failed:", error);
+    return { started: false, reason: "poll-failed" };
+  }
+  if (items.length === 0) return { started: false, reason: "empty" };
+
+  const job = {
+    items,
+    index: 0,
+    tabId: null,
+    stage: "opening",
+    attempt: 0,
+    result: null,
+    successCount: 0,
+    failureCount: 0,
+  };
+  await saveArticleJob(job);
+  void resumeArticleJob(job);
+  return { started: true, count: items.length };
+}
+
+async function handleArticleTimeout() {
+  const job = await loadArticleJob();
+  if (!job || job.stage !== "loading" || !job.tabId) return;
+
+  try {
+    const tab = await chrome.tabs.get(job.tabId);
+    if (tab.status === "complete") {
+      await handleArticleTabComplete(job.tabId);
+      return;
+    }
+  } catch {}
+  await failCurrentArticle(job, `Article tab timed out after ${ARTICLE_TAB_TIMEOUT_MS}ms`);
 }
 
 chrome.alarms.onAlarm.addListener((alarm) => {
-  if (alarm.name === ARTICLE_ALARM) fetchXArticles();
+  if (alarm.name === ARTICLE_ALARM) {
+    void fetchPendingArticleCycle().catch((error) => console.warn("[SeedThought] Article poll failed:", error));
+  } else if (alarm.name === ARTICLE_STEP_ALARM) {
+    void resumeArticleJob().catch((error) => console.warn("[SeedThought] Article step failed:", error));
+  } else if (alarm.name === ARTICLE_TIMEOUT_ALARM) {
+    void handleArticleTimeout().catch((error) => console.warn("[SeedThought] Article timeout failed:", error));
+  }
 });
+
+async function initializeExtension() {
+  await initializeArticleSettings();
+  await syncArticleAlarm();
+  await resumeArticleJob();
+}
 
 chrome.runtime.onInstalled.addListener(() => {
   chrome.contextMenus.removeAll(() => {
@@ -321,36 +640,49 @@ chrome.runtime.onInstalled.addListener(() => {
       contexts: ["page", "selection", "link"],
     });
   });
-  chrome.alarms.create(ARTICLE_ALARM, { periodInMinutes: ARTICLE_POLL_MINUTES });
+  void initializeExtension().catch((error) => console.warn("[SeedThought] Initialization failed:", error));
+});
+
+chrome.runtime.onStartup.addListener(() => {
+  void initializeExtension().catch((error) => console.warn("[SeedThought] Startup failed:", error));
 });
 
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
-  if (info.menuItemId === "send-to-seedthought") {
-    await clipTab(tab);
-  }
+  if (info.menuItemId === "send-to-seedthought") await clipTab(tab);
 });
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
-  if (message && message.type === "clip-active-tab") {
+  if (message?.type === "clip-active-tab") {
     (async () => {
-      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
       try {
+        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
         await clipTab(tab);
         sendResponse({ ok: true });
-      } catch (e) {
-        sendResponse({ ok: false, error: e && e.message ? e.message : String(e) });
+      } catch (error) {
+        sendResponse({ ok: false, error: error?.message || String(error) });
       }
     })();
     return true;
   }
 
-  if (message && message.type === "fetch-x-articles") {
+  if (message?.type === "fetch-x-articles") {
     (async () => {
       try {
-        await fetchXArticles();
+        sendResponse({ ok: true, ...(await fetchPendingArticleCycle({ force: true })) });
+      } catch (error) {
+        sendResponse({ ok: false, error: error?.message || String(error) });
+      }
+    })();
+    return true;
+  }
+
+  if (message?.type === "sync-x-article-alarm") {
+    (async () => {
+      try {
+        await syncArticleAlarm();
         sendResponse({ ok: true });
-      } catch (e) {
-        sendResponse({ ok: false, error: e && e.message ? e.message : String(e) });
+      } catch (error) {
+        sendResponse({ ok: false, error: error?.message || String(error) });
       }
     })();
     return true;
