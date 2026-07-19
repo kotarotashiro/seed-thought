@@ -13,16 +13,13 @@ import {
   Sprout,
   BookOpen,
   Sparkles,
-  TrendingUp,
-  Layers,
   FileText,
   Bookmark,
   Library,
-  Network,
 } from "lucide-react";
 import { clsx } from "clsx";
 
-// 「入れる → 理解する → 残す → 出す」の行為フローでグルーピングする。
+// 「入れる → 理解する → 積み上がる → 出す」の行為フローでグルーピングする。
 // title なしのグループは見出しを出さない（ホーム / 設定）。
 const navGroups: {
   title?: string;
@@ -38,16 +35,13 @@ const navGroups: {
     items: [
       { href: "/posts", label: "保存した投稿", icon: Archive },
       { href: "/chat", label: "AIに聞く", icon: Sparkles },
-      { href: "/map", label: "知識マップ", icon: Network },
-      { href: "/assets", label: "資産庫", icon: Library },
     ],
   },
   {
-    title: "残す・見返す",
+    title: "積み上がる",
     items: [
       { href: "/knowhow", label: "学びメモ", icon: BookOpen },
-      { href: "/collections", label: "コレクション", icon: Layers },
-      { href: "/insights", label: "保存傾向", icon: TrendingUp },
+      { href: "/assets", label: "資産庫", icon: Library },
     ],
   },
   {

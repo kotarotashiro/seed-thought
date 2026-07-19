@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ChevronRight, RefreshCw, Sparkles } from "lucide-react";
@@ -70,30 +70,30 @@ function MaterialChip({ material }: { material: SynthesisMaterialView }) {
 export function TodaySynthesisCard() {
   const router = useRouter();
   const [suggestion, setSuggestion] = useState<SynthesisSuggestionView | null>(null);
+  const [requested, setRequested] = useState(false);
   const [remainingRegenerations, setRemainingRegenerations] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [busyAction, setBusyAction] = useState<"accept" | "regenerate" | "dismiss" | null>(null);
 
-  async function loadToday(showLoading = true) {
-    if (showLoading) setLoading(true);
+  async function requestGeneration() {
+    setRequested(true);
+    setLoading(true);
+    setBusyAction("regenerate");
     setError(false);
     try {
-      const res = await fetch("/api/synthesis/today");
-      if (!res.ok) throw new Error("synthesis failed");
+      const res = await fetch("/api/synthesis/today/regenerate", { method: "POST" });
+      if (!res.ok) throw new Error("synthesis generation failed");
       const data = (await res.json()) as TodaySynthesisResponse;
       setSuggestion(data.suggestion);
       setRemainingRegenerations(data.remainingRegenerations ?? 0);
     } catch {
       setError(true);
     } finally {
-      if (showLoading) setLoading(false);
+      setLoading(false);
+      setBusyAction(null);
     }
   }
-
-  useEffect(() => {
-    loadToday();
-  }, []);
 
   async function accept() {
     if (!suggestion) return;
@@ -111,19 +111,7 @@ export function TodaySynthesisCard() {
   }
 
   async function regenerate() {
-    setBusyAction("regenerate");
-    setError(false);
-    try {
-      const res = await fetch("/api/synthesis/today/regenerate", { method: "POST" });
-      if (!res.ok) throw new Error("regenerate failed");
-      const data = (await res.json()) as TodaySynthesisResponse;
-      setSuggestion(data.suggestion);
-      setRemainingRegenerations(data.remainingRegenerations ?? 0);
-    } catch {
-      setError(true);
-    } finally {
-      setBusyAction(null);
-    }
+    await requestGeneration();
   }
 
   async function dismiss() {
@@ -140,6 +128,26 @@ export function TodaySynthesisCard() {
     }
   }
 
+  if (!requested) {
+    return (
+      <Card className="border-border-light bg-bg-card py-5">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="mb-1 text-xs font-semibold text-accent">今日の掛け合わせ</p>
+            <h2 className="font-semibold text-text">理解した素材から、次の種を見つける</h2>
+            <p className="mt-1 text-sm text-text-secondary">
+              生成はボタンを押したときだけ行われます。
+            </p>
+          </div>
+          <Button variant="secondary" onClick={requestGeneration} loading={busyAction === "regenerate"}>
+            <Sparkles className="mr-1.5 h-4 w-4" />
+            掛け合わせを生成
+          </Button>
+        </div>
+      </Card>
+    );
+  }
+
   if (loading) return <SynthesisSkeleton />;
   if (!suggestion && !error) return null;
 
@@ -151,7 +159,7 @@ export function TodaySynthesisCard() {
             <h2 className="font-semibold text-text">生成に失敗しました</h2>
             <p className="mt-1 text-sm text-text-secondary">時間をおいて再試行してください。</p>
           </div>
-          <Button variant="secondary" onClick={() => loadToday()} loading={loading}>
+          <Button variant="secondary" onClick={requestGeneration} loading={loading}>
             再試行
           </Button>
         </div>

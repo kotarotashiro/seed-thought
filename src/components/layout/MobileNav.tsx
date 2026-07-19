@@ -8,31 +8,28 @@ import {
   BookOpen,
   FileText,
   Home,
-  Layers,
-  Link2,
+ Link2,
   Menu,
   PenSquare,
   Settings,
   Sparkles,
   Sprout,
-  TrendingUp,
-  X as XIcon,
+ X as XIcon,
   Bookmark,
   Library,
-  Network,
 } from "lucide-react";
 import { clsx } from "clsx";
 
-// ボトムタブ = ホーム + 主要な行き先4つ（ラベルは具体名で迷わないように）。
+// ボトムタブ = ホーム + 理解と積み上げの主要な行き先4つ。
 const mobileItems = [
   { href: "/", label: "ホーム", icon: Home },
   { href: "/posts", label: "保存した投稿", icon: Archive },
   { href: "/chat", label: "AIに聞く", icon: Sparkles },
   { href: "/knowhow", label: "学びメモ", icon: BookOpen },
-  { href: "/collections", label: "コレクション", icon: Layers },
+  { href: "/assets", label: "資産庫", icon: Library },
 ];
 
-// ドロワーは Sidebar と同じ「入れる → 理解する → 残す → 出す」グルーピング。
+// ドロワーは Sidebar と同じ「入れる → 理解する → 積み上がる → 出す」グルーピング。
 const drawerGroups: {
   title?: string;
   items: { href: string; label: string; icon: typeof Home }[];
@@ -47,16 +44,13 @@ const drawerGroups: {
     items: [
       { href: "/posts", label: "保存した投稿", icon: Archive },
       { href: "/chat", label: "AIに聞く", icon: Sparkles },
-      { href: "/map", label: "知識マップ", icon: Network },
-      { href: "/assets", label: "資産庫", icon: Library },
     ],
   },
   {
-    title: "残す・見返す",
+    title: "積み上がる",
     items: [
       { href: "/knowhow", label: "学びメモ", icon: BookOpen },
-      { href: "/collections", label: "コレクション", icon: Layers },
-      { href: "/insights", label: "保存傾向", icon: TrendingUp },
+      { href: "/assets", label: "資産庫", icon: Library },
     ],
   },
   {

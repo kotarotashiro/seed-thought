@@ -13,6 +13,17 @@ import { BookOpen, Sprout, User, GraduationCap, ChevronRight } from "lucide-reac
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Post = any;
 
+type AutoLearnedCard = {
+  postId: string;
+  learnedAt: string;
+  authorName: string | null;
+  authorUsername: string | null;
+  authorAvatarUrl: string | null;
+  id: string;
+  title: string;
+  summary: string;
+};
+
 // ─── Hero sub-components ──────────────────────────────────────
 
 function TodayHeroSkeleton() {
@@ -33,6 +44,95 @@ function TodayHeroSkeleton() {
       </div>
       <div className="h-12 bg-border-light rounded-xl" />
     </div>
+  );
+}
+
+function RecentAutoLearnedSection({
+  cards,
+  loading,
+  error,
+}: {
+  cards: AutoLearnedCard[];
+  loading: boolean;
+  error: boolean;
+}) {
+  return (
+    <section className="space-y-4" aria-labelledby="recent-auto-learned-heading">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="text-xs font-semibold tracking-wide text-accent">理解が積み上がる</p>
+          <h2 id="recent-auto-learned-heading" className="mt-1 text-xl font-bold tracking-tight text-text">
+            新しく理解された素材
+          </h2>
+          <p className="mt-1 text-sm text-text-secondary">
+            {loading
+              ? "自動学習の結果を確認しています…"
+              : error
+                ? "自動学習の結果を読み込めませんでした。"
+                : "この1週間で" + cards.length + "件が学習カードになりました"}
+          </p>
+        </div>
+        <Link href="/knowhow" className="text-sm font-medium text-accent hover:underline">
+          学びメモをすべて見る
+        </Link>
+      </div>
+
+      {loading ? (
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          {[1, 2, 3].map((item) => (
+            <div key={item} className="h-44 animate-pulse rounded-xl border border-border bg-bg-card p-5">
+              <div className="mb-4 h-3 w-24 rounded bg-border-light" />
+              <div className="mb-2 h-5 w-4/5 rounded bg-border-light" />
+              <div className="h-3 w-full rounded bg-border-light" />
+              <div className="mt-2 h-3 w-3/4 rounded bg-border-light" />
+            </div>
+          ))}
+        </div>
+      ) : error ? (
+        <Card className="py-8 text-center">
+          <p className="text-sm text-text-secondary">時間をおいてページを再読み込みしてください。</p>
+        </Card>
+      ) : cards.length === 0 ? (
+        <Card className="border-border-light bg-bg-card py-8 text-center">
+          <GraduationCap className="mx-auto mb-3 h-7 w-7 text-accent" />
+          <p className="font-medium text-text">自動学習のカードがここに増えていきます</p>
+          <p className="mt-1 text-sm text-text-secondary">
+            自動学習は稼働中です。新しい投稿が理解されるまで少し待ちましょう。
+          </p>
+        </Card>
+      ) : (
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          {cards.map((card) => (
+            <Link key={card.id} href={"/posts/" + card.postId + "/learning"} className="group block">
+              <Card hoverable className="h-full p-5">
+                <div className="mb-3 flex items-center gap-2">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-accent-light">
+                    {card.authorAvatarUrl ? (
+                      <img src={card.authorAvatarUrl} alt="" className="h-full w-full object-cover" />
+                    ) : (
+                      <BookOpen className="h-4 w-4 text-accent" />
+                    )}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="truncate text-xs font-medium text-text-secondary">
+                      {card.authorName || "自動学習"}
+                    </p>
+                    {card.authorUsername && (
+                      <p className="truncate text-xs text-text-muted">@{card.authorUsername}</p>
+                    )}
+                  </div>
+                </div>
+                <h3 className="line-clamp-2 text-base font-semibold leading-snug text-text group-hover:text-accent">
+                  {card.title}
+                </h3>
+                <p className="mt-2 line-clamp-3 text-sm leading-relaxed text-text-secondary">{card.summary}</p>
+                <p className="mt-4 text-xs font-medium text-accent">学習カードを見る →</p>
+              </Card>
+            </Link>
+          ))}
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -163,6 +263,10 @@ export default function HomePage() {
   const [heroLoading, setHeroLoading] = useState(true);
   const [heroError, setHeroError] = useState(false);
 
+  const [recentCards, setRecentCards] = useState<AutoLearnedCard[]>([]);
+  const [recentLoading, setRecentLoading] = useState(true);
+  const [recentError, setRecentError] = useState(false);
+
   const [undigestedTotal, setUndigestedTotal] = useState<number | null>(null);
   const [knowhowTotal, setKnowhowTotal] = useState<number | null>(null);
 
@@ -176,6 +280,28 @@ export default function HomePage() {
 
   // prevents the mode-change effect from firing before initial mount fetch
   const gridInitRef = useRef(false);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function fetchRecentAutoLearned() {
+      try {
+        const res = await fetch("/api/auto-learn/recent");
+        if (!res.ok) throw new Error("recent auto-learned cards failed");
+        const data = (await res.json()) as { cards?: AutoLearnedCard[] };
+        if (!cancelled) setRecentCards(data.cards ?? []);
+      } catch {
+        if (!cancelled) setRecentError(true);
+      } finally {
+        if (!cancelled) setRecentLoading(false);
+      }
+    }
+
+    fetchRecentAutoLearned();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Initial fetch: hero post + undigested count + knowhow count
   useEffect(() => {
@@ -280,14 +406,18 @@ export default function HomePage() {
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold tracking-tight text-text sm:text-[28px]">
-          今これを学ぶ
+          理解と資産化
         </h1>
         <p className="mt-1.5 text-sm text-text-secondary">
-          保存した投稿から1件を選んで深掘りしましょう
+          自動で理解した素材を見返し、次の学びへつなげましょう
         </p>
       </div>
 
-      <TodaySynthesisCard />
+      <RecentAutoLearnedSection
+        cards={recentCards}
+        loading={recentLoading}
+        error={recentError}
+      />
 
       {/* Hero */}
       <TodayHero post={heroPost} loading={heroLoading} error={heroError} />
@@ -352,6 +482,8 @@ export default function HomePage() {
           </div>
         )}
       </div>
+
+      <TodaySynthesisCard />
     </div>
   );
 }
