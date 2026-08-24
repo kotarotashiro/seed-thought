@@ -5,20 +5,12 @@ import {
   Download,
   Image as ImageIcon,
   Loader2,
-  RefreshCw,
-  Sparkles,
   Trash2,
-  Wand2,
   X as CloseIcon,
   ZoomIn,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { useConfirm } from "@/components/ui/DialogProvider";
-import {
-  IMAGE_PROVIDER_OPTIONS,
-  DEFAULT_IMAGE_MODEL,
-  type ImageModel,
-} from "@/lib/ai/imageModels";
 
 interface CardImage {
   id: string;
@@ -31,8 +23,6 @@ interface CardImage {
 
 export function LearningCardImages({
   cardId,
-  explanationPrompt,
-  diagramPrompt,
 }: {
   cardId: string;
   explanationPrompt: string;
@@ -41,12 +31,6 @@ export function LearningCardImages({
   const confirm = useConfirm();
   const [images, setImages] = useState<CardImage[]>([]);
   const [loading, setLoading] = useState(true);
-  const [generating, setGenerating] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [customPrompt, setCustomPrompt] = useState("");
-  const [selectedModel, setSelectedModel] = useState<ImageModel>(
-    DEFAULT_IMAGE_MODEL
-  );
   const [lightboxImage, setLightboxImage] = useState<CardImage | null>(null);
 
   useEffect(() => {
@@ -77,43 +61,6 @@ export function LearningCardImages({
     return () => window.removeEventListener("keydown", handler);
   }, [lightboxImage]);
 
-  const generate = async (
-    kind: "explanation" | "diagram" | "custom",
-    prompt?: string,
-    generatingKey?: string
-  ) => {
-    const key = generatingKey ?? kind;
-    setGenerating(key);
-    setError(null);
-    try {
-      const res = await fetch(`/api/learning-cards/${cardId}/images`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          kind,
-          model: selectedModel,
-          ...(prompt ? { prompt } : {}),
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "画像生成に失敗しました");
-      setImages((prev) => [data.image, ...prev]);
-      if (kind === "custom") setCustomPrompt("");
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setGenerating(null);
-    }
-  };
-
-  const regenerate = (img: CardImage) => {
-    void generate(
-      img.kind as "explanation" | "diagram" | "custom",
-      img.kind === "custom" ? img.prompt : undefined,
-      `regen-${img.id}`
-    );
-  };
-
   const remove = async (imageId: string) => {
     const ok = await confirm({
       message: "この画像を削除しますか？",
@@ -143,83 +90,12 @@ export function LearningCardImages({
 
   return (
     <div className="space-y-4">
-      {/* Model selector */}
-      <div className="flex items-center gap-2">
-        <span className="text-xs text-text-secondary">モデル:</span>
-        <div className="flex rounded-full border border-border bg-border-light p-0.5">
-          {IMAGE_PROVIDER_OPTIONS.map((opt) => (
-            <button
-              key={opt.id}
-              type="button"
-              onClick={() => setSelectedModel(opt.id)}
-              className={
-                selectedModel === opt.id
-                  ? "rounded-full bg-white px-3 py-1 text-xs font-medium text-text shadow-sm"
-                  : "rounded-full px-3 py-1 text-xs font-medium text-text-secondary hover:text-text"
-              }
-            >
-              {opt.label}
-            </button>
-          ))}
-        </div>
+      <div className="rounded-xl border border-border bg-border-light px-4 py-3">
+        <p className="text-sm font-medium text-text">画像の新規生成は停止中です</p>
+        <p className="mt-1 text-xs text-text-secondary">
+          生成済み画像の閲覧・保存・削除は引き続き利用できます。
+        </p>
       </div>
-
-      {/* Generate buttons */}
-      <div className="flex flex-wrap gap-2">
-        <Button
-          variant="primary"
-          size="sm"
-          onClick={() => void generate("explanation")}
-          loading={generating === "explanation"}
-          loadingLabel="生成中..."
-          disabled={!explanationPrompt}
-        >
-          <Wand2 className="mr-1.5 h-4 w-4" />
-          解説画像を生成
-        </Button>
-        <Button
-          variant="secondary"
-          size="sm"
-          onClick={() => void generate("diagram")}
-          loading={generating === "diagram"}
-          loadingLabel="生成中..."
-          disabled={!diagramPrompt}
-        >
-          <Sparkles className="mr-1.5 h-4 w-4" />
-          図解を生成
-        </Button>
-      </div>
-
-      <details className="rounded-xl border border-border bg-white">
-        <summary className="cursor-pointer px-4 py-2 text-sm font-medium text-text-secondary hover:text-text">
-          カスタムプロンプトで生成
-        </summary>
-        <div className="space-y-2 border-t border-border-light p-3">
-          <textarea
-            value={customPrompt}
-            onChange={(e) => setCustomPrompt(e.target.value)}
-            placeholder="自由なプロンプトを入力..."
-            rows={3}
-            className="w-full resize-y rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none"
-          />
-          <Button
-            size="sm"
-            onClick={() => void generate("custom", customPrompt)}
-            loading={generating === "custom"}
-            loadingLabel="生成中..."
-            disabled={!customPrompt.trim()}
-          >
-            <Wand2 className="mr-1.5 h-4 w-4" />
-            この内容で生成
-          </Button>
-        </div>
-      </details>
-
-      {error && (
-        <div className="rounded-xl border border-danger/30 bg-danger/5 px-3 py-2 text-xs text-danger">
-          {error}
-        </div>
-      )}
 
       {loading ? (
         <div className="flex items-center gap-2 text-sm text-text-muted">
@@ -229,7 +105,7 @@ export function LearningCardImages({
       ) : images.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border bg-white px-4 py-6 text-center text-sm text-text-muted">
           <ImageIcon className="mx-auto mb-2 h-6 w-6 opacity-50" />
-          まだ画像はありません。上のボタンから生成してください。
+          保存済みの画像はありません。
         </div>
       ) : (
         <div className="grid gap-3 sm:grid-cols-2">
@@ -265,16 +141,6 @@ export function LearningCardImages({
                   <Button variant="secondary" size="sm" onClick={() => download(img)}>
                     <Download className="mr-1 h-3.5 w-3.5" />
                     保存
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => regenerate(img)}
-                    loading={generating === `regen-${img.id}`}
-                    loadingLabel="生成中..."
-                  >
-                    <RefreshCw className="mr-1 h-3.5 w-3.5" />
-                    別バージョン
                   </Button>
                   <Button variant="ghost" size="sm" onClick={() => remove(img.id)}>
                     <Trash2 className="mr-1 h-3.5 w-3.5" />

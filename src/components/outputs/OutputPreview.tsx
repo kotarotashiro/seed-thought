@@ -28,7 +28,7 @@ function SeminarSection({ label, children }: { label: string; children: React.Re
         <span className="text-sm font-semibold text-text">{label}</span>
         {open ? <ChevronUp className="h-4 w-4 text-text-muted" /> : <ChevronDown className="h-4 w-4 text-text-muted" />}
       </button>
-      {open && <div className="px-4 pb-4 pt-1">{children}</div>}
+      {open && <div className="min-w-0 px-4 pb-4 pt-1 wrap-anywhere">{children}</div>}
     </div>
   );
 }
@@ -199,9 +199,9 @@ export function OutputPreview({ title, content, contentJson, outputType, onDelet
       ) : null;
 
     return (
-      <Card>
-        <div className="mb-4 flex items-center justify-between gap-2">
-          <h3 className="text-base font-bold text-text">{title}</h3>
+      <Card className="min-w-0 wrap-anywhere">
+        <div className="mb-4 flex min-w-0 items-center justify-between gap-2">
+          <h3 className="min-w-0 flex-1 wrap-anywhere text-base font-bold text-text">{title}</h3>
           <div className="flex flex-shrink-0 gap-2">
             <Button variant="secondary" size="sm" onClick={handleCopyFull} className="gap-1.5">
               {copied ? (
@@ -221,7 +221,7 @@ export function OutputPreview({ title, content, contentJson, outputType, onDelet
           </div>
         )}
 
-        <div className="space-y-3">
+        <div className="space-y-3 wrap-anywhere">
           {j.whyItMatters && (
             <SeminarSection label="何が重要なのか">
               <p className="whitespace-pre-wrap text-sm leading-relaxed text-text">{j.whyItMatters}</p>
@@ -351,9 +351,9 @@ export function OutputPreview({ title, content, contentJson, outputType, onDelet
     const s = contentJson as SeminarJson;
 
     return (
-      <Card>
-        <div className="flex items-center justify-between gap-2 mb-4">
-          <h3 className="text-base font-bold text-text">{title}</h3>
+      <Card className="min-w-0 wrap-anywhere">
+        <div className="flex min-w-0 items-center justify-between gap-2 mb-4">
+          <h3 className="min-w-0 flex-1 wrap-anywhere text-base font-bold text-text">{title}</h3>
           <div className="flex flex-shrink-0 gap-2">
             <Button variant="secondary" size="sm" onClick={handleCopy} className="gap-1.5">
               {copied ? <><Check className="w-3.5 h-3.5" />コピーしました</> : <><Copy className="w-3.5 h-3.5" />全文コピー</>}
@@ -407,7 +407,7 @@ export function OutputPreview({ title, content, contentJson, outputType, onDelet
 
           {s.schedule && s.schedule.length > 0 && (
             <SeminarSection label="4. 90分セミナー構成">
-              <div className="overflow-x-auto">
+              <div className="min-w-0 overflow-x-auto">
                 <table className="w-full text-xs">
                   <thead><tr className="border-b border-border"><th className="text-left py-1 pr-3 text-text-muted font-medium">時間</th><th className="text-left py-1 pr-3 text-text-muted font-medium">パート</th><th className="text-left py-1 text-text-muted font-medium">内容</th></tr></thead>
                   <tbody>
@@ -455,7 +455,7 @@ export function OutputPreview({ title, content, contentJson, outputType, onDelet
                   return (
                     <div key={key}>
                       <p className="font-medium text-text mb-1">{labels[key] ?? key}</p>
-                      <pre className="whitespace-pre-wrap text-xs text-text-secondary bg-border-light rounded-lg px-3 py-2 font-sans">{val as string}</pre>
+                      <pre className="overflow-x-auto whitespace-pre-wrap wrap-anywhere text-xs text-text-secondary bg-border-light rounded-lg px-3 py-2 font-sans">{val as string}</pre>
                     </div>
                   );
                 })}
@@ -481,10 +481,10 @@ export function OutputPreview({ title, content, contentJson, outputType, onDelet
           {s.promotion && (
             <SeminarSection label="10. 告知文">
               <div className="space-y-3 text-sm">
-                {s.promotion.xPost && <div><p className="font-medium text-text mb-1">X投稿用</p><pre className="whitespace-pre-wrap text-xs text-text-secondary bg-border-light rounded-lg px-3 py-2 font-sans">{s.promotion.xPost}</pre></div>}
-                {s.promotion.instagram && <div><p className="font-medium text-text mb-1">Instagram用</p><pre className="whitespace-pre-wrap text-xs text-text-secondary bg-border-light rounded-lg px-3 py-2 font-sans">{s.promotion.instagram}</pre></div>}
-                {s.promotion.line && <div><p className="font-medium text-text mb-1">LINE配信用</p><pre className="whitespace-pre-wrap text-xs text-text-secondary bg-border-light rounded-lg px-3 py-2 font-sans">{s.promotion.line}</pre></div>}
-                {s.promotion.lpCopy && <div><p className="font-medium text-text mb-1">LPファーストビュー</p><pre className="whitespace-pre-wrap text-xs text-text-secondary bg-border-light rounded-lg px-3 py-2 font-sans">{s.promotion.lpCopy}</pre></div>}
+                {s.promotion.xPost && <div><p className="font-medium text-text mb-1">X投稿用</p><pre className="overflow-x-auto whitespace-pre-wrap wrap-anywhere text-xs text-text-secondary bg-border-light rounded-lg px-3 py-2 font-sans">{s.promotion.xPost}</pre></div>}
+                {s.promotion.instagram && <div><p className="font-medium text-text mb-1">Instagram用</p><pre className="overflow-x-auto whitespace-pre-wrap wrap-anywhere text-xs text-text-secondary bg-border-light rounded-lg px-3 py-2 font-sans">{s.promotion.instagram}</pre></div>}
+                {s.promotion.line && <div><p className="font-medium text-text mb-1">LINE配信用</p><pre className="overflow-x-auto whitespace-pre-wrap wrap-anywhere text-xs text-text-secondary bg-border-light rounded-lg px-3 py-2 font-sans">{s.promotion.line}</pre></div>}
+                {s.promotion.lpCopy && <div><p className="font-medium text-text mb-1">LPファーストビュー</p><pre className="overflow-x-auto whitespace-pre-wrap wrap-anywhere text-xs text-text-secondary bg-border-light rounded-lg px-3 py-2 font-sans">{s.promotion.lpCopy}</pre></div>}
               </div>
             </SeminarSection>
           )}
@@ -505,9 +505,9 @@ export function OutputPreview({ title, content, contentJson, outputType, onDelet
 
   // ---------- Default display ----------
   return (
-    <Card>
+    <Card className="min-w-0 wrap-anywhere">
       <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
-        <h3 className="text-base font-bold text-text">{title}</h3>
+        <h3 className="min-w-0 wrap-anywhere text-base font-bold text-text">{title}</h3>
         <div className="flex flex-wrap gap-2">
           <Button variant="secondary" size="sm" onClick={handleCopy} className="gap-1.5">
             {copied ? (
@@ -533,7 +533,7 @@ export function OutputPreview({ title, content, contentJson, outputType, onDelet
       </div>
 
       <div className="bg-border-light rounded-xl p-4">
-        <pre className="text-sm text-text whitespace-pre-wrap font-sans leading-relaxed">
+        <pre className="overflow-x-auto text-sm text-text whitespace-pre-wrap wrap-anywhere font-sans leading-relaxed">
           {displayContent}
         </pre>
       </div>

@@ -62,14 +62,14 @@ function RecentAutoLearnedSection({
         <div>
           <p className="text-xs font-semibold tracking-wide text-accent">理解が積み上がる</p>
           <h2 id="recent-auto-learned-heading" className="mt-1 text-xl font-bold tracking-tight text-text">
-            新しく理解された素材
+            過去に自動学習した素材
           </h2>
           <p className="mt-1 text-sm text-text-secondary">
             {loading
-              ? "自動学習の結果を確認しています…"
+              ? "過去の自動学習カードを確認しています…"
               : error
-                ? "自動学習の結果を読み込めませんでした。"
-                : "この1週間で" + cards.length + "件が学習カードになりました"}
+                ? "過去の自動学習カードを読み込めませんでした。"
+                : "この1週間に自動学習されたカードは" + cards.length + "件です"}
           </p>
         </div>
         <Link href="/knowhow" className="text-sm font-medium text-accent hover:underline">
@@ -95,9 +95,9 @@ function RecentAutoLearnedSection({
       ) : cards.length === 0 ? (
         <Card className="border-border-light bg-bg-card py-8 text-center">
           <GraduationCap className="mx-auto mb-3 h-7 w-7 text-accent" />
-          <p className="font-medium text-text">自動学習のカードがここに増えていきます</p>
+          <p className="font-medium text-text">過去1週間の自動学習カードはありません</p>
           <p className="mt-1 text-sm text-text-secondary">
-            自動学習は稼働中です。新しい投稿が理解されるまで少し待ちましょう。
+            AutoLearn は停止中です。必要な投稿は保存一覧から手動でカード化できます。
           </p>
         </Card>
       ) : (
@@ -409,7 +409,7 @@ export default function HomePage() {
           理解と資産化
         </h1>
         <p className="mt-1.5 text-sm text-text-secondary">
-          自動で理解した素材を見返し、次の学びへつなげましょう
+          保存した投稿から必要なものを選び、手動で学習カードにしましょう
         </p>
       </div>
 

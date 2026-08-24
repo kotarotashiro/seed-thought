@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getUserFacingError } from "@/lib/api/errors";
 import { generateLearningCard } from "@/lib/learning/generate";
 import { getPostForLearning } from "@/lib/posts/learningSource";
+import { buildLearningMaterialSnapshot, getLearningCardStatus, LearningMaterialsIncompleteError } from "@/lib/posts/learningMaterials";
 import { XaiTokenExpiredError } from "@/lib/xai/oauth";
 
 // 学習カード生成（LLM 1回）。厳密学習は別ルート（./strict）で生成する。
@@ -25,7 +26,13 @@ export async function GET(
       ? (() => { try { return JSON.parse(post.learningCard!.strictLearningJson!); } catch { return null; } })()
       : null;
 
-    return NextResponse.json({ post, learningCard: post.learningCard, strictLearning });
+    const materials = buildLearningMaterialSnapshot(post);
+    return NextResponse.json({
+      post,
+      learningCard: post.learningCard,
+      strictLearning,
+      learningStatus: getLearningCardStatus(post.learningCard, materials),
+    });
   } catch (error) {
     console.error("Failed to fetch learning card:", error);
     return NextResponse.json({ error: "学習カードの取得に失敗しました" }, { status: 500 });
@@ -50,17 +57,34 @@ export async function POST(
         ? { provider, model: typeof model === "string" ? model : undefined }
         : undefined;
 
-    const result = await generateLearningCard(postId, { learningMode, override });
+    const allowIncomplete = (body as { allowIncomplete?: boolean }).allowIncomplete === true;
+    const result = await generateLearningCard(postId, { learningMode, override, allowIncomplete });
     if (!result) {
       return NextResponse.json({ error: "投稿が見つかりません" }, { status: 404 });
     }
 
     return NextResponse.json(
-      { learningCard: result.learningCard, output: result.output, strictLearning: null },
+      {
+        learningCard: result.learningCard,
+        output: result.output,
+        strictLearning: null,
+        learningStatus: getLearningCardStatus(result.learningCard, result.materials),
+      },
       { status: 201 }
     );
   } catch (error) {
     console.error("Failed to generate learning card:", error);
+    if (error instanceof LearningMaterialsIncompleteError) {
+      return NextResponse.json(
+        {
+          error: "学習カードを生成するための補助情報が不足しています。表示された素材を準備してください。",
+          code: error.code,
+          missingSources: error.missingSources,
+          materials: error.materials,
+        },
+        { status: 409 },
+      );
+    }
     if (error instanceof XaiTokenExpiredError) {
       return NextResponse.json(
         { error: error.message, code: "GROK_TOKEN_EXPIRED" },

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
-import { submitVideoGeneration, pollVideoGeneration } from "@/lib/ai/grokVideoProvider";
+import { pollVideoGeneration } from "@/lib/ai/grokVideoProvider";
 
 export const maxDuration = 300;
 
@@ -18,47 +18,11 @@ export async function GET(
 }
 
 // POST /api/learning-cards/[cardId]/videos — submit a new video generation job
-export async function POST(
-  request: Request,
-  { params }: { params: Promise<{ cardId: string }> }
-) {
-  const { cardId } = await params;
-
-  const card = await prisma.learningCard.findUnique({
-    where: { id: cardId },
-    select: { title: true, coreInsight: true },
-  });
-
-  if (!card) {
-    return NextResponse.json({ error: "カードが見つかりません" }, { status: 404 });
-  }
-
-  let prompt: string;
-  try {
-    const body = (await request.json()) as { prompt?: string };
-    prompt = body.prompt?.trim() || `${card.title}。${card.coreInsight}`;
-  } catch {
-    prompt = `${card.title}。${card.coreInsight}`;
-  }
-
-  try {
-    const { jobId } = await submitVideoGeneration(prompt);
-
-    const video = await prisma.learningCardVideo.create({
-      data: {
-        learningCardId: cardId,
-        prompt,
-        status: "processing",
-        videoId: jobId,
-      },
-    });
-
-    return NextResponse.json(video, { status: 201 });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "動画生成に失敗しました";
-    console.error("[videos POST]", message);
-    return NextResponse.json({ error: message }, { status: 500 });
-  }
+export async function POST() {
+  return NextResponse.json(
+    { error: "動画の新規生成は停止中です" },
+    { status: 410 }
+  );
 }
 
 // DELETE /api/learning-cards/[cardId]/videos?videoId=xxx — delete a video record

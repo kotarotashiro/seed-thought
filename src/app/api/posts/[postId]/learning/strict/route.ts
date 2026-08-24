@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db/prisma";
 import { getAiProvider } from "@/lib/ai/provider";
 import { getUserFacingError } from "@/lib/api/errors";
 import { getPostForLearning, buildSourcePost } from "@/lib/posts/learningSource";
+import { buildLearningGenerationMetadata, LearningMaterialsIncompleteError, prepareLearningMaterials } from "@/lib/posts/learningMaterials";
 import { XaiTokenExpiredError } from "@/lib/xai/oauth";
 
 // 厳密学習生成（LLM 1回）。学習カードとは別ルートに分離。学習カードが先に
@@ -28,7 +29,8 @@ export async function POST(
       );
     }
 
-    const source = await buildSourcePost(post);
+    const prepared = await prepareLearningMaterials(postId);
+    const source = await buildSourcePost(prepared.post, prepared.materials);
 
     const strictLearningOutput = await getAiProvider().generateStrictLearning({
       postText: source.text,
@@ -38,17 +40,34 @@ export async function POST(
       },
       articleTitle: source.articleTitle,
       articleDescription: source.articleDescription,
+      learningMaterials: prepared.materials,
+      learningCardJson: post.learningCard.outputJson,
       userMemo: post.learningCard.userMemo ?? null,
     });
+    const strictWithMetadata = {
+      ...strictLearningOutput,
+      learningMetadata: buildLearningGenerationMetadata(prepared.materials),
+    };
 
     await prisma.learningCard.update({
       where: { sourcePostId: post.id },
-      data: { strictLearningJson: JSON.stringify(strictLearningOutput) },
+      data: { strictLearningJson: JSON.stringify(strictWithMetadata) },
     });
 
-    return NextResponse.json({ strictLearning: strictLearningOutput }, { status: 201 });
+    return NextResponse.json({ strictLearning: strictWithMetadata }, { status: 201 });
   } catch (error) {
     console.error("Failed to generate strict learning:", error);
+    if (error instanceof LearningMaterialsIncompleteError) {
+      return NextResponse.json(
+        {
+          error: "厳密学習に必要な補助情報が不足しています。表示された素材を準備してください。",
+          code: error.code,
+          missingSources: error.missingSources,
+          materials: error.materials,
+        },
+        { status: 409 },
+      );
+    }
     if (error instanceof XaiTokenExpiredError) {
       return NextResponse.json(
         { error: error.message, code: "GROK_TOKEN_EXPIRED" },

@@ -45,11 +45,20 @@ async function enrichOne(postId: string): Promise<void> {
     const preview = await fetchArticlePreview(url);
 
     if (preview.title || preview.description) {
+      let existingRaw: Record<string, unknown> = {};
+      try {
+        const parsed = post.urlCardJson ? JSON.parse(post.urlCardJson) : {};
+        if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) existingRaw = parsed as Record<string, unknown>;
+      } catch {
+        existingRaw = {};
+      }
       const updated = JSON.stringify({
+        ...existingRaw,
         expandedUrl: card.expandedUrl ?? url,
         title: preview.title ?? card.title,
         description: preview.description ?? card.description,
         imageUrl: preview.imageUrl ?? card.imageUrl,
+        contentQuality: preview.quality,
         pastedByUser: false,
       });
       await prisma.post.update({

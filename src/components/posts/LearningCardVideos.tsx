@@ -1,8 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Film, Loader2, RefreshCw, Trash2 } from "lucide-react";
-import { Button } from "@/components/ui/Button";
+import { Film, Loader2, Trash2 } from "lucide-react";
 import { useConfirm } from "@/components/ui/DialogProvider";
 
 interface CardVideo {
@@ -28,9 +27,7 @@ export function LearningCardVideos({ cardId }: { cardId: string }) {
   const confirm = useConfirm();
   const [videos, setVideos] = useState<CardVideo[]>([]);
   const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [customPrompt, setCustomPrompt] = useState("");
   const [deleting, setDeleting] = useState<string | null>(null);
   const pollRef = useRef<number | null>(null);
 
@@ -118,64 +115,14 @@ export function LearningCardVideos({ cardId }: { cardId: string }) {
     }
   };
 
-  const submit = async (prompt?: string) => {
-    setSubmitting(true);
-    setError(null);
-    try {
-      const res = await fetch(`/api/learning-cards/${cardId}/videos`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(prompt ? { prompt } : {}),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "動画生成に失敗しました");
-      setVideos((prev) => [data, ...prev]);
-      setCustomPrompt("");
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap gap-2">
-        <Button
-          size="sm"
-          onClick={() => submit()}
-          loading={submitting}
-          loadingLabel="送信中..."
-        >
-          <Film className="mr-1.5 h-4 w-4" />
-          このカードから動画を生成
-        </Button>
+      <div className="rounded-xl border border-border bg-border-light px-4 py-3">
+        <p className="text-sm font-medium text-text">動画の新規生成は停止中です</p>
+        <p className="mt-1 text-xs text-text-secondary">
+          生成済み動画の再生・状態確認・削除は引き続き利用できます。
+        </p>
       </div>
-
-      <details className="rounded-xl border border-border bg-white">
-        <summary className="cursor-pointer px-4 py-2 text-sm font-medium text-text-secondary hover:text-text">
-          カスタムプロンプトで生成
-        </summary>
-        <div className="space-y-2 border-t border-border-light p-3">
-          <textarea
-            value={customPrompt}
-            onChange={(e) => setCustomPrompt(e.target.value)}
-            placeholder="動画の内容を自由に指定..."
-            rows={3}
-            className="w-full resize-y rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none"
-          />
-          <Button
-            size="sm"
-            onClick={() => submit(customPrompt)}
-            loading={submitting}
-            loadingLabel="送信中..."
-            disabled={!customPrompt.trim()}
-          >
-            <Film className="mr-1.5 h-4 w-4" />
-            この内容で生成
-          </Button>
-        </div>
-      </details>
 
       {error && (
         <div className="rounded-xl border border-danger/30 bg-danger/5 px-3 py-2 text-xs text-danger">
@@ -191,8 +138,7 @@ export function LearningCardVideos({ cardId }: { cardId: string }) {
       ) : videos.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border bg-white px-4 py-6 text-center text-sm text-text-muted">
           <Film className="mx-auto mb-2 h-6 w-6 opacity-50" />
-          まだ動画はありません。上のボタンから生成してください。<br />
-          <span className="text-xs">※ 生成には数分かかります</span>
+          保存済みの動画はありません。
         </div>
       ) : (
         <div className="grid gap-3 sm:grid-cols-2">

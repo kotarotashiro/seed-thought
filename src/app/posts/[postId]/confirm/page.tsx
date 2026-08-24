@@ -138,30 +138,6 @@ export default function ConfirmPage({ params }: { params: Promise<{ postId: stri
     };
   }, [postId]);
 
-  // 投稿ロード後に1回だけ自動取得（ツリー・リンク）
-  const autoFetchedRef = useRef(false);
-  useEffect(() => {
-    if (!post || autoFetchedRef.current) return;
-    autoFetchedRef.current = true;
-
-    const isLikeOrBookmark =
-      post.source === "user_like" || post.source === "user_bookmark";
-    const canThread = isLikeOrBookmark && !!post.sourcePostId;
-    // threadFetchedAt が入っていれば取得済み（子投稿0件の単独ポストも含む）。
-    // 未取得のときだけ自動取得し、開くたびのX API再読み取り課金を防ぐ。
-    const alreadyChecked = !!post.threadFetchedAt || (post.threadPosts?.length ?? 0) > 0;
-    const alreadyHasLinks = relatedLinks.length > 0;
-    const hasUrl = /https?:\/\//i.test(post.text ?? "");
-
-    if (canThread && !alreadyChecked) {
-      void handleFetchThread();
-    }
-    if (!alreadyHasLinks && hasUrl) {
-      void handleEnrichLinks();
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [post?.id]);
-
   // 生成モデル選択用に、利用可能な provider とデフォルトを取得
   useEffect(() => {
     let cancelled = false;
@@ -210,8 +186,8 @@ export default function ConfirmPage({ params }: { params: Promise<{ postId: stri
 
   // 選んだモデルを学習ページへクエリパラメータで渡す
   const learningHref = genProvider
-    ? `/posts/${postId}/learning?provider=${encodeURIComponent(genProvider)}${genModel ? `&model=${encodeURIComponent(genModel)}` : ""}`
-    : `/posts/${postId}/learning`;
+    ? `/posts/${postId}/learning?provider=${encodeURIComponent(genProvider)}${genModel ? `&model=${encodeURIComponent(genModel)}` : ""}${post?.learningReadiness?.isStale ? "&regenerate=1" : ""}`
+    : `/posts/${postId}/learning${post?.learningReadiness?.isStale ? "?regenerate=1" : ""}`;
 
   const handleFetchThread = async (force = false) => {
     setFetchingThread(true);
@@ -281,6 +257,32 @@ export default function ConfirmPage({ params }: { params: Promise<{ postId: stri
     }
   };
 
+  // 投稿ロード後に1回だけ自動取得（ツリー・リンク）
+  const autoFetchedRef = useRef(false);
+  useEffect(() => {
+    if (!post || autoFetchedRef.current) return;
+    autoFetchedRef.current = true;
+
+    const isLikeOrBookmark =
+      post.source === "user_like" || post.source === "user_bookmark";
+    const canThread = isLikeOrBookmark && !!post.sourcePostId;
+    // threadFetchedAt が入っていれば取得済み（子投稿0件の単独ポストも含む）。
+    // 未取得のときだけ自動取得し、開くたびのX API再読み取り課金を防ぐ。
+    const alreadyChecked = !!post.threadFetchedAt || (post.threadPosts?.length ?? 0) > 0;
+    const alreadyHasLinks = relatedLinks.length > 0;
+    const hasUrl = /https?:\/\//i.test(post.text ?? "");
+
+    if (canThread && !alreadyChecked) {
+      // 初回表示時に不足素材を補うための意図的な非同期取得。
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      void handleFetchThread();
+    }
+    if (!alreadyHasLinks && hasUrl) {
+      void handleEnrichLinks();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [post?.id]);
+
   // 投稿に添付された画像をビジョンモデルで読み取り、中身を学習素材に加える
   const handleAnalyzeImages = async (force = false) => {
     setAnalyzingImages(true);
@@ -338,6 +340,7 @@ export default function ConfirmPage({ params }: { params: Promise<{ postId: stri
         description: data.description || null,
         pastedContent: data.description || null,
         pastedByUser: false,
+        contentQuality: data.quality || "summary",
         isXArticle: Boolean(data.isXArticle),
         imageUrl: data.image || null,
       };
@@ -492,6 +495,11 @@ export default function ConfirmPage({ params }: { params: Promise<{ postId: stri
   const hasImages = imageMedia.length > 0;
   const readImages = imageMedia.filter((m) => m.description && m.description.trim());
   const allImagesRead = hasImages && readImages.length === imageMedia.length;
+  const readinessMaterials = Array.isArray(post.learningReadiness?.materials)
+    ? post.learningReadiness.materials
+    : [];
+  const readinessLabel = (status: string) =>
+    status === "ready" ? "準備済み" : status === "failed" ? "取得失敗" : status === "excluded" ? "除外" : "未取得";
 
   return (
     <div className="mx-auto max-w-2xl space-y-5 sm:space-y-6">
@@ -784,6 +792,25 @@ export default function ConfirmPage({ params }: { params: Promise<{ postId: stri
         <p className="mb-4 text-xs text-text-muted">
           投稿に含まれる記事URLや、動画の文字起こしを追加すると、学習カードの精度が上がります。
         </p>
+        <div className="mb-5 rounded-xl border border-border bg-border-light/50 px-3 py-3">
+          <p className="mb-2 text-xs font-semibold text-text-secondary">学習素材の準備状況</p>
+          <div className="space-y-1.5">
+            {readinessMaterials.map((material: { id: string; label: string; status: string; quality?: string; reason?: string }) => (
+              <div key={material.id} className="flex items-start justify-between gap-3 text-xs">
+                <span className="min-w-0 text-text-secondary">{material.label}</span>
+                <span className={`flex-shrink-0 ${material.status === "ready" ? "text-success" : material.status === "failed" ? "text-danger" : "text-warning"}`}>
+                  {readinessLabel(material.status)}{material.quality === "summary" ? "（要約）" : material.quality === "metadata_only" ? "（概要のみ）" : ""}
+                </span>
+              </div>
+            ))}
+            {readinessMaterials.length === 0 && <p className="text-xs text-text-muted">投稿本文を確認中です。</p>}
+          </div>
+          {readinessMaterials.some((material: { status: string }) => material.status !== "ready") && (
+            <p className="mt-2 text-xs leading-relaxed text-warning">
+              未取得の素材がある場合、通常の学習カード生成は止まり、必要な解決方法が表示されます。
+            </p>
+          )}
+        </div>
 
         {/* 投稿内リンクの自動取得 */}
         <div className="space-y-2">
@@ -1010,7 +1037,11 @@ export default function ConfirmPage({ params }: { params: Promise<{ postId: stri
         <Link href={learningHref} className="block">
           <Button className="w-full">
             <BookOpen className="w-4 h-4 mr-2" />
-            学習カードを生成
+            {post.learningCard && !post.learningReadiness?.isStale
+              ? "学習カードを見る"
+              : post.learningReadiness?.isStale
+                ? "補助情報を反映して再生成"
+                : "補助情報を読み取って学習カードを生成"}
           </Button>
         </Link>
       </Card>

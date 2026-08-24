@@ -7,6 +7,8 @@ import {
 } from "@/lib/ai/fallback";
 import { needsJapaneseTranslation } from "@/lib/text/language";
 import { resolveArticleForAi } from "@/lib/posts/articleContent";
+import { mergeArticleCardJson } from "@/lib/posts/articleParser";
+import { buildLearningMaterialSnapshot, getLearningCardStatus } from "@/lib/posts/learningMaterials";
 
 // 投稿分類・翻訳のLLM呼び出し。Vercel Hobby(Fluid Compute)上限の300秒まで引き上げ、
 // Kimi等の遅いモデルでも打ち切られないようにする。
@@ -108,9 +110,16 @@ export async function GET(
           learningCard: true,
         },
       });
+      if (!post) {
+        return NextResponse.json({ error: "投稿が見つかりません" }, { status: 404 });
+      }
     }
 
-    return NextResponse.json(post);
+    const learningMaterials = buildLearningMaterialSnapshot(post);
+    return NextResponse.json({
+      ...post,
+      learningReadiness: getLearningCardStatus(post.learningCard, learningMaterials),
+    });
   } catch (error) {
     console.error("Failed to fetch post:", error);
     return NextResponse.json({ error: "投稿の取得に失敗しました" }, { status: 500 });
@@ -174,7 +183,8 @@ export async function PATCH(
 
     let hasNewPastedContent = false;
     if (body.urlCardJson !== undefined) {
-      updateData.urlCardJson = body.urlCardJson;
+      const current = await prisma.post.findUnique({ where: { id: postId }, select: { urlCardJson: true } });
+      updateData.urlCardJson = mergeArticleCardJson(current?.urlCardJson, body.urlCardJson);
       try {
         const incoming = JSON.parse(body.urlCardJson) as { pastedByUser?: boolean; pastedContent?: string };
         if (incoming.pastedByUser && typeof incoming.pastedContent === "string" && incoming.pastedContent.trim().length > 0) {

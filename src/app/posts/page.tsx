@@ -417,9 +417,9 @@ export default function PostsPage() {
           {activeTab === "recommend" ? (
             <>
               <Sparkles className="w-12 h-12 text-text-muted mx-auto mb-3" />
-              <h3 className="text-lg font-semibold text-text mb-2">おすすめはまだありません</h3>
+              <h3 className="text-lg font-semibold text-text mb-2">保存済みのおすすめはありません</h3>
               <p className="text-sm text-text-secondary mb-4">
-                投稿が増えると、AIがあなたの興味に合った投稿を自動でおすすめします。
+                おすすめの新規生成は停止中です。
               </p>
             </>
           ) : (

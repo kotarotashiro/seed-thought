@@ -76,6 +76,23 @@ interface LearningCardView {
   strictLearningJson?: string | null;
 }
 
+interface LearningMaterialView {
+  id: string;
+  label: string;
+  kind: string;
+  status: "ready" | "missing" | "failed" | "excluded";
+  quality?: "full" | "summary" | "metadata_only";
+  reason?: string;
+}
+
+interface LearningStatusView {
+  isStale: boolean;
+  materialFingerprint: string;
+  generatedFingerprint: string | null;
+  materials: LearningMaterialView[];
+  missingSources: Array<{ sourceId: string; kind: string; label: string; reason: string }>;
+}
+
 interface ThreadPostView {
   id: string;
   text: string;
@@ -177,12 +194,14 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
   const alert = useAlert();
   const [post, setPost] = useState<PostView | null>(null);
   const [card, setCard] = useState<LearningCardView | null>(null);
+  const [learningStatus, setLearningStatus] = useState<LearningStatusView | null>(null);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [saving, setSaving] = useState(false);
   const [memo, setMemo] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [incompleteGenerationAvailable, setIncompleteGenerationAvailable] = useState(false);
   const autoGenerateTriedRef = useRef(false);
   const generateAbortControllerRef = useRef<AbortController | null>(null);
 
@@ -333,6 +352,7 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
         if (cancelled) return;
         setPost(data.post || null);
         setCard(data.learningCard || null);
+        setLearningStatus(data.learningStatus || null);
         setMemo(data.learningCard?.userMemo || "");
         setLearningMode(data.learningCard?.learningMode === "format" ? "format" : "content");
         setStrictLearning(data.strictLearning || null);
@@ -358,19 +378,23 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
     const params = new URLSearchParams(window.location.search);
     const provider = params.get("provider");
     const model = params.get("model");
+    const regenerate = params.get("regenerate") === "1";
     if (provider) {
+      // URLパラメータを初期状態へ一度だけ反映する意図的な同期。
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setGenProvider(provider);
       // 明示選択して来た = 既存カードがあっても選択モデルで作り直す意図
       forceRegenRef.current = true;
     }
     if (model) setGenModel(model);
+    if (regenerate) forceRegenRef.current = true;
     // クエリは消しておく（リロード時に意図せず再生成しないように）
-    if (provider || model) {
+    if (provider || model || regenerate) {
       window.history.replaceState({}, "", window.location.pathname);
     }
   }, []);
 
-  const handleGenerate = async (mode?: "content" | "format") => {
+  const handleGenerate = async (mode?: "content" | "format", allowIncomplete = false) => {
     const activeMode = mode ?? learningMode;
     const previousMode = learningMode;
     if (mode !== undefined) setLearningMode(mode);
@@ -390,12 +414,13 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
         body: JSON.stringify({
           learningMode: activeMode,
           ...(genProvider ? { provider: genProvider, model: genModel || undefined } : {}),
+          ...(allowIncomplete ? { allowIncomplete: true } : {}),
         }),
       });
       // タイムアウト等で Vercel が非JSON（プレーンテキスト/HTML）のエラーを返すことがある。
       // res.json() を直接呼ぶと「Unexpected token」で落ちるため、まずテキストで受けてから解析する。
       const rawBody = await res.text();
-      let data: { error?: string; code?: string; learningCard?: LearningCardView; strictLearning?: StrictLearningOutput } = {};
+      let data: { error?: string; code?: string; learningCard?: LearningCardView; strictLearning?: StrictLearningOutput; learningStatus?: LearningStatusView; missingSources?: Array<{ label?: string; reason?: string }>; materials?: LearningMaterialView[] } = {};
       try {
         data = rawBody ? JSON.parse(rawBody) : {};
       } catch {
@@ -409,9 +434,25 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
         if (data.code === "GROK_TOKEN_EXPIRED") {
           setTokenExpired(true);
         }
+        if (data.code === "LEARNING_MATERIALS_INCOMPLETE") {
+          setIncompleteGenerationAvailable(true);
+          const missing = (data.missingSources || []).map((source) => `${source.label || "補助情報"}: ${source.reason || "内容を準備してください"}`);
+          if (data.materials) {
+            setLearningStatus((current) => ({
+              isStale: Boolean(current?.isStale),
+              materialFingerprint: current?.materialFingerprint || "",
+              generatedFingerprint: current?.generatedFingerprint || null,
+              materials: data.materials || current?.materials || [],
+              missingSources: missing.map((reason, index) => ({ sourceId: String(index), kind: "", label: reason.split(":")[0], reason: reason.split(":").slice(1).join(":").trim() })),
+            }));
+          }
+          throw new Error(`${data.error || "補助情報が不足しています"}${missing.length ? `\n\n${missing.join("\n")}` : ""}`);
+        }
         throw new Error(data.error || `学習カードの生成に失敗しました (HTTP ${res.status})`);
       }
       setCard(data.learningCard || null);
+      setLearningStatus(data.learningStatus || null);
+      setIncompleteGenerationAvailable(false);
       // 厳密学習はこのレスポンスには含まれない（別ルートで生成）。状態をリセットして後追い生成する。
       setStrictLearning(null);
       setStrictError(null);
@@ -624,7 +665,7 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
   }
 
   return (
-    <div className="mx-auto max-w-4xl space-y-5 sm:space-y-6">
+    <div className="mx-auto min-w-0 max-w-4xl space-y-5 wrap-anywhere sm:space-y-6">
       <button
         onClick={safeBack}
         className="flex items-center gap-1.5 text-sm text-text-secondary transition-colors hover:text-text"
@@ -712,6 +753,25 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
           )}
         </div>
       </div>
+
+      {learningStatus?.isStale && card && (
+        <div className="flex flex-col gap-3 rounded-xl border border-warning/30 bg-warning-light px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <p className="text-sm font-bold text-text">補助情報が更新されています</p>
+            <p className="mt-1 text-xs leading-relaxed text-text-secondary">
+              画像・動画・記事・関連リンクの内容がカード作成時と異なります。再生成すると、最新の学習素材を反映します。
+            </p>
+          </div>
+          <Button onClick={() => void handleGenerate()} loading={generating} loadingLabel="再生成中..." className="w-full flex-shrink-0 sm:w-auto">
+            補助情報を反映して再生成
+          </Button>
+          {incompleteGenerationAvailable && (
+            <Button variant="secondary" onClick={() => void handleGenerate(undefined, true)} loading={generating} loadingLabel="除外して生成中..." className="w-full flex-shrink-0 sm:w-auto">
+              未取得の素材を除外して生成
+            </Button>
+          )}
+        </div>
+      )}
 
       {/* Post card */}
       <Card>
@@ -886,7 +946,7 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
             <div className="space-y-4">
               <div className="flex items-start gap-3 rounded-xl border border-warning/30 bg-warning-light px-4 py-3">
                 <AlertCircle className="mt-0.5 h-5 w-5 flex-shrink-0 text-warning" />
-                <div>
+                <div className="min-w-0 flex-1">
                   <p className="text-sm font-bold text-text">Grok認証の有効期限が切れました</p>
                   <p className="mt-1 text-sm text-text-secondary">
                     ローカルで再認証してからもう一度お試しください。
@@ -924,6 +984,11 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
                 <Sparkles className="mr-1.5 h-4 w-4" />
                 {error ? "再生成" : "学習する"}
               </Button>
+              {incompleteGenerationAvailable && (
+                <Button variant="secondary" onClick={() => void handleGenerate(undefined, true)} loading={generating} loadingLabel="除外して生成中..." className="w-full sm:w-auto">
+                  未取得の素材を除外して生成
+                </Button>
+              )}
             </div>
           )}
         </Card>
@@ -932,7 +997,7 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
           {generating && (
             <div className="flex items-center gap-3 rounded-xl border border-accent/30 bg-accent-light/40 px-4 py-3">
               <Loader2 className="h-4 w-4 flex-shrink-0 animate-spin text-accent" />
-              <p className="text-sm text-text">
+              <p className="min-w-0 flex-1 text-sm text-text">
                 選択したモデルで学習カードを作り直しています…（内容量により数分かかることがあります）
               </p>
               <Button type="button" variant="secondary" onClick={cancelGenerate} className="shrink-0">
@@ -956,13 +1021,17 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
               <p className="mb-4 text-base font-semibold text-text">{output.title}</p>
             )}
             <div className="space-y-4">
-              <p className="whitespace-pre-wrap text-sm leading-relaxed text-text">{output.summary}</p>
+              {/* 解読がある場合は oneLiner（正体）を代表に立て、summary との二重ワンライナーを避ける */}
+              <p className="whitespace-pre-wrap text-sm leading-relaxed text-text">
+                {output.decode?.oneLiner || output.summary}
+              </p>
               <div className="grid gap-3 sm:grid-cols-2">
                 <div className="rounded-xl bg-accent-subtle px-4 py-3">
                   <p className="mb-1 text-xs font-medium text-accent">投稿者の狙い</p>
                   <p className="text-sm leading-relaxed text-text">{output.originalIntent}</p>
                 </div>
-                {(output.whyForYou || output.whatIsInteresting) && (
+                {/* 旧カードのみ。解読の whySignificant があるカードでは重複するため出さない */}
+                {!output.decode?.whySignificant?.length && (output.whyForYou || output.whatIsInteresting) && (
                   <div className="rounded-xl bg-border-light px-4 py-3">
                     <p className="mb-1 text-xs font-medium text-text-muted">なぜ見る価値があるか</p>
                     <p className="text-sm leading-relaxed text-text">{output.whyForYou || output.whatIsInteresting}</p>
@@ -972,13 +1041,38 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
             </div>
           </Card>
 
+          {output.learningMetadata?.sources && output.learningMetadata.sources.length > 0 && (
+            <Card>
+              <SectionHeader icon={BookOpen} title="参照した学習素材" />
+              <div className="space-y-2">
+                {output.learningMetadata.sources.map((source) => {
+                  const status = source.status === "ready" ? "準備済み" : source.status === "failed" ? "取得失敗" : source.status === "excluded" ? "除外" : "未取得";
+                  return (
+                    <div key={source.sourceId} className="rounded-xl border border-border px-4 py-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <p className="min-w-0 text-sm font-semibold text-text">{source.label}</p>
+                        <span className={`flex-shrink-0 text-xs ${source.used ? "text-success" : "text-danger"}`}>
+                          {source.used ? "参照済み" : status}
+                        </span>
+                      </div>
+                      {source.quote && (
+                        <p className="mt-1 whitespace-pre-wrap break-words text-xs leading-relaxed text-text-secondary">根拠: 「{source.quote}」</p>
+                      )}
+                      {!source.used && source.reason && (
+                        <p className="mt-1 text-xs leading-relaxed text-danger">{source.reason}</p>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </Card>
+          )}
+
           {/* 解読（SeedThought 2）: なぜすごいのか・before/after */}
           {output.decode && (
             <Card>
               <SectionHeader icon={Lightbulb} title="なぜすごいのか（解読）" />
-              {output.decode.oneLiner && (
-                <p className="mb-4 text-base font-semibold text-text">{output.decode.oneLiner}</p>
-              )}
+              {/* oneLiner は「一言でいうと」カードに出すためここでは重複表示しない */}
               <div className="space-y-2.5">
                 {output.decode.whySignificant.map((w, i) => (
                   <div key={`why-${i}`} className="rounded-xl border border-border px-4 py-3">
@@ -1203,10 +1297,14 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
           {/* 周辺情報（background context） */}
           {output.backgroundContext && (() => {
             const bg = output.backgroundContext;
+            // 旧カードは origin/relatedFrameworks を持つが、解読側に同じ役割の
+            // lineage/adjacentPatterns があるカードでは二重表示になるため出さない
+            const lineageShown = Boolean(output.decode?.mechanism?.lineage);
+            const adjacentShown = Boolean(output.decode?.adjacentPatterns?.length);
             const hasContent =
-              bg.origin ||
+              (bg.origin && !lineageShown) ||
               bg.historicalContext ||
-              (bg.relatedFrameworks && bg.relatedFrameworks.length > 0) ||
+              (bg.relatedFrameworks && bg.relatedFrameworks.length > 0 && !adjacentShown) ||
               (bg.referencedWorks && bg.referencedWorks.length > 0) ||
               (bg.furtherReading && bg.furtherReading.length > 0);
             if (!hasContent) return null;
@@ -1216,25 +1314,25 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
                 {bg.postType && (
                   <p className="mb-4 text-xs text-text-muted">投稿タイプ: {bg.postType}</p>
                 )}
-                <div className="space-y-4">
-                  {bg.origin && (
-                    <div className="rounded-xl border border-border px-4 py-3">
+                <div className="min-w-0 space-y-4 wrap-anywhere">
+                  {bg.origin && !lineageShown && (
+                    <div className="min-w-0 rounded-xl border border-border px-4 py-3">
                       <p className="mb-1 text-xs font-medium text-text-muted">原典・出典</p>
-                      <p className="whitespace-pre-wrap text-sm leading-relaxed text-text">{safeStr(bg.origin)}</p>
+                      <p className="whitespace-pre-wrap wrap-anywhere text-sm leading-relaxed text-text">{safeStr(bg.origin)}</p>
                     </div>
                   )}
                   {bg.historicalContext && (
-                    <div className="rounded-xl border border-border px-4 py-3">
+                    <div className="min-w-0 rounded-xl border border-border px-4 py-3">
                       <p className="mb-1 text-xs font-medium text-text-muted">時代背景・文脈</p>
-                      <p className="whitespace-pre-wrap text-sm leading-relaxed text-text">{safeStr(bg.historicalContext)}</p>
+                      <p className="whitespace-pre-wrap wrap-anywhere text-sm leading-relaxed text-text">{safeStr(bg.historicalContext)}</p>
                     </div>
                   )}
-                  {bg.relatedFrameworks && bg.relatedFrameworks.length > 0 && (
+                  {bg.relatedFrameworks && bg.relatedFrameworks.length > 0 && !adjacentShown && (
                     <div>
                       <p className="mb-2 text-sm font-semibold text-text">類似フレームワーク・関連する考え方</p>
                       <div className="space-y-2">
                         {bg.relatedFrameworks.map((f, i) => (
-                          <div key={`${f.name}-${i}`} className="rounded-xl border border-border px-4 py-3">
+                          <div key={`${f.name}-${i}`} className="min-w-0 rounded-xl border border-border px-4 py-3">
                             <p className="mb-1 text-sm font-semibold text-text">{f.name}</p>
                             <p className="mb-1 text-sm leading-relaxed text-text-secondary">{f.description}</p>
                             {f.relation && (
@@ -1250,7 +1348,7 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
                       <p className="mb-2 text-sm font-semibold text-text">投稿で言及されているもの</p>
                       <div className="space-y-2">
                         {bg.referencedWorks.map((w, i) => (
-                          <div key={`${w.name}-${i}`} className="rounded-xl bg-border-light px-4 py-3">
+                          <div key={`${w.name}-${i}`} className="min-w-0 rounded-xl bg-border-light px-4 py-3">
                             <p className="mb-1 text-sm font-semibold text-text">{w.name}</p>
                             <p className="text-sm leading-relaxed text-text-secondary">{w.context}</p>
                           </div>
@@ -1263,7 +1361,7 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
                       <p className="mb-2 text-sm font-semibold text-text">もっと知りたい人へ</p>
                       <div className="space-y-2">
                         {bg.furtherReading.map((r, i) => (
-                          <div key={`${r.topic}-${i}`} className="rounded-xl border border-border px-4 py-3">
+                          <div key={`${r.topic}-${i}`} className="min-w-0 rounded-xl border border-border px-4 py-3">
                             <p className="mb-1 text-sm font-semibold text-text">{r.topic}</p>
                             <p className="text-sm leading-relaxed text-text-secondary">{r.reason}</p>
                           </div>
@@ -1280,19 +1378,19 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
           {output.steps && output.steps.length > 0 && (
           <Card>
             <SectionHeader icon={ListChecks} title="実践手順" />
-            <div className="space-y-4">
+            <div className="min-w-0 space-y-4 wrap-anywhere">
               {output.steps.map((step, index) => (
                 <div key={`${step.title}-${index}`} className="rounded-xl border border-border px-4 py-4">
                   <div className="mb-2 flex items-center gap-2">
                     <Badge variant="learning">{index + 1}</Badge>
-                    <p className="text-sm font-semibold text-text">{step.title}</p>
+                    <p className="min-w-0 wrap-anywhere text-sm font-semibold text-text">{step.title}</p>
                   </div>
                   <p className="mb-3 text-sm leading-relaxed text-text-secondary">{step.description}</p>
                   <ul className="space-y-1.5">
                     {step.actions.map((action, actionIndex) => (
                       <li key={`${action}-${actionIndex}`} className="flex gap-2 text-sm text-text">
                         <CheckCircle2 className="mt-0.5 h-4 w-4 flex-shrink-0 text-success" />
-                        {action}
+                        <span className="min-w-0 wrap-anywhere">{action}</span>
                       </li>
                     ))}
                   </ul>
@@ -1316,7 +1414,7 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
             {strictOpen && (
               <div className="mt-4">
                 {strictLearning ? (
-                  <div className="space-y-4">
+                  <div className="min-w-0 space-y-4 wrap-anywhere">
                     <div className="rounded-xl bg-accent-subtle px-4 py-3">
                       <p className="mb-1 text-xs font-medium text-accent">一言でいうと</p>
                       <p className="text-sm font-medium leading-relaxed text-text">{strictLearning.oneLiner}</p>
@@ -1358,7 +1456,7 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
                             {strictLearning.strictLearningView.positiveExamples.map((ex, i) => (
                               <li key={i} className="flex gap-2 text-sm text-text">
                                 <CheckCircle2 className="mt-0.5 h-4 w-4 flex-shrink-0 text-success" />
-                                {ex}
+                                <span className="min-w-0 wrap-anywhere">{ex}</span>
                               </li>
                             ))}
                           </ul>
@@ -1369,7 +1467,7 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
                             {strictLearning.strictLearningView.negativeExamples.map((ex, i) => (
                               <li key={i} className="flex gap-2 text-sm text-text-secondary">
                                 <span className="mt-0.5 flex-shrink-0 text-danger font-bold">✗</span>
-                                {ex}
+                                <span className="min-w-0 wrap-anywhere">{ex}</span>
                               </li>
                             ))}
                           </ul>
@@ -1380,7 +1478,7 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
                             {strictLearning.strictLearningView.boundaryExamples.map((ex, i) => (
                               <li key={i} className="flex gap-2 text-sm text-text-secondary">
                                 <span className="flex-shrink-0 text-warning">△</span>
-                                {ex}
+                                <span className="min-w-0 wrap-anywhere">{ex}</span>
                               </li>
                             ))}
                           </ul>
@@ -1438,7 +1536,7 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
                         {strictLearning.fifteenMinuteExercise.steps.map((step, i) => (
                           <div key={i} className="flex gap-2 text-sm text-text">
                             <span className="flex-shrink-0 font-medium text-accent">{i + 1}.</span>
-                            {step}
+                            <span className="min-w-0 wrap-anywhere">{step}</span>
                           </div>
                         ))}
                       </div>
@@ -1704,7 +1802,7 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
                   onChange={(e) => setCiteAuthor(e.target.checked)}
                   className="mt-0.5 h-4 w-4 flex-shrink-0 accent-accent"
                 />
-                <span className="text-xs leading-relaxed text-text-secondary">
+                <span className="min-w-0 wrap-anywhere text-xs leading-relaxed text-text-secondary">
                   <span className="font-medium text-text">引用元アカウントを明記する</span>
                   <br />
                   オンにすると @ユーザー名・氏名を出典として本文に入れます。オフのときは投稿者を特定せず匿名の引用で生成します。
@@ -1724,7 +1822,7 @@ export default function PostLearningPage({ params }: { params: Promise<{ postId:
             {outputError && (
               <div className="mt-3 flex items-start gap-2 rounded-xl border border-danger/20 bg-danger-light p-3">
                 <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0 text-danger" />
-                <p className="text-sm text-danger">{outputError}</p>
+                <p className="min-w-0 flex-1 wrap-anywhere text-sm text-danger">{outputError}</p>
               </div>
             )}
           </Card>

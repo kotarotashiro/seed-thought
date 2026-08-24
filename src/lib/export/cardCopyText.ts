@@ -39,7 +39,10 @@ export function buildCardCopyText(
     const parts: string[] = [];
     if (output.summary) parts.push(`**一言でいうと**\n${output.summary}`);
     if (output.originalIntent) parts.push(`**投稿者の狙い**\n${output.originalIntent}`);
-    if (output.whyForYou) parts.push(`**なぜ見る価値があるか**\n${output.whyForYou}`);
+    // 旧カードのみ。解読の whySignificant があるカードでは重複するため省く
+    if (output.whyForYou && !output.decode?.whySignificant?.length) {
+      parts.push(`**なぜ見る価値があるか**\n${output.whyForYou}`);
+    }
     if (parts.length) sections.push(`## 一言でいうと\n\n${parts.join("\n\n")}`);
   }
 
@@ -148,9 +151,10 @@ export function buildCardCopyText(
     if (bg) {
       const parts: string[] = [];
       if (bg.postType) parts.push(`**投稿タイプ**: ${bg.postType}`);
-      if (bg.origin) parts.push(`**原典・出典**\n${bg.origin}`);
+      // 旧カードの origin/relatedFrameworks は、解読側に同役割の lineage/adjacentPatterns があれば省く
+      if (bg.origin && !output.decode?.mechanism?.lineage) parts.push(`**原典・出典**\n${bg.origin}`);
       if (bg.historicalContext) parts.push(`**時代背景・文脈**\n${bg.historicalContext}`);
-      if (bg.relatedFrameworks && bg.relatedFrameworks.length > 0) {
+      if (bg.relatedFrameworks && bg.relatedFrameworks.length > 0 && !output.decode?.adjacentPatterns?.length) {
         parts.push(
           `**類似フレームワーク・関連する考え方**\n${bg.relatedFrameworks
             .map((f) => `- **${f.name}**: ${f.description}\n  - 関係: ${f.relation}`)

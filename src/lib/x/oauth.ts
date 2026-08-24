@@ -4,8 +4,15 @@ import crypto from "crypto";
 const AUTH_URL = "https://twitter.com/i/oauth2/authorize";
 const TOKEN_URL = "https://api.twitter.com/2/oauth2/token";
 
-const REQUIRED_SCOPES = ["tweet.read", "users.read", "offline.access", "like.read", "bookmark.read"];
-const DEFAULT_SCOPES = [...REQUIRED_SCOPES, "tweet.write"];
+const REQUIRED_SCOPES = [
+  "tweet.read",
+  "tweet.write",
+  "users.read",
+  "offline.access",
+  "like.read",
+  "bookmark.read",
+];
+const DEFAULT_SCOPES = [...REQUIRED_SCOPES];
 
 function getClientId(): string {
   const clientId = process.env.X_CLIENT_ID;

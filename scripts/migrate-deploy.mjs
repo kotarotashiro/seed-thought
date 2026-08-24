@@ -18,6 +18,7 @@
 // The migration URL preference matches prisma.config.ts:
 //   DIRECT_URL ?? DATABASE_URL
 
+import "dotenv/config";
 import { spawn } from "node:child_process";
 import pg from "pg";
 

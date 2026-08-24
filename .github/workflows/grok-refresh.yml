@@ -6,8 +6,9 @@ name: Keep Grok OAuth warm
 
 on:
   schedule:
-    # 毎時17分（UTC基準）。毎時0分の混雑による大幅遅延を避ける。
-    - cron: "17 * * * *"
+    # JST 08:00〜00:59 の毎時17分。JST 01:00〜07:59 は更新しない。
+    # UTC では 23時と0〜15時が実行対象。
+    - cron: "17 0-15,23 * * *"
   workflow_dispatch: {} # 手動実行も可能
 
 permissions:

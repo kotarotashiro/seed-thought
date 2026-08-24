@@ -10,6 +10,7 @@ import type {
   PostSummaryForTrend,
   SeminarContent,
   SeminarDesign,
+  LearningMaterial,
   SourcePostForLearning,
   SynthesisInput,
   TranslateTextInput,
@@ -91,6 +92,23 @@ const MAX_ARTICLE_CHARS = 6000;
 const MAX_TRANSCRIPT_CHARS = 8000;
 const MAX_IMAGE_CHARS = 4000;
 
+export function buildLearningMaterialsBlock(materials: LearningMaterial[] | undefined): string {
+  if (!materials || materials.length === 0) return "";
+  return `## 共通学習素材（本体・補足・解読・検品・厳密学習の全工程で同じ素材集合を使用）
+${materials
+  .map((material) => {
+    const status = material.status === "ready" ? "準備済み" : material.status === "missing" ? "未取得" : material.status === "failed" ? "取得失敗" : "除外";
+    const quality = material.quality ? ` / 品質: ${material.quality}` : "";
+    const location = material.url ? `\nURL: ${material.url}` : "";
+    const body = material.content ? `\n内容:\n${truncateForPrompt(material.content, 8000)}` : "";
+    const reason = material.reason ? `\n理由: ${material.reason}` : "";
+    return `### ${material.label}（${material.kind} / ${status}${quality}）${location}${body}${reason}`;
+  })
+  .join("\n\n")}
+注意: URLや画像URLの存在だけを内容として扱わない。準備済み素材の内容だけを根拠にし、未取得・失敗・除外素材は推測で補わないこと。
+`;
+}
+
 function truncateForPrompt(text: string | undefined | null, max: number): string | undefined {
   if (text == null) return undefined;
   if (text.length <= max) return text;
@@ -134,13 +152,18 @@ function buildLearningInputBlock(input: SourcePostForLearning): string {
     .join("\n\n");
   // 巨大ツリー対策：JSON に載せる本文系フィールドも切り詰めてから整形する。
   // 画像説明は上の専用セクションで渡すため、JSON 側の media からは除いて重複と肥大化を防ぐ。
-  const trimmedInput: SourcePostForLearning = {
-    ...input,
+  const { learningMaterials, ...inputWithoutMaterials } = input;
+  const trimmedInput: Omit<SourcePostForLearning, "learningMaterials"> = {
+    ...inputWithoutMaterials,
     text: truncateForPrompt(input.text, MAX_POST_TEXT_CHARS) ?? input.text,
     translatedText: truncateForPrompt(input.translatedText, MAX_POST_TEXT_CHARS),
     articleDescription,
     videoTranscript,
-    media: input.media?.map(({ description: _description, ...rest }) => rest),
+    media: input.media?.map((media) => {
+      const copy = { ...media };
+      delete copy.description;
+      return copy;
+    }),
   };
 
   return `${input.articleTitle || articleDescription ? `## 記事情報（投稿リンク先の内容）
@@ -150,7 +173,7 @@ ${articleDescription ? `内容: ${articleDescription}` : ""}
 ${videoTranscript}
 ` : ""}${imageBlock ? `## 画像の内容（投稿に添付された画像をAIが読み取ったもの。本文と同等に重視すること）
 ${imageBlock}
-` : ""}## 投稿データ
+` : ""}${buildLearningMaterialsBlock(learningMaterials)}## 投稿データ
 ${JSON.stringify(trimmedInput, null, 2)}`;
 }
 
@@ -179,7 +202,6 @@ ${buildLearningInputBlock(input)}
   "title": "学習カードのタイトル（バズタイトル禁止、構造的に）",
   "summary": "一言でいうと（オリエンテーション。1〜2文、長くしない）",
   "originalIntent": "投稿者が本当に伝えたかったこと",
-  "whyForYou": "なぜこの投稿を見る価値があるか（1〜2文）",
   "capture": {
     "format": "list | steps | claims | template | narrative のいずれか",
     "headline": "投稿の中身を一言で表す見出し（例: コンバートするヒーローの10要素）",
@@ -215,6 +237,10 @@ ${buildLearningInputBlock(input)}
 - 「10個ある」と数だけ言って中身を省略するのは禁止。10個あるなら items に10個全部入れる
 - 抽象化・批評・自分の言葉への変換はしない（それは別セクションの仕事）
 - 投稿のノイズ（煽り・自分語り・宣伝・URL・CTA）は削り、価値のある中身だけ残す
+
+## steps（実践手順）の作法
+- steps は「ユーザーが今日実行するための最小手順」（3〜5個）。capture の繰り返しにしない
+- capture の format が steps（手順の転写）のときは、同じ手順を steps に再掲しない。準備・順番・つまずきやすい箇所など「実行するとき目線」の情報だけを書き、付け足すことが無ければ steps は空配列 [] でよい
 
 ## 最終確認
 - すべての必須フィールドを省略しない
@@ -259,11 +285,7 @@ ${buildLearningInputBlock(input)}
   "userLearningMemo": "あとで見返すための学習メモ",
   "backgroundContext": {
     "postType": "判定タイプ（例: 既存概念の解説/著者の経験/ハウツー/統計/エッセイ/製品紹介/感想）",
-    "origin": "原典・出典を1つの文字列で記述（例: 「ダニエル・カーネマン『ファスト＆スロー』2011年 https://...」）。オブジェクト不可。該当しない場合は null",
     "historicalContext": "時代背景・なぜこの主張が生まれたか。該当しない場合は null",
-    "relatedFrameworks": [
-      { "name": "類似フレームワーク名", "description": "説明", "relation": "どう似ているか・違うか" }
-    ],
     "referencedWorks": [
       { "name": "投稿で言及されている本・人物・概念", "context": "補足説明" }
     ],
@@ -280,12 +302,13 @@ ${beginnerTeachingRules}
 
 ## 周辺情報（backgroundContext）の作法
 「勉強できる人」として、投稿を理解するための周辺情報を提供する。
+原典・出典と類似の型・フレームワークは別工程（解読）が担当するため、ここでは出力しない。
 まず投稿のタイプを判定し、活きるフィールドのみを埋める：
-- 既存概念・著作・出来事の解説 → 原典・時代背景・類似フレームワーク全て
-- 著者の経験・気づき → 類似する考え方が中心、原典は「投稿者自身の主張」
-- ハウツー・チュートリアル → 公式ソース・代替手段・用語解説
-- 統計・データ・ニュース → 一次ソース・推移・関連レポート
-- エッセイ・思想・社会論 → 類似する論者・批判的見解
+- 既存概念・著作・出来事の解説 → 時代背景・言及されている著作の補足
+- 著者の経験・気づき → 言及されている概念の補足が中心
+- ハウツー・チュートリアル → 公式ソースへの導線（furtherReading）・用語解説
+- 統計・データ・ニュース → 一次ソースへの導線（furtherReading）・推移の文脈
+- エッセイ・思想・社会論 → 時代背景・類似する論者への導線（furtherReading）
 - 短い感想・ジョーク・ミーム → 周辺情報はほぼ空でよい
 
 該当しないサブフィールドは null または空配列 []。不確かな情報は「諸説あり」と明示。
@@ -403,6 +426,7 @@ export function buildDecodeReviewPrompt(decodeJson: string, input: SourcePostFor
 ## 元投稿
 ${postText}
 ${input.translatedText ? `\n## 日本語訳\n${truncateForPrompt(input.translatedText, MAX_POST_TEXT_CHARS)}\n` : ""}
+${buildLearningMaterialsBlock(input.learningMaterials)}
 ## 解読JSON（検品対象）
 ${decodeJson}
 
@@ -427,6 +451,7 @@ export async function buildStrictLearningPrompt(input: {
   articleDescription?: string;
   learningCardJson?: string;
   userMemo?: string | null;
+  learningMaterials?: LearningMaterial[];
 }): Promise<string> {
   const profile = await getProfile();
 
@@ -448,6 +473,7 @@ ${WRITER_VOICE_RULES}
 ${input.postText}
 
 ${articleSection}
+${buildLearningMaterialsBlock(input.learningMaterials)}
 ## 投稿分類
 カテゴリ: ${input.classification.primaryCategory}
 要約: ${input.classification.summary}

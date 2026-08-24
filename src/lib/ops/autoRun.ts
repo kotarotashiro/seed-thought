@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db/prisma";
+import { FEATURE_POLICY } from "./featurePolicy";
 
 const QUOTA_STATE_KEY = "ops_quota_state";
 const USAGE_KEY_PREFIX = "ops_usage:";
@@ -200,6 +201,10 @@ export async function recordAutoEnrichUsage(processedCount: number): Promise<voi
 }
 
 export async function canRunAutoLearn(requestedLimit: number): Promise<AutoRunDecision> {
+  if (!FEATURE_POLICY.autoLearn) {
+    return { allowed: false, reason: "AutoLearn is stopped by operating policy", limit: 0 };
+  }
+
   if (!envFlag("AUTO_LEARN_ENABLED", true)) {
     return { allowed: false, reason: "AUTO_LEARN_ENABLED is off", limit: 0 };
   }
@@ -258,10 +263,10 @@ export async function recordAutoClassifyUsage(processedCount: number): Promise<v
 }
 
 export function autoRecommendationsEnabled(): boolean {
-  return envFlag("AUTO_RECOMMEND_ENABLED", false);
+  return FEATURE_POLICY.autoRecommendations && envFlag("AUTO_RECOMMEND_ENABLED", false);
 }
 
 export function autoTrendDigestEnabled(): boolean {
-  return envFlag("AUTO_TREND_DIGEST_ENABLED", false);
+  return FEATURE_POLICY.trendGeneration && envFlag("AUTO_TREND_DIGEST_ENABLED", false);
 }
 

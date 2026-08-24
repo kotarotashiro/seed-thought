@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
 import { refreshStoredXaiTokens } from "@/lib/xai/refresh";
+import {
+  GROK_REFRESH_PAUSE_REASON,
+  isScheduledGrokRefreshAllowed,
+} from "@/lib/ops/featurePolicy";
 
 // Manual / fallback endpoint for refreshing Grok OAuth tokens.
 // In production, this is also called from /api/cron/x-sync once per day to stay
@@ -18,6 +22,15 @@ function isAuthorized(request: Request): boolean {
 export async function GET(request: Request) {
   if (!isAuthorized(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  if (!isScheduledGrokRefreshAllowed()) {
+    return NextResponse.json({
+      ok: true,
+      skipped: true,
+      code: "quiet_hours",
+      reason: GROK_REFRESH_PAUSE_REASON,
+    });
   }
 
   try {

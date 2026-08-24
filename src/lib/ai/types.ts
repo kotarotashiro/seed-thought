@@ -12,6 +12,53 @@ export interface TranslateTextInput {
   text: string;
 }
 
+export type LearningMaterialKind =
+  | "post"
+  | "thread"
+  | "image"
+  | "video_transcript"
+  | "article"
+  | "related_link";
+
+export type LearningMaterialStatus = "ready" | "missing" | "failed" | "excluded";
+
+export type LearningMaterialQuality = "full" | "summary" | "metadata_only";
+
+/**
+ * 学習カードの全工程が共有する、投稿の事実上の入力素材。
+ * URLやメディアの存在だけでは ready にせず、実際の内容を content に持つ。
+ */
+export interface LearningMaterial {
+  id: string;
+  kind: LearningMaterialKind;
+  label: string;
+  url?: string;
+  content: string;
+  status: LearningMaterialStatus;
+  quality?: LearningMaterialQuality;
+  reason?: string;
+}
+
+export interface LearningSourceEvidence {
+  sourceId: string;
+  label: string;
+  kind: LearningMaterialKind;
+  used: boolean;
+  quote?: string;
+  reason?: string;
+  status?: LearningMaterialStatus;
+  quality?: LearningMaterialQuality;
+}
+
+export interface LearningGenerationMetadata {
+  version: 1;
+  materialFingerprint: string;
+  sources: LearningSourceEvidence[];
+  generatedAt: string;
+  /** ユーザーが明示的に未取得素材を除外して生成した場合のみ記録する。 */
+  excludedSourceIds?: string[];
+}
+
 export interface SourcePostForLearning {
   id: string;
   authorName: string;
@@ -27,6 +74,8 @@ export interface SourcePostForLearning {
     altText?: string;
     /** ビジョンモデルが読み取った画像の中身（テキスト/図/スクショの説明） */
     description?: string;
+    /** 自動読み取りが失敗した場合の表示用情報（内容としては学習に使わない） */
+    analysisError?: string;
   }[];
   tags?: string[];
   genre?: string;
@@ -38,6 +87,8 @@ export interface SourcePostForLearning {
   articleDescription?: string;
   /** User-pasted video transcript */
   videoTranscript?: string;
+  /** 共通学習素材。本文・補足・解読・検品・厳密学習で同じ集合を使う。 */
+  learningMaterials?: LearningMaterial[];
   /** Learning mode: "content" extracts the topic itself, "format" extracts reusable patterns */
   learningMode?: "content" | "format";
 }
@@ -167,7 +218,7 @@ export interface LearningOutput {
   summary: string;
   /** 投稿者が本当に伝えたかったこと */
   originalIntent: string;
-  /** なぜあなたが見る価値があるか */
+  /** なぜあなたが見る価値があるか（旧カードのみ。新規生成では decode.whySignificant に一本化） */
   whyForYou?: string;
   /** ① 投稿の中身そのもの（忠実転写） */
   capture?: LearningCapture;
@@ -203,6 +254,8 @@ export interface LearningOutput {
   backgroundContext?: BackgroundContext | null;
   /** 解読器の出力（SeedThought 2）。生成失敗時や旧カードは null/undefined */
   decode?: DecodeOutput | null;
+  /** 生成時点の素材fingerprintと、各素材を使った根拠。旧カードには存在しない。 */
+  learningMetadata?: LearningGenerationMetadata;
   status: "draft" | "saved";
 
   // --- legacy（旧カード互換。新規生成では使わない） ---
@@ -217,8 +270,10 @@ export interface LearningOutput {
 
 /**
  * 投稿を理解するための「周辺情報」。
- * 勉強のできる解説者が補足する形：原典・時代背景・類似フレームワーク等。
+ * 勉強のできる解説者が補足する形：時代背景・言及物の補足・導線。
  * 投稿タイプによって該当しない項目は null/空配列で返す。
+ * origin / relatedFrameworks / terminology は旧カードのみ
+ * （新規生成では decode.mechanism.lineage / decode.adjacentPatterns / beginnerZone.glossary に一本化）。
  */
 export interface BackgroundContext {
   postType?: string | null;
@@ -355,6 +410,8 @@ export interface StrictLearningOutput {
     steps: string[];
     deliverable: string;
   };
+  /** 厳密学習も同じ素材集合で生成したことを追跡するための後方互換メタデータ。 */
+  learningMetadata?: LearningGenerationMetadata;
 }
 
 export interface PostSummaryForSearch {
@@ -434,6 +491,7 @@ export interface AiProvider {
     articleDescription?: string;
     learningCardJson?: string;
     userMemo?: string | null;
+    learningMaterials?: LearningMaterial[];
   }): Promise<StrictLearningOutput>;
   searchSemantically(query: string, posts: PostSummaryForSearch[]): Promise<SemanticSearchResult>;
   analyzeLikeTrends(posts: PostSummaryForTrend[]): Promise<TrendInsight>;

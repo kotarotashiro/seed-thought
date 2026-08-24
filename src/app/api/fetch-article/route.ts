@@ -8,6 +8,7 @@ interface ArticleResult {
   title: string | null;
   description: string | null;
   image: string | null;
+  quality: "full" | "summary" | "metadata_only";
 }
 
 function isUrlLike(s: string): boolean {
@@ -31,7 +32,7 @@ async function fetchWithGrok(url: string): Promise<ArticleResult> {
       const title = parsed.title && !isUrlLike(parsed.title) ? parsed.title : null;
       const description = parsed.description && !isUrlLike(parsed.description) ? parsed.description : null;
       if (title || description) {
-        return { finalUrl: url, title, description, image: null };
+        return { finalUrl: url, title, description, image: null, quality: "summary" };
       }
     } catch {
       // fall through
@@ -50,6 +51,7 @@ async function fetchWithGrok(url: string): Promise<ArticleResult> {
     title: null,
     description: looksUseless ? null : fallback,
     image: null,
+    quality: looksUseless ? "metadata_only" : "summary",
   };
 }
 
@@ -104,7 +106,7 @@ async function fetchWithHtml(url: string): Promise<ArticleResult> {
     const contentType = res.headers.get("content-type") ?? "";
 
     if (!contentType.includes("text/html")) {
-      return { finalUrl, title: null, description: null, image: null };
+      return { finalUrl, title: null, description: null, image: null, quality: "metadata_only" };
     }
 
     const fullText = await res.text();
@@ -121,6 +123,7 @@ async function fetchWithHtml(url: string): Promise<ArticleResult> {
       title: rawTitle ? decodeEntities(rawTitle) : null,
       description: rawDesc ? decodeEntities(rawDesc) : null,
       image: image || null,
+      quality: "metadata_only",
     };
   } catch (err) {
     clearTimeout(timer);
@@ -182,6 +185,7 @@ export async function GET(request: Request) {
         title: null,
         description: cachedPost.text.slice(0, 500),
         image: null,
+        quality: "full",
         isXArticle: true,
         fromCache: true,
       });
@@ -192,6 +196,7 @@ export async function GET(request: Request) {
       title: null,
       description: null,
       image: null,
+      quality: "metadata_only",
       isXArticle: true,
       fromCache: false,
     });

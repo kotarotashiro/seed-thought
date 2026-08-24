@@ -600,6 +600,7 @@ export function getAiProvider(): AiProvider {
       articleDescription?: string;
       learningCardJson?: string;
       userMemo?: string | null;
+      learningMaterials?: import("./types").LearningMaterial[];
     }): Promise<StrictLearningOutput> {
       const ctx = await getClient("generateStrictLearning");
       if (ctx.isMock) return mockProvider.generateStrictLearning(input);

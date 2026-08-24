@@ -98,17 +98,17 @@ export async function GET(request: Request) {
   }
 
   try {
-    const recoveredCount = await recoverStaleTasks();
     const decision = await canRunAutoLearn(1);
     if (!decision.allowed) {
       return NextResponse.json({
         ok: true,
         processedCount: 0,
-        recoveredCount,
+        recoveredCount: 0,
         autoLearnSkipped: decision.reason,
       });
     }
 
+    const recoveredCount = await recoverStaleTasks();
     const { task, skippedCount } = await claimNextTask();
     if (!task) {
       return NextResponse.json({ ok: true, processedCount: 0, skippedCount, recoveredCount });

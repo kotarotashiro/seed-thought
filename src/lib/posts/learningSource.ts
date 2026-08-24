@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db/prisma";
-import type { SourcePostForLearning } from "@/lib/ai/types";
+import type { LearningMaterial, SourcePostForLearning } from "@/lib/ai/types";
 import { buildPostTextWithThread } from "@/lib/posts/threadText";
 import { resolveArticleForAi } from "@/lib/posts/articleContent";
 
@@ -10,6 +10,7 @@ type RawMediaItem = {
   thumbnailUrl?: unknown;
   altText?: unknown;
   description?: unknown;
+  analysisError?: unknown;
 };
 
 export function parseTags(tagsJson?: string | null): string[] {
@@ -54,6 +55,7 @@ export function parseMedia(mediaJson?: string | null): SourcePostForLearning["me
         thumbnailUrl,
         altText: typeof item.altText === "string" ? item.altText : undefined,
         description: typeof item.description === "string" ? item.description : undefined,
+        analysisError: typeof item.analysisError === "string" ? item.analysisError : undefined,
       });
     });
     return parsed;
@@ -76,7 +78,8 @@ export async function getPostForLearning(postId: string) {
 export type PostForLearning = NonNullable<Awaited<ReturnType<typeof getPostForLearning>>>;
 
 export async function buildSourcePost(
-  post: PostForLearning
+  post: PostForLearning,
+  learningMaterials?: LearningMaterial[],
 ): Promise<Omit<SourcePostForLearning, "learningMode">> {
   const threadMedia = post.threadPosts.flatMap((threadPost) => parseMedia(threadPost.mediaJson));
 
@@ -102,5 +105,6 @@ export async function buildSourcePost(
     articleTitle,
     articleDescription,
     videoTranscript: post.videoTranscriptText || undefined,
+    learningMaterials,
   };
 }

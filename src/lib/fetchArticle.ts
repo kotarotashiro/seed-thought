@@ -4,6 +4,7 @@ export interface ArticlePreview {
   title: string | null;
   description: string | null;
   imageUrl: string | null;
+  quality: "full" | "summary" | "metadata_only";
 }
 
 function isUrlLike(s: string): boolean {
@@ -57,7 +58,7 @@ async function fetchWithJina(url: string): Promise<ArticlePreview> {
     const description = body.slice(0, 8_000);
     if (!description) throw new Error("Jina returned empty body");
 
-    return { title, description, imageUrl: null };
+    return { title, description, imageUrl: null, quality: "full" };
   } catch (err) {
     clearTimeout(timer);
     throw err instanceof Error ? err : new Error("Jina fetch failed");
@@ -79,12 +80,17 @@ async function fetchWithGrok(url: string): Promise<ArticlePreview> {
         const title = parsed.title && !isUrlLike(parsed.title) ? parsed.title : null;
         const description = parsed.description && !isUrlLike(parsed.description) ? parsed.description : null;
         if (title || description) {
-          return { title, description, imageUrl: null };
+          return { title, description, imageUrl: null, quality: "summary" };
         }
       } catch { /* fall through */ }
     }
     const fallback = content.trim().slice(0, 300);
-    return { title: null, description: fallback && !isUrlLike(fallback) ? fallback : null, imageUrl: null };
+    return {
+      title: null,
+      description: fallback && !isUrlLike(fallback) ? fallback : null,
+      imageUrl: null,
+      quality: fallback && !isUrlLike(fallback) ? "summary" : "metadata_only",
+    };
   } catch {
     throw new Error("Grok fetch failed");
   }
@@ -131,7 +137,7 @@ async function fetchWithHtml(url: string): Promise<ArticlePreview> {
     clearTimeout(timer);
 
     const contentType = res.headers.get("content-type") ?? "";
-    if (!contentType.includes("text/html")) return { title: null, description: null, imageUrl: null };
+    if (!contentType.includes("text/html")) return { title: null, description: null, imageUrl: null, quality: "metadata_only" };
 
     const html = (await res.text()).slice(0, 200_000);
     const rawTitle =
@@ -144,6 +150,7 @@ async function fetchWithHtml(url: string): Promise<ArticlePreview> {
       title: rawTitle ? decodeEntities(rawTitle) : null,
       description: rawDesc ? decodeEntities(rawDesc) : null,
       imageUrl: image || null,
+      quality: "metadata_only",
     };
   } catch {
     clearTimeout(timer);
@@ -184,6 +191,6 @@ export async function fetchArticlePreview(url: string): Promise<ArticlePreview> 
   try {
     return await fetchWithHtml(url);
   } catch {
-    return { title: null, description: null, imageUrl: null };
+    return { title: null, description: null, imageUrl: null, quality: "metadata_only" };
   }
 }

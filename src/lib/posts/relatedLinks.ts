@@ -12,6 +12,9 @@ export interface RelatedLink {
   description: string | null;
   imageUrl: string | null;
   fetchedAt: string;
+  quality?: "full" | "summary" | "metadata_only";
+  status?: "ready" | "failed";
+  reason?: string;
 }
 
 function normalizeUrl(raw: string): string {
@@ -113,9 +116,21 @@ export async function enrichPostRelatedLinks(
         description: r.value.description,
         imageUrl: r.value.imageUrl,
         fetchedAt: new Date().toISOString(),
+        quality: r.value.quality,
+        status: r.value.title || r.value.description ? "ready" : "failed",
+        reason: r.value.title || r.value.description ? undefined : "リンクの内容を取得できませんでした",
       });
     } else {
       console.warn(`[relatedLinks] failed to fetch ${url}:`, r.reason);
+      fetched.push({
+        url,
+        title: null,
+        description: null,
+        imageUrl: null,
+        fetchedAt: new Date().toISOString(),
+        status: "failed",
+        reason: r.reason instanceof Error ? r.reason.message : "リンクの内容を取得できませんでした",
+      });
     }
   });
 

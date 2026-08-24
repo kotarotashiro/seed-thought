@@ -89,28 +89,16 @@ export default function InsightsPage() {
   const [reanalyzing, setReanalyzing] = useState(false);
   const [error, setError] = useState("");
   const [trend, setTrend] = useState<TrendDigest | null>(null);
-  const [trendLoading, setTrendLoading] = useState(false);
 
-  const loadTrend = async (force = false) => {
+  const loadTrend = async () => {
     try {
-      if (force) {
-        setTrendLoading(true);
-        const res = await fetch("/api/trend-digest", { method: "POST" });
-        if (res.ok) {
-          const d = await res.json();
-          if (d?.content) setTrend(d);
-        }
-      } else {
-        const res = await fetch("/api/trend-digest");
-        if (res.ok) {
-          const d = await res.json();
-          if (d?.content) setTrend(d);
-        }
+      const res = await fetch("/api/trend-digest");
+      if (res.ok) {
+        const d = await res.json();
+        if (d?.content) setTrend(d);
       }
     } catch {
       // ignore
-    } finally {
-      setTrendLoading(false);
     }
   };
 
@@ -243,10 +231,9 @@ export default function InsightsPage() {
                 <Globe className="h-5 w-5 text-text-secondary" />
                 <h3 className="text-sm font-semibold text-text">X 最新トレンド（あなたのカテゴリ）</h3>
               </div>
-              <Button variant="ghost" size="sm" onClick={() => loadTrend(true)} disabled={trendLoading}>
-                <RefreshCw className={`mr-1.5 h-4 w-4 ${trendLoading ? "animate-spin" : ""}`} />
-                {trendLoading ? "取得中..." : trend ? "更新" : "取得"}
-              </Button>
+              <span className="rounded-full bg-border-light px-2.5 py-1 text-xs text-text-muted">
+                新規生成停止中
+              </span>
             </div>
             {trend ? (
               <div className="space-y-2">
@@ -259,7 +246,7 @@ export default function InsightsPage() {
               </div>
             ) : (
               <p className="text-sm text-text-secondary">
-                xAI のリアルタイム X 検索であなたの関心カテゴリの最新動向を取得します。「取得」を押すと生成されます。
+                トレンドの新規生成は停止中です。保存済みのトレンドがある場合だけここに表示されます。
               </p>
             )}
           </div>
